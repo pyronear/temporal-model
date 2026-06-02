@@ -3,24 +3,30 @@
 Monolithic repository for the Pyronear **temporal smoke classifier**:
 train it, evaluate it, and serve it behind an API.
 
-> Scaffold stage: directory structure and tooling only. The model, training,
-> evaluation, and inference logic are migrated from the existing temporal model
-> implementation in a later step.
+The model is a per-tube smoke classifier: a YOLO detector proposes boxes, boxes
+are linked into temporal tubes (greedy IoU), each tube's frames are cropped to
+224×224 patches and scored by a **ViT (DINOv2) backbone + transformer head**
+that emits one logit per tube. The repo is scoped to the production
+`vit_dinov2_finetune` model.
+
+> Status: `core` and `train` are implemented (migrated from the `vision-rd`
+> `bbox-tube-temporal` work). `eval` and `api` are still scaffold stubs.
 
 ## Packages
 
 Four independent packages, each with its own `pyproject.toml` and `tests/`.
 They share one PEP 420 namespace package, `temporal_model`.
 
-| Path | Distribution | Import | Purpose |
-|------|--------------|--------|---------|
-| `core/`  | `temporal-model-core`  | `temporal_model.core`  | Model, tube building, patch extraction, inference. |
-| `train/` | `temporal-model-train` | `temporal_model.train` | DVC training pipeline. Depends on `core`. |
-| `eval/`  | `temporal-model-eval`  | `temporal_model.eval`  | DVC evaluation pipeline. Depends on `core`. |
-| `api/`   | `temporal-model-api`   | `temporal_model.api`   | FastAPI serving layer, shipped as a Docker service. Depends on `core`. |
+| Path | Distribution | Import | Purpose | Status |
+|------|--------------|--------|---------|--------|
+| `core/`  | `temporal-model-core`  | `temporal_model.core`  | Model, tube building, patch extraction, inference, packaging. | implemented |
+| `train/` | `temporal-model-train` | `temporal_model.train` | DVC training pipeline. Depends on `core`. | implemented |
+| `eval/`  | `temporal-model-eval`  | `temporal_model.eval`  | DVC evaluation pipeline. Depends on `core`. | scaffold |
+| `api/`   | `temporal-model-api`   | `temporal_model.api`   | FastAPI serving layer, shipped as a Docker service. Depends on `core`. | scaffold |
 
 `train`/`eval`/`api` depend on `core` via a `uv` path source
-(`temporal-model-core = { path = "../core", editable = true }`).
+(`temporal-model-core = { path = "../core", editable = true }`). `core` and
+`train` pull in PyTorch / timm / ultralytics, so their first `uv sync` is large.
 
 ## Quick start
 
