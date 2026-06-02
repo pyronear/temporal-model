@@ -142,7 +142,7 @@ No other lines change. (`Frame` is imported only for the `build_record` type hin
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `cd eval && uv run pytest tests/test_protocol_eval.py -q; cd ..`
-Expected: all tests pass (12 tests).
+Expected: all tests pass (11 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -316,7 +316,7 @@ Run: `git rm eval/tests/test_smoke.py`
 - [ ] **Step 3: Run the full eval suite**
 
 Run: `cd eval && uv run pytest -q; cd ..`
-Expected: 22 tests pass (12 protocol_eval + 7 eval_plots + 3 driver), no errors.
+Expected: 21 tests pass (11 protocol_eval + 7 eval_plots + 3 driver), no errors.
 
 - [ ] **Step 4: Commit**
 
@@ -358,6 +358,11 @@ stages:
         - ../core/src/temporal_model/core/tubes.py
         - ../core/src/temporal_model/core/model_input.py
         - ../core/src/temporal_model/core/protocol.py
+        - ../core/src/temporal_model/core/types.py
+        - ../core/src/temporal_model/core/details_schema.py
+        - ../core/src/temporal_model/core/logistic_calibrator.py
+        - ../core/src/temporal_model/core/package.py
+        - ../core/src/temporal_model/core/temporal_classifier.py
         - data/06_models/vit_dinov2_finetune/model.zip
         - data/01_raw/datasets/${item}
       outs:
@@ -474,7 +479,7 @@ Expected: no lint errors; formatting clean. If `ruff format --check` reports dif
 - [ ] **Step 4: Run the full eval test suite once more**
 
 Run: `cd eval && uv run pytest -q; cd ..`
-Expected: 22 passed.
+Expected: 21 passed.
 
 - [ ] **Step 5: Confirm nothing else broke (core still green, since eval imports it)**
 
@@ -494,5 +499,5 @@ git commit -m "docs(eval): document packaged-eval pipeline; mark eval implemente
 
 - **Spec coverage:** modules (Tasks 2–4), tests (Tasks 2–4), dvc.yaml train+val + model.zip-as-external-input + params removal (Task 6), pyproject deps incl. pyyaml removal (Task 1), `__init__` cleanup + test_smoke removal (Task 5), CI unchanged + READMEs (Task 7). Non-goals (checkpoint eval, analyze/compare, multi-variant, leaderboard registry, FiftyOne) are not touched.
 - **Import-rewrite consistency:** `pyrocore` → `temporal_model.core.protocol`; `bbox_tube_temporal.data`/`.model` → `temporal_model.core.data`/`.model`; `bbox_tube_temporal_exp.{eval_plots,protocol_eval}` → `temporal_model.eval.{eval_plots,protocol_eval}`. Applied identically in modules and their tests.
-- **Test count:** 12 (protocol_eval) + 7 (eval_plots) + 3 (driver) = 22.
+- **Test count:** 11 (protocol_eval) + 7 (eval_plots) + 3 (driver) = 21.
 - **Symbols verified present in core:** `core.data.{list_sequences,is_wf_sequence,get_sorted_frames}`, `core.model.BboxTubeTemporalModel.{from_archive,predict}`, `core.protocol.{Frame,TemporalModelOutput,TemporalModel.load_sequence}`.

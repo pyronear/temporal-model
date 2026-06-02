@@ -101,6 +101,11 @@ stages:
         - ../core/src/temporal_model/core/tubes.py
         - ../core/src/temporal_model/core/model_input.py
         - ../core/src/temporal_model/core/protocol.py
+        - ../core/src/temporal_model/core/types.py
+        - ../core/src/temporal_model/core/details_schema.py
+        - ../core/src/temporal_model/core/logistic_calibrator.py
+        - ../core/src/temporal_model/core/package.py
+        - ../core/src/temporal_model/core/temporal_classifier.py
         - data/06_models/vit_dinov2_finetune/model.zip
         - data/01_raw/datasets/${item}
       outs:

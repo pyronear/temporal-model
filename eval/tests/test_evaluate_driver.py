@@ -1,4 +1,4 @@
-"""End-to-end smoke test for scripts/evaluate_packaged.py.
+"""End-to-end smoke test for temporal_model.eval.evaluate.
 
 Monkeypatches BboxTubeTemporalModel so the driver never touches YOLO
 or a real classifier — purely exercises the iteration / aggregation /
