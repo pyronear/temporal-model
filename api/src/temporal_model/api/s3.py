@@ -45,7 +45,10 @@ def fetch_frames(s3_client, bucket: str, keys: list[str], dest_dir: Path) -> lis
             if error_code in _NOT_FOUND_CODES:
                 raise FrameNotFound(f"frame not found: {key}") from exc
             raise S3Unavailable(f"S3 error fetching {key}: {error_code}") from exc
-        except botoexc.EndpointConnectionError as exc:
-            raise S3Unavailable(f"S3 endpoint unreachable: {exc}") from exc
+        except botoexc.BotoCoreError as exc:
+            # Covers connection/timeout/credential/param errors (the base class
+            # of EndpointConnectionError, ConnectTimeoutError, NoCredentialsError,
+            # ParamValidationError, ...). ClientError is not a BotoCoreError.
+            raise S3Unavailable(f"S3 error fetching {key}: {exc}") from exc
         paths.append(dst)
     return paths

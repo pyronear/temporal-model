@@ -162,3 +162,19 @@ def test_predict_model_not_loaded_503(client):
     r = client.post("/predict", json={"frames": KEYS})
     assert r.status_code == 503
     assert r.json()["code"] == "model_not_loaded"
+
+
+def test_predict_mapping_error_returns_coded_500(client):
+    # A response-mapping failure (malformed details) must surface as a coded
+    # error, not a bare 500 — to_response runs inside the error-handling scope.
+    bad = SimpleNamespace(is_positive=True, trigger_frame_index=0, details={})
+    client.app.state.runner = FakeRunner(output=bad)
+    r = client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 500
+    assert r.json()["code"] == "inference_error"
+
+
+def test_startup_fails_without_bucket(monkeypatch):
+    monkeypatch.setattr(settings, "s3_bucket", "")
+    with pytest.raises(RuntimeError), TestClient(app):
+        pass

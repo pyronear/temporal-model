@@ -59,3 +59,14 @@ def test_generic_client_error_raises_s3_unavailable(tmp_path):
 
     with pytest.raises(S3Unavailable):
         fetch_frames(_Boom(), "bucket", ["cam12/a.jpg"], tmp_path)
+
+
+def test_botocore_error_raises_s3_unavailable(tmp_path):
+    # A non-ClientError BotoCoreError (timeout, missing creds, param validation)
+    # must still map to S3Unavailable rather than escape uncaught.
+    class _Boom:
+        def download_file(self, *a, **k):
+            raise botoexc.NoCredentialsError()
+
+    with pytest.raises(S3Unavailable):
+        fetch_frames(_Boom(), "bucket", ["cam12/a.jpg"], tmp_path)
