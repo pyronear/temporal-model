@@ -9,9 +9,6 @@ are linked into temporal tubes (greedy IoU), each tube's frames are cropped to
 that emits one logit per tube. The repo is scoped to the production
 `vit_dinov2_finetune` model.
 
-> Status: all four packages — `core`, `train`, `api`, and `eval` — are
-> implemented (migrated from the `vision-rd` `bbox-tube-temporal` work).
-
 ## Packages
 
 Four independent packages, each with its own `pyproject.toml` and `tests/`.
