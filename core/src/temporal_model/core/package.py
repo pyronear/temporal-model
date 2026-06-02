@@ -153,7 +153,7 @@ def _build_classifier(classifier_cfg: dict[str, Any]) -> TemporalSmokeClassifier
         "finetune": classifier_cfg.get("finetune", False),
         "finetune_last_n_blocks": classifier_cfg.get("finetune_last_n_blocks", 0),
         "max_frames": classifier_cfg.get("max_frames", 20),
-        "global_pool": classifier_cfg.get("global_pool", "avg"),
+        "global_pool": classifier_cfg.get("global_pool", "token"),
     }
     for k in (
         "transformer_num_layers",
