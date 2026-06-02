@@ -109,6 +109,27 @@ def test_predict_verbose(client):
     assert r.status_code == 200
     assert body["details"]["preprocessing"]["num_tube_candidates"] == 2
     assert body["details"]["tubes"][0]["tube_id"] == 7
+    assert body["is_smoke"] is True
+    assert body["probability"] == 0.98
+    assert body["trigger_frame_index"] == 3
+    assert body["model"] == {"name": "bbox-tube-vit-dinov2", "version": "1.2.0"}
+    assert body["details"]["decision"] == {
+        "aggregation": "max_logit",
+        "threshold": 0.5,
+        "trigger_tube_id": 7,
+    }
+
+
+def test_health_unavailable(client):
+    client.app.state.runner = None
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert r.json() == {
+        "status": "unavailable",
+        "model_loaded": False,
+        "model_name": None,
+        "model_version": None,
+    }
 
 
 def test_predict_empty_frames_400(client):
