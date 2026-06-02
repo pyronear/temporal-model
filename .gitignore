@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# DVC data layers — keep the directory structure, ignore the contents
+**/data/**
+!**/data/**/
+!**/data/**/.gitkeep
+**/.dvc/cache
+**/.dvc/tmp
+
+# API model artifacts mounted at runtime
+api/models/
+
+# OS
+.DS_Store
