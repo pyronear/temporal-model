@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "temporal-model-core"
+version = "0.1.0"
+description = "Core model, tube building, and inference for the bbox-tube temporal smoke classifier"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26,<2",
+    "pydantic>=2.6",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/temporal_model"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.9",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B", "SIM", "PLC0415"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["temporal_model"]
+
+[tool.ruff.format]
+quote-style = "double"
