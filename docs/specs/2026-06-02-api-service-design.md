@@ -128,6 +128,13 @@ number in `[0, 1]`:
 - when `is_smoke` is `false` → the **highest** kept-tube probability (the
   strongest sub-threshold evidence), or `0.0` when no tubes were kept.
 
+The "no tube found" outcome (`probability` `0.0`, `is_smoke` `false`) is *not*
+separately flagged in the default response — it is distinguishable from a
+tracked-but-low-scoring tube only via `?verbose=true` (`num_tube_candidates: 0`
+and an empty `tubes` list). A default-level tube count was considered and
+rejected (YAGNI): the lean default carries the verdict only, and consumers
+needing the distinction request `details`.
+
 **Verbose response** — `POST /predict?verbose=true` (`verbose` defaults to
 `false`) returns the same top-level fields plus a `details` block:
 
