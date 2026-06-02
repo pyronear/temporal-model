@@ -47,3 +47,15 @@ def test_endpoint_failure_raises_s3_unavailable(tmp_path, monkeypatch):
 
     with pytest.raises(S3Unavailable):
         fetch_frames(_Boom(), BUCKET, ["cam12/a.jpg"], tmp_path)
+
+
+def test_generic_client_error_raises_s3_unavailable(tmp_path):
+    class _Boom:
+        def download_file(self, *a, **k):
+            raise botoexc.ClientError(
+                {"Error": {"Code": "AccessDenied", "Message": "nope"}},
+                "GetObject",
+            )
+
+    with pytest.raises(S3Unavailable):
+        fetch_frames(_Boom(), "bucket", ["cam12/a.jpg"], tmp_path)
