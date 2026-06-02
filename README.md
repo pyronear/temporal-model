@@ -6,8 +6,8 @@ train it, evaluate it, and serve it behind an API.
 The model is a per-tube smoke classifier: a YOLO detector proposes boxes, boxes
 are linked into temporal tubes (greedy IoU), each tube's frames are cropped to
 224×224 patches and scored by a **ViT (DINOv2) backbone + transformer head**
-that emits one logit per tube. The repo is scoped to the production
-`vit_dinov2_finetune` model.
+that emits one logit per tube. The repo is scoped to this single production
+model rather than a research sweep of architectures.
 
 ## Packages
 
