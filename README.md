@@ -1,4 +1,4 @@
-# temporal-model
+# 🕐🔥 temporal-model
 
 Monolithic repository for the Pyronear **temporal smoke classifier**:
 train it, evaluate it, and serve it behind an API.
