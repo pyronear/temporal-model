@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "temporal-model-eval"
 version = "0.1.0"
-description = "DVC evaluation pipeline for the bbox-tube temporal smoke classifier"
+description = "DVC evaluation pipeline for the temporal smoke classifier"
 requires-python = ">=3.11"
 dependencies = [
     "temporal-model-core",

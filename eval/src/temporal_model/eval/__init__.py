@@ -1,1 +1,1 @@
-"""Evaluation pipeline for the bbox-tube temporal smoke classifier (scaffold stub)."""
+"""Evaluation pipeline for the temporal smoke classifier (scaffold stub)."""

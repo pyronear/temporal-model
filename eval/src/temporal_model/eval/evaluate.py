@@ -8,11 +8,9 @@ import argparse
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Evaluate the bbox-tube temporal smoke classifier."
+        description="Evaluate the temporal smoke classifier."
     )
-    parser.add_argument(
-        "--params", default="params.yaml", help="Path to params.yaml"
-    )
+    parser.add_argument("--params", default="params.yaml", help="Path to params.yaml")
     parser.parse_args()
     raise SystemExit("temporal-eval: not implemented yet (scaffold stub)")
 

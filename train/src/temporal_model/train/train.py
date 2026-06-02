@@ -7,12 +7,8 @@ import argparse
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Train the bbox-tube temporal smoke classifier."
-    )
-    parser.add_argument(
-        "--params", default="params.yaml", help="Path to params.yaml"
-    )
+    parser = argparse.ArgumentParser(description="Train the temporal smoke classifier.")
+    parser.add_argument("--params", default="params.yaml", help="Path to params.yaml")
     parser.parse_args()
     raise SystemExit("temporal-train: not implemented yet (scaffold stub)")
 

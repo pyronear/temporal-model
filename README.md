@@ -1,12 +1,11 @@
 # temporal-model
 
-Monolithic repository for the Pyronear **bbox-tube temporal smoke classifier**:
+Monolithic repository for the Pyronear **temporal smoke classifier**:
 train it, evaluate it, and serve it behind an API.
 
 > Scaffold stage: directory structure and tooling only. The model, training,
-> evaluation, and inference logic are migrated from
-> `vision-rd/lib/bbox-tube-temporal` and the bbox-tube-temporal experiment in a
-> later step.
+> evaluation, and inference logic are migrated from the existing temporal model
+> implementation in a later step.
 
 ## Packages
 
