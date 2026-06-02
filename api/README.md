@@ -21,6 +21,10 @@ make serve                  # local dev, http://localhost:8000
 docker compose up --build   # API + MinIO (S3) locally
 ```
 
+Place a `model.zip` under `api/models/` before `docker compose up` — the
+container mounts `./models:/models` and loads `/models/model.zip`. Without it
+the service starts but `/health` reports `model_loaded: false`.
+
 Configuration via env vars (prefix `TEMPORAL_API_`): `MODEL_PATH`, `DEVICE`,
 `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT_URL` (empty = real AWS; set for OVH or
 MinIO), `HOST`, `PORT`. AWS/OVH/MinIO credentials come from the standard boto3
