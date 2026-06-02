@@ -9,8 +9,6 @@ Also exposes :func:`render_batch_grid` for standalone use (e.g. from a
 notebook or from ``scripts/visualize_augment.py``).
 """
 
-from __future__ import annotations
-
 import os
 
 os.environ.setdefault("MPLBACKEND", "Agg")

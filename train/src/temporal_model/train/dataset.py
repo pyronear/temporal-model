@@ -4,8 +4,6 @@ Reads cropped PNG patches produced by ``scripts/build_model_input.py``
 and returns per-tube tensors padded to a fixed length with a mask.
 """
 
-from __future__ import annotations
-
 import json
 from collections.abc import Callable
 from pathlib import Path

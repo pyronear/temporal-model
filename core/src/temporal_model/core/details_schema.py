@@ -8,8 +8,6 @@ Consumers that want typed access parse with
 See ``docs/specs/2026-04-17-details-schema-redesign.md``.
 """
 
-from __future__ import annotations
-
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict

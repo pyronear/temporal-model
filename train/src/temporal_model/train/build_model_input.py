@@ -38,7 +38,9 @@ def _process_one(
             patch_size=patch_size,
         )
         return sequence_id, label, None
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
+        # Worker boundary: one bad tube returns an error tuple instead of
+        # killing the whole ProcessPoolExecutor.
         return None, "", f"{tube_path.name}: {exc}"
 
 

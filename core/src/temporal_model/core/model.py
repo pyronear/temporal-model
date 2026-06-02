@@ -4,8 +4,6 @@ Wires the YOLO companion + tube building + patch cropping + the trained
 temporal classifier into the :class:`TemporalModel` contract.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Any, Self
 

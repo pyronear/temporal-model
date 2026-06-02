@@ -3,8 +3,6 @@
 See ``docs/specs/2026-04-14-training-augmentation-design.md`` for design.
 """
 
-from __future__ import annotations
-
 from collections.abc import Callable
 
 import torch
@@ -109,8 +107,7 @@ class TemporalTubeTransform:
     """Sub-sequence sampling + random stride + per-frame drop with re-compaction.
 
     Operates on ``(patches: [T, 3, H, W], mask: [T])``. Output valid frames
-    always occupy positions ``[0..k-1]`` so ``pack_padded_sequence`` (used by
-    the GRU head) sees a contiguous valid prefix.
+    always occupy positions ``[0..k-1]`` (a contiguous valid prefix).
     """
 
     def __init__(
