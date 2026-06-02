@@ -11,7 +11,6 @@ that emits one logit per tube.
 ## Packages
 
 Four independent packages, each with its own `pyproject.toml` and `tests/`.
-They share one PEP 420 namespace package, `temporal_model`.
 
 | Path | Import | Purpose |
 |------|--------|---------|
