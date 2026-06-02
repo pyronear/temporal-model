@@ -1,25 +1,78 @@
-# Training pipeline parameters. Scaffold skeleton — values are placeholders.
+# Keys prefixed with `_` are shared defaults consumed via YAML merge keys
+# (`<<: *anchor`). They are NOT DVC stage parameters — no dvc.yaml stage lists
+# them under `params:`, so stage hashing ignores them.
+#
+# Caveat: `dvc exp run -S train_vit_dinov2_finetune.seed=100` rewrites this file
+# and would materialize the merged dict (losing the anchor). That's fine for
+# one-off experiments; to keep anchors intact, edit params.yaml by hand.
+
 truncate:
   max_frames: 20
 
 tubes:
   iou_threshold: 0.2
   max_misses: 2
+  # Post-build merge thresholds. When all three are present, the build_tubes
+  # stage runs the merge. Set any to `null` to disable the merge (reverts to
+  # legacy behavior).
+  merge_iomin: 0.3
+  merge_prox_factor: 1.0
+  merge_max_gap: 10
 
 build_tubes:
   min_tube_length: 4
+  min_detected_entries: 2
 
 model_input:
   context_factor: 1.5
   patch_size: 224
 
-train:
-  seed: 42
-  backbone: resnet18
-  head: gru
-  learning_rate: 1.0e-3
-  batch_size: 16
+_train_defaults: &train_defaults
+  max_frames: 20
+  batch_size: 32
+  num_workers: 4
+  learning_rate: 0.001
+  weight_decay: 0.01
   max_epochs: 30
+  early_stop_patience: 5
+  seed: 42
+
+_vit_defaults: &vit_defaults
+  <<: *train_defaults
+  batch_size: 16
+  learning_rate: 0.0001
+  weight_decay: 0.05
+  max_epochs: 30
+  global_pool: token
+  img_size: 224
+  transformer_num_layers: 2
+  transformer_num_heads: 6
+  transformer_ffn_dim: 1536
+  transformer_dropout: 0.1
+  use_cosine_warmup: true
+  warmup_frac: 0.05
+
+train_vit_dinov2_finetune:
+  <<: *vit_defaults
+  backbone: vit_small_patch14_dinov2.lvd142m
+  finetune: true
+  finetune_last_n_blocks: 1
+  backbone_lr: 0.00001
 
 augment:
-  flip_prob: 0.5
+  enabled: true
+  spatial:
+    flip_prob: 0.5
+    rotation_deg: 5.0
+    scale_range: [0.9, 1.1]
+    translate_frac: 0.05
+  photometric:
+    brightness_range: [0.8, 1.2]
+    contrast_range: [0.8, 1.2]
+    saturation_range: [0.8, 1.2]
+  temporal:
+    subseq_prob: 0.5
+    subseq_min_len: 4
+    stride_prob: 0.25
+    frame_drop_prob: 0.15
+    min_valid_after_drop: 4
