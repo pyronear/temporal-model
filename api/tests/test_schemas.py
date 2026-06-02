@@ -94,6 +94,14 @@ def test_uncalibrated_probability_is_null():
     assert resp.probability is None
 
 
+def test_smoke_trigger_tube_missing_returns_none():
+    details = _details([_tube(7, 0.98)])
+    details["decision"]["trigger_tube_id"] = 999  # not among kept tubes
+    out = SimpleNamespace(is_positive=True, trigger_frame_index=3, details=details)
+    resp = to_response(out, name="m", version="1.2.0", calibrated=True, verbose=False)
+    assert resp.probability is None
+
+
 def test_verbose_adds_details_block():
     out = SimpleNamespace(
         is_positive=True, trigger_frame_index=3, details=_details([_tube(7, 0.98)])
