@@ -39,3 +39,11 @@ known-first-party = ["temporal_model"]
 
 [tool.ruff.format]
 quote-style = "double"
+
+[tool.pytest.ini_options]
+# starlette's TestClient opportunistically prefers the new `httpx2` package and
+# warns when falling back to `httpx`. We intentionally stay on `httpx` (the dep
+# starlette and fastapi officially declare), so silence that nudge.
+filterwarnings = [
+    "ignore::starlette.exceptions.StarletteDeprecationWarning",
+]
