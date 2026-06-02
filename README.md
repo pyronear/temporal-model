@@ -13,12 +13,12 @@ that emits one logit per tube.
 Four independent packages, each with its own `pyproject.toml` and `tests/`.
 They share one PEP 420 namespace package, `temporal_model`.
 
-| Path | Distribution | Import | Purpose |
-|------|--------------|--------|---------|
-| `core/`  | `temporal-model-core`  | `temporal_model.core`  | Model, tube building, patch extraction, inference, packaging. |
-| `train/` | `temporal-model-train` | `temporal_model.train` | DVC training pipeline. Depends on `core`. |
-| `eval/`  | `temporal-model-eval`  | `temporal_model.eval`  | DVC evaluation pipeline (packaged-model protocol metrics). Depends on `core`. |
-| `api/`   | `temporal-model-api`   | `temporal_model.api`   | FastAPI serving layer, shipped as a Docker service. Depends on `core`. |
+| Path | Import | Purpose |
+|------|--------|---------|
+| `core/`  | `temporal_model.core`  | Model, tube building, patch extraction, inference, packaging. |
+| `train/` | `temporal_model.train` | DVC training pipeline. Depends on `core`. |
+| `eval/`  | `temporal_model.eval`  | DVC evaluation pipeline (packaged-model protocol metrics). Depends on `core`. |
+| `api/`   | `temporal_model.api`   | FastAPI serving layer, shipped as a Docker service. Depends on `core`. |
 
 `train`/`eval`/`api` depend on `core` via a `uv` path source
 (`temporal-model-core = { path = "../core", editable = true }`). `core` and
