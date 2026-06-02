@@ -39,3 +39,11 @@ Per package, `cd <pkg> && make install|lint|format|test`.
 cd api
 docker compose up --build      # serves http://localhost:8000 (GET /health)
 ```
+
+## Origin
+
+Ported from the Pyronear [`vision-rd`](https://github.com/pyronear/vision-rd)
+research repo's `bbox-tube-temporal` work:
+
+- `core/` — from [`lib/bbox-tube-temporal`](https://github.com/pyronear/vision-rd/tree/main/lib/bbox-tube-temporal)
+- `train/` and `eval/` — from [`experiments/temporal-models/bbox-tube-temporal`](https://github.com/pyronear/vision-rd/tree/main/experiments/temporal-models/bbox-tube-temporal)
