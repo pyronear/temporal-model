@@ -1,0 +1,4 @@
+stages:
+  noop:
+    desc: "Placeholder stage — replace with the real evaluation pipeline on migration."
+    cmd: echo "TODO: implement evaluate -> evaluate_packaged -> compare_variants stages"

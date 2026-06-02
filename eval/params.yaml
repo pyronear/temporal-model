@@ -1,0 +1,7 @@
+# Evaluation pipeline parameters. Scaffold skeleton — values are placeholders.
+evaluate:
+  threshold: 0.5
+  target_recall: 0.95
+
+protocol:
+  aggregation: max_logit

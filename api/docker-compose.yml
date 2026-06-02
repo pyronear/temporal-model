@@ -1,0 +1,11 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: api/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - TEMPORAL_API_MODEL_PATH=/models/model.zip
+    volumes:
+      - ./models:/models

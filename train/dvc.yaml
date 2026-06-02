@@ -1,0 +1,4 @@
+stages:
+  noop:
+    desc: "Placeholder stage — replace with the real training pipeline on migration."
+    cmd: echo "TODO: implement truncate -> build_tubes -> build_model_input -> train stages"

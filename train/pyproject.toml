@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "temporal-model-train"
+version = "0.1.0"
+description = "DVC training pipeline for the temporal smoke classifier"
+requires-python = ">=3.11"
+dependencies = [
+    "temporal-model-core",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+temporal-train = "temporal_model.train.train:main"
+
+[tool.uv.sources]
+temporal-model-core = { path = "../core", editable = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/temporal_model"]
+
+[dependency-groups]
+dev = [
+    "dvc>=3.56",
+    "pytest>=8.0",
+    "ruff>=0.9",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B", "SIM", "PLC0415"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["temporal_model"]
+
+[tool.ruff.format]
+quote-style = "double"
