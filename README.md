@@ -9,8 +9,8 @@ are linked into temporal tubes (greedy IoU), each tube's frames are cropped to
 that emits one logit per tube. The repo is scoped to the production
 `vit_dinov2_finetune` model.
 
-> Status: `core`, `train`, and `api` are implemented (migrated from the
-> `vision-rd` `bbox-tube-temporal` work). `eval` is still a scaffold stub.
+> Status: all four packages — `core`, `train`, `api`, and `eval` — are
+> implemented (migrated from the `vision-rd` `bbox-tube-temporal` work).
 
 ## Packages
 
@@ -21,7 +21,7 @@ They share one PEP 420 namespace package, `temporal_model`.
 |------|--------------|--------|---------|--------|
 | `core/`  | `temporal-model-core`  | `temporal_model.core`  | Model, tube building, patch extraction, inference, packaging. | implemented |
 | `train/` | `temporal-model-train` | `temporal_model.train` | DVC training pipeline. Depends on `core`. | implemented |
-| `eval/`  | `temporal-model-eval`  | `temporal_model.eval`  | DVC evaluation pipeline. Depends on `core`. | scaffold |
+| `eval/`  | `temporal-model-eval`  | `temporal_model.eval`  | DVC evaluation pipeline (packaged-model protocol metrics). Depends on `core`. | implemented |
 | `api/`   | `temporal-model-api`   | `temporal_model.api`   | FastAPI serving layer, shipped as a Docker service. Depends on `core`. | implemented |
 
 `train`/`eval`/`api` depend on `core` via a `uv` path source
