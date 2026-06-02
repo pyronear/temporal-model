@@ -1,4 +1,4 @@
-# temporal-model
+# 🕐🔥 temporal-model
 
 Monolithic repository for the Pyronear **temporal smoke classifier**:
 train it, evaluate it, and serve it behind an API.
@@ -6,23 +6,18 @@ train it, evaluate it, and serve it behind an API.
 The model is a per-tube smoke classifier: a YOLO detector proposes boxes, boxes
 are linked into temporal tubes (greedy IoU), each tube's frames are cropped to
 224×224 patches and scored by a **ViT (DINOv2) backbone + transformer head**
-that emits one logit per tube. The repo is scoped to the production
-`vit_dinov2_finetune` model.
-
-> Status: `core` and `train` are implemented (migrated from the `vision-rd`
-> `bbox-tube-temporal` work). `eval` and `api` are still scaffold stubs.
+that emits one logit per tube.
 
 ## Packages
 
 Four independent packages, each with its own `pyproject.toml` and `tests/`.
-They share one PEP 420 namespace package, `temporal_model`.
 
-| Path | Distribution | Import | Purpose | Status |
-|------|--------------|--------|---------|--------|
-| `core/`  | `temporal-model-core`  | `temporal_model.core`  | Model, tube building, patch extraction, inference, packaging. | implemented |
-| `train/` | `temporal-model-train` | `temporal_model.train` | DVC training pipeline. Depends on `core`. | implemented |
-| `eval/`  | `temporal-model-eval`  | `temporal_model.eval`  | DVC evaluation pipeline. Depends on `core`. | scaffold |
-| `api/`   | `temporal-model-api`   | `temporal_model.api`   | FastAPI serving layer, shipped as a Docker service. Depends on `core`. | scaffold |
+| Path | Import | Purpose |
+|------|--------|---------|
+| `core/`  | `temporal_model.core`  | Model, tube building, patch extraction, inference, packaging. |
+| `train/` | `temporal_model.train` | DVC training pipeline. Depends on `core`. |
+| `eval/`  | `temporal_model.eval`  | DVC evaluation pipeline (packaged-model protocol metrics). Depends on `core`. |
+| `api/`   | `temporal_model.api`   | FastAPI serving layer, shipped as a Docker service. Depends on `core`. |
 
 `train`/`eval`/`api` depend on `core` via a `uv` path source
 (`temporal-model-core = { path = "../core", editable = true }`). `core` and
@@ -44,3 +39,11 @@ Per package, `cd <pkg> && make install|lint|format|test`.
 cd api
 docker compose up --build      # serves http://localhost:8000 (GET /health)
 ```
+
+## Origin
+
+Ported from the Pyronear [`vision-rd`](https://github.com/pyronear/vision-rd)
+research repo's `bbox-tube-temporal` work:
+
+- `core/` — from [`lib/bbox-tube-temporal`](https://github.com/pyronear/vision-rd/tree/main/lib/bbox-tube-temporal)
+- `train/` and `eval/` — from [`experiments/temporal-models/bbox-tube-temporal`](https://github.com/pyronear/vision-rd/tree/main/experiments/temporal-models/bbox-tube-temporal)

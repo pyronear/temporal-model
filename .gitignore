@@ -9,6 +9,8 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 .ipynb_checkpoints/
+# Model weights extracted from a packaged model.zip at load time (core.from_archive)
+.cache/
 
 # DVC data layers — keep the directory structure, ignore the contents
 **/data/**
