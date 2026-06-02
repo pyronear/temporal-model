@@ -1,4 +1,95 @@
 stages:
-  noop:
-    desc: "Placeholder stage — replace with the real training pipeline on migration."
-    cmd: echo "TODO: implement truncate -> build_tubes -> build_model_input -> train stages"
+  truncate:
+    foreach:
+      - train
+      - val
+    do:
+      cmd: >-
+        uv run python -m temporal_model.train.truncate
+        --input-dir data/01_raw/datasets_full/${item}
+        --output-dir data/01_raw/datasets/${item}
+        --max-frames ${truncate.max_frames}
+      deps:
+        - src/temporal_model/train/truncate.py
+        - data/01_raw/datasets_full/${item}
+      params:
+        - truncate.max_frames
+      outs:
+        - data/01_raw/datasets/${item}
+
+  build_tubes:
+    foreach:
+      - train
+      - val
+    do:
+      cmd: >-
+        uv run python -m temporal_model.train.build_tubes
+        --input-dir data/01_raw/datasets/${item}
+        --output-dir data/03_primary/tubes/${item}
+        --iou-threshold ${tubes.iou_threshold}
+        --max-misses ${tubes.max_misses}
+        --min-tube-length ${build_tubes.min_tube_length}
+        --min-detected-entries ${build_tubes.min_detected_entries}
+        --merge-iomin ${tubes.merge_iomin}
+        --merge-prox-factor ${tubes.merge_prox_factor}
+        --merge-max-gap ${tubes.merge_max_gap}
+      deps:
+        - src/temporal_model/train/build_tubes.py
+        - ../core/src/temporal_model/core/tubes.py
+        - ../core/src/temporal_model/core/data.py
+        - ../core/src/temporal_model/core/types.py
+        - data/01_raw/datasets/${item}
+      params:
+        - tubes
+        - build_tubes
+      outs:
+        - data/03_primary/tubes/${item}
+
+  build_model_input:
+    foreach:
+      - train
+      - val
+    do:
+      cmd: >-
+        uv run python -m temporal_model.train.build_model_input
+        --tubes-dir data/03_primary/tubes/${item}
+        --raw-dir data/01_raw/datasets/${item}
+        --output-dir data/05_model_input/${item}
+        --context-factor ${model_input.context_factor}
+        --patch-size ${model_input.patch_size}
+      deps:
+        - src/temporal_model/train/build_model_input.py
+        - ../core/src/temporal_model/core/model_input.py
+        - data/03_primary/tubes/${item}
+        - data/01_raw/datasets/${item}
+      params:
+        - model_input
+      outs:
+        - data/05_model_input/${item}
+
+  train:
+    cmd: >-
+      uv run python -m temporal_model.train.train
+      --train-dir data/05_model_input/train
+      --val-dir data/05_model_input/val
+      --output-dir data/06_models/vit_dinov2_finetune
+      --params-path params.yaml
+      --params-key train_vit_dinov2_finetune
+    deps:
+      - src/temporal_model/train/train.py
+      - src/temporal_model/train/augment.py
+      - src/temporal_model/train/dataset.py
+      - src/temporal_model/train/lit_temporal.py
+      - src/temporal_model/train/training_plots.py
+      - src/temporal_model/train/batch_samples.py
+      - ../core/src/temporal_model/core/temporal_classifier.py
+      - data/05_model_input/train
+      - data/05_model_input/val
+    params:
+      - train_vit_dinov2_finetune
+      - augment
+    outs:
+      - data/06_models/vit_dinov2_finetune/best_checkpoint.pt
+      - data/06_models/vit_dinov2_finetune/csv_logs/
+    plots:
+      - data/06_models/vit_dinov2_finetune/plots/training_curves.png

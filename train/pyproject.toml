@@ -10,6 +10,15 @@ requires-python = ">=3.11"
 dependencies = [
     "temporal-model-core",
     "pyyaml>=6.0",
+    "torch>=2.2",
+    "torchvision>=0.17",
+    "timm>=1.0",
+    "lightning>=2.2",
+    "matplotlib>=3.8",
+    "pandas>=2.0",
+    "numpy>=1.26,<2",
+    "tensorboard>=2.16",
+    "pydantic>=2.6",
 ]
 
 [project.scripts]

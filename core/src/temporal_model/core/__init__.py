@@ -1,5 +1,12 @@
-"""Core model, tube-building, and inference for the temporal smoke classifier.
+"""Core model, tube-building, and inference for the temporal smoke classifier."""
 
-Scaffold stub. Implementations are migrated from
-the existing implementation in a later step.
-"""
+from .protocol import Frame, TemporalModel, TemporalModelOutput
+from .tubes import build_tubes, merge_colocated_tubes
+
+__all__ = [
+    "Frame",
+    "TemporalModel",
+    "TemporalModelOutput",
+    "build_tubes",
+    "merge_colocated_tubes",
+]
