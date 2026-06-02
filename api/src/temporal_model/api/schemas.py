@@ -7,7 +7,7 @@ block. ``details`` is only set when verbose, so the route serializes with
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class PredictRequest(BaseModel):
@@ -26,7 +26,12 @@ class PredictRequest(BaseModel):
 
 class FrameEntry(BaseModel):
     frame_idx: int
-    bbox: tuple[float, float, float, float] | None
+    bbox: tuple[float, float, float, float] | None = Field(
+        description=(
+            "Detection box as (cx, cy, w, h) normalized to [0, 1] "
+            "(YOLO xywhn convention); null on a gap frame."
+        ),
+    )
     is_gap: bool
     confidence: float | None
 

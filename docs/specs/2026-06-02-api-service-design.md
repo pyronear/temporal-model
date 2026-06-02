@@ -45,8 +45,8 @@ Established facts from the `vision-rd` source that constrain this design:
   - `tubes`: `num_candidates`, `kept: [KeptTube]`
     - `KeptTube`: `tube_id`, `start_frame`, `end_frame`, `logit`, `probability`
       (`None` if uncalibrated), `first_crossing_frame`, `entries: [TubeEntry]`
-    - `TubeEntry`: `frame_idx`, `bbox: (x1,y1,x2,y2) | None`, `is_gap`,
-      `confidence`
+    - `TubeEntry`: `frame_idx`, `bbox: (cx,cy,w,h) normalized to [0,1] | None`,
+      `is_gap`, `confidence`
   - `decision`: `aggregation` (`"max_logit" | "logistic"`), `threshold`,
     `trigger_tube_id`
 - **Critical model contract:** the model parses **timestamps from frame
@@ -166,8 +166,8 @@ needing the distinction request `details`.
         "probability": 0.98,
         "first_crossing_frame": 3,
         "entries": [
-          { "frame_idx": 2, "bbox": [12.0, 40.0, 88.0, 130.0], "is_gap": false, "confidence": 0.81 },
-          { "frame_idx": 3, "bbox": null,                       "is_gap": true,  "confidence": null }
+          { "frame_idx": 2, "bbox": [0.693, 0.504, 0.0083, 0.0148], "is_gap": false, "confidence": 0.81 },
+          { "frame_idx": 3, "bbox": null,                           "is_gap": true,  "confidence": null }
         ]
       }
     ]
@@ -180,8 +180,8 @@ needing the distinction request `details`.
 - `details.preprocessing` ← `BboxTubeDetails.preprocessing`, with
   `num_tube_candidates` ← `BboxTubeDetails.tubes.num_candidates`
 - `details.tubes` ← `BboxTubeDetails.tubes.kept` (per-tube `probability` is
-  `null` when uncalibrated; `bbox` is `[x1,y1,x2,y2]` pixel floats or `null` on a
-  gap frame)
+  `null` when uncalibrated; `bbox` is `(cx, cy, w, h)` normalized to `[0, 1]`
+  (YOLO `xywhn` convention), or `null` on a gap frame)
 
 ### `GET /health`
 
