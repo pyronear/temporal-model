@@ -6,6 +6,7 @@ settings / the boto3 chain — never from the request.
 """
 
 from pathlib import Path
+from typing import Any
 
 import boto3
 import botocore.exceptions as botoexc
@@ -16,7 +17,7 @@ from .settings import Settings
 _NOT_FOUND_CODES = {"404", "NoSuchKey", "NoSuchBucket"}
 
 
-def make_s3_client(settings: Settings):
+def make_s3_client(settings: Settings) -> Any:
     """Build a boto3 S3 client. ``endpoint_url`` empty → real AWS."""
     return boto3.client(
         "s3",

@@ -26,9 +26,10 @@ def test_fetch_preserves_order_and_basenames(tmp_path):
         "adf_2023-05-23T17-18-01.jpg",
         "adf_2023-05-23T17-18-31.jpg",
     ]
-    assert all(p.exists() and p.read_bytes() for p in paths)
-    # order is preserved exactly as requested
-    assert paths == sorted(paths, key=lambda p: p.parent.name)
+    assert all(p.read_bytes() == b"\xff\xd8\xff\xe0jpegbytes" for p in paths)
+    for i, (path, key) in enumerate(zip(paths, KEYS, strict=True)):
+        assert path.parent.name == f"{i:04d}"
+        assert path.name == key.rsplit("/", 1)[-1]
 
 
 @mock_aws
