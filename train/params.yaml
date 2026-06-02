@@ -1,0 +1,25 @@
+# Training pipeline parameters. Scaffold skeleton — values are placeholders.
+truncate:
+  max_frames: 20
+
+tubes:
+  iou_threshold: 0.2
+  max_misses: 2
+
+build_tubes:
+  min_tube_length: 4
+
+model_input:
+  context_factor: 1.5
+  patch_size: 224
+
+train:
+  seed: 42
+  backbone: resnet18
+  head: gru
+  learning_rate: 1.0e-3
+  batch_size: 16
+  max_epochs: 30
+
+augment:
+  flip_prob: 0.5
