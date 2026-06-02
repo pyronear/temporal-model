@@ -1,4 +1,37 @@
 stages:
-  noop:
-    desc: "Placeholder stage — replace with the real evaluation pipeline on migration."
-    cmd: echo "TODO: implement evaluate -> evaluate_packaged -> compare_variants stages"
+  evaluate:
+    foreach:
+      - train
+      - val
+    do:
+      cmd: >-
+        uv run python -m temporal_model.eval.evaluate
+        --model-zip data/06_models/vit_dinov2_finetune/model.zip
+        --sequences-dir data/01_raw/datasets/${item}
+        --output-dir data/08_reporting/${item}/vit_dinov2_finetune
+        --model-name vit_dinov2_finetune-${item}
+      deps:
+        - src/temporal_model/eval/evaluate.py
+        - src/temporal_model/eval/protocol_eval.py
+        - src/temporal_model/eval/eval_plots.py
+        - ../core/src/temporal_model/core/data.py
+        - ../core/src/temporal_model/core/model.py
+        - ../core/src/temporal_model/core/inference.py
+        - ../core/src/temporal_model/core/tubes.py
+        - ../core/src/temporal_model/core/model_input.py
+        - ../core/src/temporal_model/core/protocol.py
+        - data/06_models/vit_dinov2_finetune/model.zip
+        - data/01_raw/datasets/${item}
+      outs:
+        - data/08_reporting/${item}/vit_dinov2_finetune/predictions.json:
+            cache: false
+        - data/08_reporting/${item}/vit_dinov2_finetune/dropped.json:
+            cache: false
+      metrics:
+        - data/08_reporting/${item}/vit_dinov2_finetune/metrics.json:
+            cache: false
+      plots:
+        - data/08_reporting/${item}/vit_dinov2_finetune/pr_curve.png
+        - data/08_reporting/${item}/vit_dinov2_finetune/roc_curve.png
+        - data/08_reporting/${item}/vit_dinov2_finetune/confusion_matrix.png
+        - data/08_reporting/${item}/vit_dinov2_finetune/confusion_matrix_normalized.png
