@@ -10,6 +10,12 @@ class Settings(BaseSettings):
     )
 
     model_path: str = "/models/model.zip"
+    device: str | None = None
+
+    s3_bucket: str = ""
+    s3_region: str | None = None
+    s3_endpoint_url: str | None = None
+
     host: str = "0.0.0.0"
     port: int = 8000
 

@@ -1,16 +1,180 @@
+from types import SimpleNamespace
+
+import boto3
+import pytest
 from fastapi.testclient import TestClient
+from moto import mock_aws
 
 from temporal_model.api.app import app
+from temporal_model.api.settings import settings
 
-client = TestClient(app)
-
-
-def test_health_ok():
-    response = client.get("/health")
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+BUCKET = "frames"
+KEYS = ["cam12/adf_2023-05-23T17-18-01.jpg", "cam12/adf_2023-05-23T17-18-31.jpg"]
 
 
-def test_predict_stub_returns_501():
-    response = client.post("/predict", json={"frame_paths": []})
-    assert response.status_code == 501
+def _details(kept, trigger):
+    return {
+        "decision": {
+            "aggregation": "max_logit",
+            "threshold": 0.5,
+            "trigger_tube_id": trigger,
+        },
+        "preprocessing": {
+            "num_frames_input": 30,
+            "num_truncated": 0,
+            "padded_frame_indices": [],
+        },
+        "tubes": {"num_candidates": 2, "kept": kept},
+    }
+
+
+def _smoke_output():
+    kept = [
+        {
+            "tube_id": 7,
+            "start_frame": 2,
+            "end_frame": 12,
+            "logit": 3.4,
+            "probability": 0.98,
+            "first_crossing_frame": 3,
+            "entries": [
+                {
+                    "frame_idx": 2,
+                    "bbox": [1.0, 2.0, 3.0, 4.0],
+                    "is_gap": False,
+                    "confidence": 0.8,
+                }
+            ],
+        }
+    ]
+    return SimpleNamespace(
+        is_positive=True, trigger_frame_index=3, details=_details(kept, 7)
+    )
+
+
+class FakeRunner:
+    name = "bbox-tube-vit-dinov2"
+    version = "1.2.0"
+    calibrated = True
+
+    def __init__(self, output=None, error=None):
+        self._output = output
+        self._error = error
+
+    async def predict(self, paths):
+        if self._error:
+            raise self._error
+        return self._output
+
+
+@pytest.fixture
+def client(monkeypatch):
+    monkeypatch.setattr(settings, "s3_bucket", BUCKET)
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="us-east-1")
+        s3.create_bucket(Bucket=BUCKET)
+        for key in KEYS:
+            s3.put_object(Bucket=BUCKET, Key=key, Body=b"\xff\xd8\xff\xe0jpeg")
+        with TestClient(app) as c:
+            c.app.state.s3_client = s3
+            c.app.state.runner = FakeRunner(output=_smoke_output())
+            yield c
+
+
+def test_health_loaded(client):
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert r.json() == {
+        "status": "ok",
+        "model_loaded": True,
+        "model_name": "bbox-tube-vit-dinov2",
+        "model_version": "1.2.0",
+    }
+
+
+def test_predict_default(client):
+    r = client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 200
+    assert r.json() == {
+        "is_smoke": True,
+        "probability": 0.98,
+        "trigger_frame_index": 3,
+        "model": {"name": "bbox-tube-vit-dinov2", "version": "1.2.0"},
+    }
+
+
+def test_predict_verbose(client):
+    r = client.post("/predict?verbose=true", json={"frames": KEYS})
+    body = r.json()
+    assert r.status_code == 200
+    assert body["details"]["preprocessing"]["num_tube_candidates"] == 2
+    assert body["details"]["tubes"][0]["tube_id"] == 7
+    assert body["is_smoke"] is True
+    assert body["probability"] == 0.98
+    assert body["trigger_frame_index"] == 3
+    assert body["model"] == {"name": "bbox-tube-vit-dinov2", "version": "1.2.0"}
+    assert body["details"]["decision"] == {
+        "aggregation": "max_logit",
+        "threshold": 0.5,
+        "trigger_tube_id": 7,
+    }
+
+
+def test_health_unavailable(client):
+    client.app.state.runner = None
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert r.json() == {
+        "status": "unavailable",
+        "model_loaded": False,
+        "model_name": None,
+        "model_version": None,
+    }
+
+
+def test_predict_empty_frames_400(client):
+    r = client.post("/predict", json={"frames": []})
+    assert r.status_code == 400
+    assert r.json()["code"] == "invalid_request"
+
+
+def test_predict_scheme_key_400(client):
+    r = client.post("/predict", json={"frames": ["s3://frames/a.jpg"]})
+    assert r.status_code == 400
+    assert r.json()["code"] == "invalid_request"
+
+
+def test_predict_missing_key_404(client):
+    r = client.post("/predict", json={"frames": ["cam12/missing.jpg"]})
+    assert r.status_code == 404
+    assert r.json()["code"] == "frame_not_found"
+
+
+def test_predict_inference_error_500(client):
+    client.app.state.runner = FakeRunner(error=RuntimeError("boom"))
+    r = client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 500
+    assert r.json()["code"] == "inference_error"
+
+
+def test_predict_model_not_loaded_503(client):
+    client.app.state.runner = None
+    r = client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 503
+    assert r.json()["code"] == "model_not_loaded"
+
+
+def test_predict_mapping_error_returns_coded_500(client):
+    # A response-mapping failure (malformed details) must surface as a coded
+    # error, not a bare 500 — to_response runs inside the error-handling scope.
+    bad = SimpleNamespace(is_positive=True, trigger_frame_index=0, details={})
+    client.app.state.runner = FakeRunner(output=bad)
+    r = client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 500
+    assert r.json()["code"] == "inference_error"
+
+
+def test_startup_fails_without_bucket(monkeypatch):
+    monkeypatch.setattr(settings, "s3_bucket", "")
+    with pytest.raises(RuntimeError), TestClient(app):
+        pass
