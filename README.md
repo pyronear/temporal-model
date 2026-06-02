@@ -38,8 +38,3 @@ Per package, `cd <pkg> && make install|lint|format|test`.
 cd api
 docker compose up --build      # serves http://localhost:8000 (GET /health)
 ```
-
-## Layout
-
-- `docs/specs/` — design documents.
-- `docs/plans/` — implementation plans.
