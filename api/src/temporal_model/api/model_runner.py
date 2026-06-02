@@ -26,7 +26,7 @@ def read_manifest(package_path: Path) -> dict[str, Any]:
     return {
         "name": manifest.get("variant"),
         "version": manifest.get("model_version"),
-        "calibrated": "logistic_calibrator" in manifest,
+        "calibrated": bool(manifest.get("logistic_calibrator")),
     }
 
 
@@ -51,6 +51,8 @@ class ModelRunner:
 
     @classmethod
     def load(cls, package_path: Path, device: str | None) -> "ModelRunner":
+        """Load a model package. Call once at startup — this blocks while the
+        model checkpoint is deserialized; do not call from a request handler."""
         meta = read_manifest(package_path)
         model = _load_core_model(package_path, device)
         return cls(model, **meta)
