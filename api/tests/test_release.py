@@ -73,24 +73,37 @@ def test_fetch_version_mismatch_raises(tmp_path: Path) -> None:
         )
 
 
-def test_publish_stamps_uploads_and_tags(tmp_path: Path) -> None:
+def test_render_model_card_substitutes_version() -> None:
+    card = release.render_model_card("1.4.2")
+    assert release.VERSION_PLACEHOLDER not in card
+    assert "v1.4.2" in card  # revision pin in the usage snippet
+    assert card.startswith("---")  # HF frontmatter preserved
+
+
+def test_publish_stamps_uploads_zip_and_card_and_tags(tmp_path: Path) -> None:
     z = _make_zip(tmp_path / "m.zip", {"variant": "vit"})  # no model_version yet
     api = MagicMock()
-    # capture the version of whatever file gets uploaded (a temp copy)
-    uploaded = {}
+    # capture the version stamped into the uploaded model.zip (a temp copy)
+    zip_version = {}
 
     def capture(**kw):
-        uploaded["version"] = release.read_model_version(Path(kw["path_or_fileobj"]))
+        if kw["path_in_repo"] == "model.zip":
+            zip_version["v"] = release.read_model_version(Path(kw["path_or_fileobj"]))
 
     api.upload_file.side_effect = capture
     release.publish("0.3.0", z, repo="org/r", api=api)
+
     # the caller's file is NOT mutated...
     assert release.read_model_version(z) is None
     # ...but the uploaded copy was stamped
-    assert uploaded["version"] == "0.3.0"
-    # uploaded as model.zip
-    up = api.upload_file.call_args.kwargs
-    assert up["path_in_repo"] == "model.zip" and up["repo_id"] == "org/r"
+    assert zip_version["v"] == "0.3.0"
+
+    # both the model and the rendered card are uploaded
+    calls = {c.kwargs["path_in_repo"]: c.kwargs for c in api.upload_file.call_args_list}
+    assert set(calls) == {"model.zip", "README.md"}
+    assert calls["model.zip"]["repo_id"] == "org/r"
+    card = calls["README.md"]["path_or_fileobj"].decode()
+    assert "0.3.0" in card and release.VERSION_PLACEHOLDER not in card
     # tagged v0.3.0
     tag = api.create_tag.call_args.kwargs
     assert tag["tag"] == "v0.3.0" and tag["repo_id"] == "org/r"

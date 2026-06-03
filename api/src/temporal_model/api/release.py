@@ -11,6 +11,7 @@ import argparse
 import shutil
 import tempfile
 import zipfile
+from importlib.resources import files
 from pathlib import Path
 
 import yaml
@@ -19,10 +20,23 @@ from huggingface_hub import HfApi, hf_hub_download
 RELEASE_REPO = "pyronear/temporal-model"
 MODEL_FILENAME = "model.zip"
 MANIFEST_FILENAME = "manifest.yaml"
+CARD_TEMPLATE = "model_card.md"
+CARD_FILENAME = "README.md"
+VERSION_PLACEHOLDER = "{{VERSION}}"
 
 
 def _tag(version: str) -> str:
     return f"v{version}"
+
+
+def render_model_card(version: str) -> str:
+    """Render the HF model card, substituting the release version.
+
+    The template ships with this package so ``publish`` always has it,
+    regardless of the working directory.
+    """
+    template = (files("temporal_model.api") / CARD_TEMPLATE).read_text(encoding="utf-8")
+    return template.replace(VERSION_PLACEHOLDER, version)
 
 
 def read_model_version(zip_path: Path) -> str | None:
@@ -78,11 +92,14 @@ def publish(
     repo: str = RELEASE_REPO,
     api: HfApi | None = None,
 ) -> None:
-    """Stamp the version into the manifest, upload ``model.zip``, tag ``v<version>``.
+    """Stamp the version into the manifest, upload ``model.zip`` + the rendered
+    model card, then tag ``v<version>``.
 
     The caller's ``file_path`` is **not** modified: the version is stamped into a
-    temporary copy, which is what gets uploaded. Versions are immutable — if the
-    ``v<version>`` tag already exists, ``create_tag`` raises (no silent overwrite).
+    temporary copy, which is what gets uploaded. The model card (README.md) is
+    rendered with this version so the repo always advertises the latest release.
+    Versions are immutable — if the ``v<version>`` tag already exists,
+    ``create_tag`` raises (no silent overwrite).
     """
     hf = api or HfApi()
     with tempfile.TemporaryDirectory() as td:
@@ -95,6 +112,12 @@ def publish(
             repo_id=repo,
             repo_type="model",
         )
+    hf.upload_file(
+        path_or_fileobj=render_model_card(version).encode("utf-8"),
+        path_in_repo=CARD_FILENAME,
+        repo_id=repo,
+        repo_type="model",
+    )
     hf.create_tag(repo_id=repo, tag=_tag(version), repo_type="model")
 
 
