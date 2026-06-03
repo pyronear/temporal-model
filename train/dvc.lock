@@ -311,3 +311,134 @@ stages:
       hash: md5
       md5: fdd4a5f178851ca87a0e355f3911904d
       size: 185240
+  package:
+    cmd: uv run python -m temporal_model.train.package --variant 
+      vit_dinov2_finetune --output data/06_models/vit_dinov2_finetune/model.zip
+    deps:
+    - path: ../core/src/temporal_model/core/data.py
+      hash: md5
+      md5: b907e5a0baedb93775446678c2cce034
+      size: 5078
+    - path: ../core/src/temporal_model/core/detector.yaml
+      hash: md5
+      md5: ba07c2480d91b7ffdbf8f1967df095f4
+      size: 481
+    - path: ../core/src/temporal_model/core/inference.py
+      hash: md5
+      md5: 88ff48f0cfd87447db64a7de51a2486c
+      size: 16612
+    - path: ../core/src/temporal_model/core/logistic_calibrator.py
+      hash: md5
+      md5: 40122f278fee865a7da300c1772df4f8
+      size: 4243
+    - path: ../core/src/temporal_model/core/model.py
+      hash: md5
+      md5: fe3300877b01ff1efaa42fbd9566d46a
+      size: 11094
+    - path: ../core/src/temporal_model/core/package.py
+      hash: md5
+      md5: 78d9a257839a1f13d7a9dcb385b1fb90
+      size: 9980
+    - path: ../core/src/temporal_model/core/tubes.py
+      hash: md5
+      md5: 9426ca83132d1d4822d014c492b7015a
+      size: 18257
+    - path: data/01_raw/datasets/train
+      hash: md5
+      md5: caf37d4bf513efd49b9617378fff1ffa.dir
+      size: 4776619781
+      nfiles: 89870
+    - path: data/01_raw/datasets/val
+      hash: md5
+      md5: 409ed7d0573adcb3be98f7ceab63cf25.dir
+      size: 444161180
+      nfiles: 8752
+    - path: data/05_model_input/val
+      hash: md5
+      md5: 6e03683938b9856a10ceab74b02f5ca9.dir
+      size: 106894868
+      nfiles: 4241
+    - path: 
+        data/06_models/detectors/yolo11s_nimble-narwhal_v6.0.0/yolo_weights.pt
+      hash: md5
+      md5: fea4ddc8d904fcc5ff11ad900e040837
+      size: 19225626
+    - path: data/06_models/vit_dinov2_finetune/best_checkpoint.pt
+      hash: md5
+      md5: 0cad8efaace67b58c395325edf430eab
+      size: 143536811
+    - path: src/temporal_model/train/calibration.py
+      hash: md5
+      md5: 9fcc002b92d7c66b446ef1f20a3d88df
+      size: 1180
+    - path: src/temporal_model/train/dataset.py
+      hash: md5
+      md5: 0963a1ba3fd9e193ab8d4d24bd97aca2
+      size: 3141
+    - path: src/temporal_model/train/logistic_calibrator_fit.py
+      hash: md5
+      md5: d610b7e469d94948111902b9ca0ef923
+      size: 2511
+    - path: src/temporal_model/train/package.py
+      hash: md5
+      md5: a39319e6d769cce5600716684ad2fdb3
+      size: 11068
+    - path: src/temporal_model/train/package_predict.py
+      hash: md5
+      md5: 0e314fd21aebe8273812760284831619
+      size: 2125
+    - path: src/temporal_model/train/val_predict.py
+      hash: md5
+      md5: cd28d9e2879024c2e58da0cc17c86512
+      size: 1514
+    params:
+      params.yaml:
+        build_tubes:
+          min_tube_length: 4
+          min_detected_entries: 2
+        model_input:
+          context_factor: 1.5
+          patch_size: 224
+        package:
+          target_recall: 0.95
+          infer_min_tube_length: 2
+          infer:
+            confidence_threshold: 0.1
+            iou_nms: 0.2
+            image_size: 1024
+            pad_to_min_frames: 20
+            pad_strategy: symmetric
+          aggregation:
+            vit_dinov2_finetune: logistic
+        train_vit_dinov2_finetune:
+          max_frames: 20
+          batch_size: 16
+          num_workers: 4
+          learning_rate: 0.0001
+          weight_decay: 0.05
+          max_epochs: 30
+          early_stop_patience: 5
+          seed: 42
+          global_pool: token
+          img_size: 224
+          transformer_num_layers: 2
+          transformer_num_heads: 6
+          transformer_ffn_dim: 1536
+          transformer_dropout: 0.1
+          use_cosine_warmup: true
+          warmup_frac: 0.05
+          backbone: vit_small_patch14_dinov2.lvd142m
+          finetune: true
+          finetune_last_n_blocks: 1
+          backbone_lr: 1e-05
+        tubes:
+          iou_threshold: 0.2
+          max_misses: 2
+          merge_iomin: 0.3
+          merge_prox_factor: 1.0
+          merge_max_gap: 10
+    outs:
+    - path: data/06_models/vit_dinov2_finetune/model.zip
+      hash: md5
+      md5: 7a79332d511a50460b63ac4c4ba71e73
+      size: 162765197
