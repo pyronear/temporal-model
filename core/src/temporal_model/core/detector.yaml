@@ -1,0 +1,9 @@
+# The companion detector bundled into every packaged model.zip.
+# Bumping the detector is a data change — edit this file, nothing else.
+# Identity is verified by SHA-256 against the published HuggingFace weights.
+# See docs/specs/2026-06-03-model-versioning-design.md.
+detector:
+  type: yolo
+  name: yolo11s_nimble-narwhal_v6.0.0
+  source: hf:pyronear/yolo11s_nimble-narwhal_v6.0.0   # downloads best.pt
+  sha256: 0bf3c7ee9f720c26613c30719fea32f47ed04fc384e443de72414d9f8148ac9d

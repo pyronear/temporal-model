@@ -60,6 +60,7 @@ Create `core/tests/test_detector.py`:
 """Tests for the detector source of truth and typed accessor."""
 
 import pytest
+from pydantic import ValidationError
 
 from temporal_model.core.detector import Detector, load_detector
 
@@ -81,7 +82,7 @@ def test_repo_id_strips_hf_prefix() -> None:
 
 def test_detector_is_frozen() -> None:
     det = load_detector()
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         det.name = "other"  # type: ignore[misc]
 
 
