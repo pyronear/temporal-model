@@ -22,6 +22,10 @@ jobs:
         with:
           python-version: "3.11"
       - name: Fetch model.zip from HuggingFace
+        env:
+          # Authenticate even though the repo is public: unauthenticated pulls of
+          # the 163 MB model.zip get rate-limited (HTTP 429) under repeated CI runs.
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           cd api
           uv sync --no-dev
