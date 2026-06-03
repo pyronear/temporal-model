@@ -27,6 +27,18 @@ model_input:
   context_factor: 1.5
   patch_size: 224
 
+package:
+  target_recall: 0.95
+  infer_min_tube_length: 2
+  infer:
+    confidence_threshold: 0.1
+    iou_nms: 0.2
+    image_size: 1024
+    pad_to_min_frames: 20
+    pad_strategy: symmetric
+  aggregation:
+    vit_dinov2_finetune: logistic
+
 _train_defaults: &train_defaults
   max_frames: 20
   batch_size: 32
