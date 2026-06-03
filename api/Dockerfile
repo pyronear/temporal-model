@@ -17,5 +17,10 @@ COPY api/ ./api/
 WORKDIR /app/api
 RUN uv sync --no-dev
 
+# Bake the released model.zip (placed in the build context by `release fetch`)
+# to MODEL_PATH.
+COPY api/models/model.zip /models/model.zip
+
 EXPOSE 8000
-CMD ["uv", "run", "uvicorn", "temporal_model.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# --no-dev: don't let `uv run` re-sync dev deps into the runtime at startup.
+CMD ["uv", "run", "--no-dev", "uvicorn", "temporal_model.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
