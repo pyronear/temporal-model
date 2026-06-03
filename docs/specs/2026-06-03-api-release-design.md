@@ -1,7 +1,7 @@
 # API Release — Design
 
 **Date:** 2026-06-03
-**Status:** Draft
+**Status:** Implemented (PR #10; CI fixes #11/#12; `v0.1.0` released to HF + Docker Hub)
 **Scope:** How a tagged release produces a self-contained API Docker image with a
 specific versioned `model.zip` **baked in**, sourced from **HuggingFace**. Covers
 the locally-runnable `release` CLI (`fetch`/`publish`), the Dockerfile changes, the

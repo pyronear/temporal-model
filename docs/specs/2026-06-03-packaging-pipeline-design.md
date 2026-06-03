@@ -1,7 +1,7 @@
 # Model Packaging Pipeline (train) — Design
 
 **Date:** 2026-06-03
-**Status:** Draft
+**Status:** Implemented (train `package` DVC stage — PR #8)
 **Scope:** A `train` DVC stage that turns a trained checkpoint into a deployable,
 **calibrated**, version-stamped `model.zip` — bundling the classifier, the
 DVC-tracked detector, a built inference `config.yaml`, and a freshly-fit logistic
