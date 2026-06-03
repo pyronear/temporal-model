@@ -36,9 +36,12 @@ Per package, `cd <pkg> && make install|lint|format|test`.
 ### Run the API locally (Docker)
 
 ```bash
-cd api
-docker compose up --build      # serves http://localhost:8000 (GET /health)
+make serve      # API + MinIO via docker compose, http://localhost:8000 (GET /health)
 ```
+
+Equivalent to `cd api && docker compose up --build`. The compose stack ships
+local-dev MinIO defaults (bucket `frames`, `minioadmin` creds); drop a
+`model.zip` under `api/models/` for `/health` to report `model_loaded: true`.
 
 ## Origin
 
