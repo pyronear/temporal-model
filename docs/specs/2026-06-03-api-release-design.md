@@ -34,8 +34,9 @@ model artifacts come from HuggingFace, and the release pipeline needs **no AWS**
   and tagged `v<version>`. `fetch` pins the exact bytes with
   `revision="v<version>"`. This mirrors "one git tag per version" — the source tag
   and the HF tag share the name.
-- **Public repo** — so the CI `fetch` needs **no token**. Only `publish` needs a
-  write token (the maintainer's, used locally — never in CI).
+- **Public repo**, but the CI `fetch` still authenticates with a read `HF_TOKEN`:
+  unauthenticated pulls of the 163 MB `model.zip` get rate-limited (HTTP 429) under
+  repeated CI runs. `publish` uses the maintainer's write token locally.
 
 > The S3 bucket `pyronear-temporal-model` created earlier is **no longer used** for
 > model release and can be deleted. (DVC's `pyro-vision-rd` S3 remote is unrelated
@@ -65,7 +66,7 @@ Established facts (current repo state):
 | Artifact home | **HuggingFace** repo `pyronear/temporal-model`; one `model.zip`, one revision/tag `v<version>` per release. No S3. |
 | Model source (build) | `fetch` via `hf_hub_download(repo, "model.zip", revision="v<version>")`; assert `manifest.model_version == <version>`. |
 | Put artifacts on HF | `publish` CLI: **stamp** `model_version = <version>` into the manifest, upload `model.zip`, tag the HF revision `v<version>`. Version declared once, at publish (matching the tag) — not baked in at packaging. |
-| Auth | **Public HF repo** → CI `fetch` needs **no token**. `publish` uses the maintainer's HF write token locally (never in CI). No AWS. |
+| Auth | **Public HF repo**, but CI `fetch` uses a read `HF_TOKEN` secret to avoid 429 rate-limits on the 163 MB pull. `publish` uses the maintainer's HF write token locally. No AWS. |
 | Registry | Docker Hub `pyronear/temporal-model-api` (unchanged). |
 | Trigger | `v*` tags **only** — drop the `main`→`latest` build (no ambiguous "latest" model). |
 | Orchestration | `scripts/release-api.sh` + adapted `push.yml`, both calling the `release` CLI. |
@@ -130,7 +131,7 @@ end **before** any tag is pushed.
 On `v*` tags:
 1. Resolve `VERSION=${GITHUB_REF#refs/tags/v}`.
 2. `python -m temporal_model.api.release fetch --version $VERSION --output api/models/model.zip`
-   (public repo — no token needed).
+   (public repo, but pass `HF_TOKEN` to avoid 429 rate-limits).
 3. `docker build -f api/Dockerfile . -t pyronear/temporal-model-api:$VERSION`.
 4. Docker Hub login (existing `DOCKERHUB_*` secrets) → `docker push …:$VERSION`.
 
@@ -204,7 +205,8 @@ Notable:
 |---|---|
 | `DOCKERHUB_LOGIN` / `DOCKERHUB_PW` | Docker Hub push (existing). |
 
-The HF repo is **public**, so the CI `fetch` needs **no secret**. Publishing uses
+The HF repo is **public**, but the CI `fetch` uses an `HF_TOKEN` read secret to
+avoid 429 rate-limits on the large pull. Publishing uses
 the maintainer's own HF write token locally — CI never needs HF access. **No AWS
 secrets, no HF secret in CI.**
 
