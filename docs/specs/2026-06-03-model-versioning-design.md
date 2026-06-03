@@ -1,7 +1,7 @@
 # Trained-Model Versioning & Release — Design
 
 **Date:** 2026-06-03
-**Status:** Draft
+**Status:** Implemented
 **Scope:** How a trained temporal smoke model (`model.zip`) is versioned, stored,
 released, and deployed to the API. Covers the version identity, manifest
 provenance (including detector tracking), artifact storage, the Docker-image
