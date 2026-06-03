@@ -19,6 +19,7 @@ dependencies = [
     "numpy>=1.26,<2",
     "tensorboard>=2.16",
     "pydantic>=2.6",
+    "scikit-learn>=1.4",
 ]
 
 [project.scripts]
