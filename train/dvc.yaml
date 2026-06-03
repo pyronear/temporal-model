@@ -93,3 +93,36 @@ stages:
       - data/06_models/vit_dinov2_finetune/csv_logs/
     plots:
       - data/06_models/vit_dinov2_finetune/plots/training_curves.png
+
+  package:
+    cmd: >-
+      uv run python -m temporal_model.train.package
+      --variant vit_dinov2_finetune
+      --output data/06_models/vit_dinov2_finetune/model.zip
+    deps:
+      - src/temporal_model/train/package.py
+      - src/temporal_model/train/calibration.py
+      - src/temporal_model/train/logistic_calibrator_fit.py
+      - src/temporal_model/train/val_predict.py
+      - src/temporal_model/train/package_predict.py
+      - src/temporal_model/train/dataset.py
+      - ../core/src/temporal_model/core/package.py
+      - ../core/src/temporal_model/core/model.py
+      - ../core/src/temporal_model/core/inference.py
+      - ../core/src/temporal_model/core/logistic_calibrator.py
+      - ../core/src/temporal_model/core/tubes.py
+      - ../core/src/temporal_model/core/data.py
+      - ../core/src/temporal_model/core/detector.yaml
+      - data/06_models/vit_dinov2_finetune/best_checkpoint.pt
+      - data/06_models/detectors/yolo11s_nimble-narwhal_v6.0.0/yolo_weights.pt
+      - data/05_model_input/val
+      - data/01_raw/datasets/train
+      - data/01_raw/datasets/val
+    params:
+      - package
+      - tubes
+      - build_tubes
+      - model_input
+      - train_vit_dinov2_finetune
+    outs:
+      - data/06_models/vit_dinov2_finetune/model.zip
