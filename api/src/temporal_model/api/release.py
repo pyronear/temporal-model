@@ -9,6 +9,7 @@ version. Runs identically locally (maintainer HF token for publish) and in CI
 
 import argparse
 import shutil
+import tempfile
 import zipfile
 from pathlib import Path
 
@@ -77,15 +78,23 @@ def publish(
     repo: str = RELEASE_REPO,
     api: HfApi | None = None,
 ) -> None:
-    """Stamp the version into the manifest, upload ``model.zip``, tag ``v<version>``."""
-    stamp_model_version(file_path, version)
+    """Stamp the version into the manifest, upload ``model.zip``, tag ``v<version>``.
+
+    The caller's ``file_path`` is **not** modified: the version is stamped into a
+    temporary copy, which is what gets uploaded. Versions are immutable — if the
+    ``v<version>`` tag already exists, ``create_tag`` raises (no silent overwrite).
+    """
     hf = api or HfApi()
-    hf.upload_file(
-        path_or_fileobj=str(file_path),
-        path_in_repo=MODEL_FILENAME,
-        repo_id=repo,
-        repo_type="model",
-    )
+    with tempfile.TemporaryDirectory() as td:
+        staged = Path(td) / MODEL_FILENAME
+        shutil.copyfile(file_path, staged)
+        stamp_model_version(staged, version)
+        hf.upload_file(
+            path_or_fileobj=str(staged),
+            path_in_repo=MODEL_FILENAME,
+            repo_id=repo,
+            repo_type="model",
+        )
     hf.create_tag(repo_id=repo, tag=_tag(version), repo_type="model")
 
 

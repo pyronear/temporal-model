@@ -215,9 +215,10 @@ secrets, no HF secret in CI.**
   mirroring the `fetch_detector` test pattern (no network):
   - `fetch` success (stamped manifest matches version, correct `revision` passed),
     `model_version` mismatch (error), missing `model_version` (error).
-  - `publish` success: stamps `model_version` into the manifest, uploads, and tags
-    `v<version>`; the round-tripped manifest reads back the stamped version (incl.
-    stamping a version-less input). Re-publishing the same version is idempotent.
+  - `publish` success: stamps `model_version` into a **temp copy** (the caller's
+    file is left untouched), uploads it, and tags `v<version>`. Versions are
+    **immutable** — re-publishing an existing version fails at `create_tag` (no
+    silent overwrite).
 - **No GPU / network** — HF calls mocked; the manifest reader/stamper works on a
   tiny fixture zip.
 - **Docker build** is validated manually/locally (and by the first CI run); not

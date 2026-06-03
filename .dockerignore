@@ -1,0 +1,16 @@
+# Build context is the repo root (docker build -f api/Dockerfile .), so Docker
+# reads THIS root .dockerignore — not api/.dockerignore. Keep the host virtualenvs,
+# caches, data, and git out of the image (the .venvs alone are ~5 GB each).
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+**/.git
+**/data
+**/.dvc/cache
+
+# api/models holds runtime-extracted weights; only the baked model.zip is wanted.
+api/models/*
+!api/models/model.zip

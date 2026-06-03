@@ -76,9 +76,18 @@ def test_fetch_version_mismatch_raises(tmp_path: Path) -> None:
 def test_publish_stamps_uploads_and_tags(tmp_path: Path) -> None:
     z = _make_zip(tmp_path / "m.zip", {"variant": "vit"})  # no model_version yet
     api = MagicMock()
+    # capture the version of whatever file gets uploaded (a temp copy)
+    uploaded = {}
+
+    def capture(**kw):
+        uploaded["version"] = release.read_model_version(Path(kw["path_or_fileobj"]))
+
+    api.upload_file.side_effect = capture
     release.publish("0.3.0", z, repo="org/r", api=api)
-    # stamped in place
-    assert release.read_model_version(z) == "0.3.0"
+    # the caller's file is NOT mutated...
+    assert release.read_model_version(z) is None
+    # ...but the uploaded copy was stamped
+    assert uploaded["version"] == "0.3.0"
     # uploaded as model.zip
     up = api.upload_file.call_args.kwargs
     assert up["path_in_repo"] == "model.zip" and up["repo_id"] == "org/r"
