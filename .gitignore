@@ -16,6 +16,7 @@ __pycache__/
 **/data/**
 !**/data/**/
 !**/data/**/.gitkeep
+!**/data/**/*.dvc
 **/.dvc/cache
 **/.dvc/tmp
 

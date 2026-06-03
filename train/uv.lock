@@ -3381,6 +3381,7 @@ name = "temporal-model-core"
 version = "0.1.0"
 source = { editable = "../core" }
 dependencies = [
+    { name = "huggingface-hub" },
     { name = "numpy" },
     { name = "pillow" },
     { name = "pydantic" },
@@ -3393,6 +3394,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "huggingface-hub", specifier = ">=0.23" },
     { name = "numpy", specifier = ">=1.26,<2" },
     { name = "pillow", specifier = ">=10.0" },
     { name = "pydantic", specifier = ">=2.6" },
