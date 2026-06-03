@@ -1,0 +1,5 @@
+outs:
+- md5: fea4ddc8d904fcc5ff11ad900e040837
+  size: 19225626
+  hash: md5
+  path: yolo_weights.pt
