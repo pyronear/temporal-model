@@ -19,6 +19,7 @@ import numpy as np
 import torch
 import yaml
 
+from .detector import load_detector
 from .logistic_calibrator import LogisticCalibrator
 from .temporal_classifier import TemporalSmokeClassifier
 
@@ -68,6 +69,8 @@ def build_model_package(
     config: dict[str, Any],
     variant: str,
     output_path: Path,
+    model_version: str | None = None,
+    train_git_sha: str | None = None,
     calibrator: LogisticCalibrator | None = None,
 ) -> Path:
     """Bundle YOLO weights + classifier checkpoint + config into a .zip archive.
@@ -79,6 +82,10 @@ def build_model_package(
         config: Full package config dict (see module docstring for schema).
         variant: Identifier recorded in the manifest (informational).
         output_path: Destination ``.zip`` path.
+        model_version: Optional released model version, stamped into the
+            manifest as ``model_version`` (omitted when ``None``).
+        train_git_sha: Optional git SHA of the training code, recorded under
+            ``provenance.train_git_sha``.
         calibrator: Optional fitted :class:`LogisticCalibrator`. When
             provided, its JSON payload is bundled into the archive and
             the manifest gets a ``logistic_calibrator`` pointer.
@@ -105,6 +112,13 @@ def build_model_package(
     }
     if calibrator is not None:
         manifest["logistic_calibrator"] = LOGISTIC_CALIBRATOR_FILENAME
+    if model_version is not None:
+        manifest["model_version"] = model_version
+    manifest["provenance"] = {
+        "train_git_sha": train_git_sha,
+        "backbone": config.get("classifier", {}).get("backbone"),
+        "detector": load_detector().model_dump(),
+    }
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(output_path, "w", compression=zipfile.ZIP_STORED) as zf:

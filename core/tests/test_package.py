@@ -10,6 +10,7 @@ import pytest
 import torch
 import yaml
 
+from temporal_model.core.detector import load_detector
 from temporal_model.core.logistic_calibrator import LogisticCalibrator
 from temporal_model.core.package import (
     CLASSIFIER_CKPT_FILENAME,
@@ -396,3 +397,63 @@ class TestCalibratorBundling:
 
         with pytest.raises(ValueError, match="sanity check"):
             load_model_package(tampered_path, extract_dir=tmp_path / "ext2")
+
+
+class TestProvenance:
+    def test_model_version_recorded_when_provided(
+        self,
+        tmp_path: Path,
+        dummy_yolo_weights: Path,
+        dummy_classifier_ckpt: Path,
+    ) -> None:
+        out = tmp_path / "m.zip"
+        build_model_package(
+            yolo_weights_path=dummy_yolo_weights,
+            classifier_ckpt_path=dummy_classifier_ckpt,
+            config=SAMPLE_CONFIG,
+            variant="vit_dinov2_finetune",
+            output_path=out,
+            model_version="1.4.0",
+        )
+        with zipfile.ZipFile(out, "r") as zf:
+            manifest = yaml.safe_load(zf.read(MANIFEST_FILENAME))
+        assert manifest["model_version"] == "1.4.0"
+
+    def test_model_version_absent_when_not_provided(self, built_archive: Path) -> None:
+        with zipfile.ZipFile(built_archive, "r") as zf:
+            manifest = yaml.safe_load(zf.read(MANIFEST_FILENAME))
+        assert "model_version" not in manifest
+
+    def test_provenance_detector_matches_source_of_truth(
+        self, built_archive: Path
+    ) -> None:
+        with zipfile.ZipFile(built_archive, "r") as zf:
+            manifest = yaml.safe_load(zf.read(MANIFEST_FILENAME))
+        assert manifest["provenance"]["detector"] == load_detector().model_dump()
+
+    def test_provenance_backbone_from_config(self, built_archive: Path) -> None:
+        with zipfile.ZipFile(built_archive, "r") as zf:
+            manifest = yaml.safe_load(zf.read(MANIFEST_FILENAME))
+        assert (
+            manifest["provenance"]["backbone"]
+            == SAMPLE_CONFIG["classifier"]["backbone"]
+        )
+
+    def test_provenance_train_git_sha_recorded(
+        self,
+        tmp_path: Path,
+        dummy_yolo_weights: Path,
+        dummy_classifier_ckpt: Path,
+    ) -> None:
+        out = tmp_path / "m.zip"
+        build_model_package(
+            yolo_weights_path=dummy_yolo_weights,
+            classifier_ckpt_path=dummy_classifier_ckpt,
+            config=SAMPLE_CONFIG,
+            variant="vit_dinov2_finetune",
+            output_path=out,
+            train_git_sha="abc1234",
+        )
+        with zipfile.ZipFile(out, "r") as zf:
+            manifest = yaml.safe_load(zf.read(MANIFEST_FILENAME))
+        assert manifest["provenance"]["train_git_sha"] == "abc1234"
