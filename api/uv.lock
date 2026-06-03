@@ -1884,6 +1884,7 @@ source = { editable = "." }
 dependencies = [
     { name = "boto3" },
     { name = "fastapi" },
+    { name = "huggingface-hub" },
     { name = "pydantic-settings" },
     { name = "pyyaml" },
     { name = "temporal-model-core" },
@@ -1902,6 +1903,7 @@ dev = [
 requires-dist = [
     { name = "boto3", specifier = ">=1.34" },
     { name = "fastapi", specifier = ">=0.110" },
+    { name = "huggingface-hub", specifier = ">=0.23" },
     { name = "pydantic-settings", specifier = ">=2.2" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "temporal-model-core", editable = "../core" },
