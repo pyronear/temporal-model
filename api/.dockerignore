@@ -6,4 +6,5 @@
 **/.git
 **/data
 **/.dvc/cache
-api/models
+api/models/*
+!api/models/model.zip
