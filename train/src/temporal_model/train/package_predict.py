@@ -28,7 +28,9 @@ def _iter_labelled_sequences(raw_dir: Path) -> Iterator[tuple[str, str, list[Pat
         yield label, seq_dir.name, frame_paths
 
 
-def collect_pipeline_records(*, model: Any, raw_dir: Path) -> list[dict]:
+def collect_pipeline_records(
+    *, model: Any, raw_dir: Path, log_every: int = 200
+) -> list[dict]:
     """Run ``model.predict_sequence`` on every labelled sequence under ``raw_dir``.
 
     Args:
@@ -36,10 +38,19 @@ def collect_pipeline_records(*, model: Any, raw_dir: Path) -> list[dict]:
             ``predict_sequence(frame_paths) -> TemporalModelOutput`` whose
             ``.details["tubes"]["kept"]`` carries the tube structure.
         raw_dir: ``{wildfire,fp}/<seq>/images/*.jpg`` tree.
+        log_every: Print a progress line every N sequences (0 disables). This is
+            the slow pass, so progress is emitted to stdout for tracking.
     """
+    total = len(list_sequences(raw_dir))
     records: list[dict] = []
-    for label, seq_name, frame_paths in _iter_labelled_sequences(raw_dir):
+    for i, (label, seq_name, frame_paths) in enumerate(
+        _iter_labelled_sequences(raw_dir), start=1
+    ):
         out = model.predict_sequence(frame_paths)
         kept = out.details.get("tubes", {}).get("kept", [])
         records.append({"label": label, "sequence": seq_name, "kept_tubes": kept})
+        if log_every and i % log_every == 0:
+            print(
+                f"[package_predict] {raw_dir.name}: {i}/{total} sequences", flush=True
+            )
     return records

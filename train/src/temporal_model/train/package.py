@@ -12,6 +12,8 @@ Usage:
 """
 
 import argparse
+import hashlib
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -20,7 +22,7 @@ import numpy as np
 import torch
 import yaml
 
-from temporal_model.core.detector import load_detector
+from temporal_model.core.detector import Detector, load_detector
 from temporal_model.core.logistic_calibrator import (
     LogisticCalibrator,
     extract_features,
@@ -109,6 +111,27 @@ def build_config(
     }
 
 
+def verify_detector_weights(yolo_weights_path: Path, detector: Detector) -> None:
+    """Assert the bundled detector weights match the declared ``detector.sha256``.
+
+    Guards provenance integrity: a hand-placed or wrong ``yolo_weights.pt`` would
+    otherwise be packaged with a manifest claiming a detector it isn't.
+
+    Raises:
+        ValueError: if the file's SHA-256 differs from ``detector.sha256``.
+    """
+    h = hashlib.sha256()
+    with yolo_weights_path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    actual = h.hexdigest()
+    if actual != detector.sha256:
+        raise ValueError(
+            f"Detector weights SHA-256 mismatch for {detector.name}: "
+            f"expected {detector.sha256}, got {actual} ({yolo_weights_path})"
+        )
+
+
 def _load_classifier_from_ckpt(
     ckpt_path: Path, variant_cfg: dict
 ) -> TemporalSmokeClassifier:
@@ -154,13 +177,23 @@ def _fit_calibrator_and_threshold(
     raw_val_dir: Path,
     target_recall: float,
 ) -> tuple[LogisticCalibrator, float]:
+    os.environ.setdefault("YOLO_VERBOSE", "False")  # quiet per-frame YOLO logs
+    print("[package] loading detector + building in-memory pipeline...", flush=True)
     fit_model = BboxTubeTemporalModel(
         yolo_model=_load_yolo(yolo_weights_path),
         classifier=classifier,
         config=pipeline_config,
     )
+    print(
+        "[package] running pipeline on TRAIN sequences (calibrator fit)...", flush=True
+    )
     train_records = collect_pipeline_records(model=fit_model, raw_dir=raw_train_dir)
+    print(
+        f"[package] fitting logistic calibrator on {len(train_records)} records...",
+        flush=True,
+    )
     calibrator = fit_logistic_calibrator(train_records)
+    print("[package] running pipeline on VAL sequences (threshold)...", flush=True)
     val_records = collect_pipeline_records(model=fit_model, raw_dir=raw_val_dir)
     probs = _calibrated_probs(val_records, calibrator)
     labels = _labels_array(val_records)
@@ -199,14 +232,21 @@ def main() -> None:
     variant_cfg = all_params[f"train_{args.variant}"]
     package_params = all_params["package"]
 
+    detector = load_detector()
     checkpoint = args.checkpoint_path or (
         Path("data/06_models") / args.variant / "best_checkpoint.pt"
     )
     yolo_weights = args.yolo_weights_path or (
-        Path("data/06_models/detectors") / load_detector().name / "yolo_weights.pt"
+        Path("data/06_models/detectors") / detector.name / "yolo_weights.pt"
     )
+    print(
+        f"[package] detector={detector.name}; verifying weights SHA-256...", flush=True
+    )
+    verify_detector_weights(yolo_weights, detector)
 
+    print(f"[package] loading classifier from {checkpoint}...", flush=True)
     classifier = _load_classifier_from_ckpt(checkpoint, variant_cfg)
+    print("[package] scoring val patches (classifier-only threshold)...", flush=True)
     probs, labels = collect_val_probabilities(
         classifier,
         args.val_patches_dir,
@@ -216,6 +256,10 @@ def main() -> None:
     )
     threshold = calibrate_threshold(
         probs, labels, target_recall=package_params["target_recall"]
+    )
+    print(
+        f"[package] val patches scored: n={len(probs)} threshold={threshold:.4f}",
+        flush=True,
     )
 
     aggregation = package_params.get("aggregation", {}).get(args.variant, "max_logit")
