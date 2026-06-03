@@ -58,14 +58,16 @@ provenance:
 All fields are **additive** — packages built before they existed still load, and
 the API surfaces a missing `model_version` as `null`.
 
-Artifacts are stored, per version, in a dedicated private S3 bucket:
+Artifacts are released on **HuggingFace**, one `model.zip` per version as an HF
+revision/tag:
 
 ```
-s3://pyronear-temporal-model/models/<version>/model.zip
+huggingface.co/pyronear/temporal-model   (model.zip @ revision v<version>)
 ```
 
-(account `894192051958`, region `eu-west-3`). Uploading a built `model.zip` to
-that key is an operational step; the API serves whichever package it is given.
+Publishing a built `model.zip` (which stamps `model_version` and tags the
+revision) is an operational step; the API serves whichever package it is baked
+with. See the [API release spec](specs/2026-06-03-api-release-design.md).
 
 ## 3. The companion detector
 
@@ -195,8 +197,9 @@ This is how the currently-served detector was confirmed to be
 
 Documented here for completeness; not yet implemented (see the spec):
 
-- **Container registry** selection and the **CI release automation** (tag →
-  build image with weights baked in → push → GitHub Release).
+- The **CI release automation** (tag → fetch `model.zip` from HF → bake into image
+  → push to Docker Hub) — designed in the API release spec.
 - The **packaging stage** that produces `model.zip` from a trained checkpoint and
-  uploads it to the S3 key.
-- A read-only CI/deploy **IAM policy** scoped to `pyronear-temporal-model`.
+  `publish`es it to HuggingFace.
+- A maintainer HF write token (local, for `publish`). The `pyronear/temporal-model`
+  repo is **public**, so CI `fetch` needs no token.

@@ -18,8 +18,8 @@ versioning and release story that is:
    across the git tag, the Docker image tag, and `manifest.model_version`.
 2. **Traceable** — the manifest self-describes how the model was built (train code
    SHA, backbone, and the exact companion detector, verified by hash).
-3. **Stored** — every versioned `model.zip` has a durable home in private S3,
-   retrievable by version.
+3. **Stored** — every versioned `model.zip` has a durable home on HuggingFace
+   (`pyronear/temporal-model`, one revision/tag per version), retrievable by version.
 4. **Deployable & reversible** — a release produces a self-contained Docker image
    tagged with the version; deploy = pin a tag, rollback = redeploy a prior tag.
 
@@ -68,12 +68,12 @@ detector tracking below.
 | Provenance fields | `train_git_sha`, `backbone`, `detector`. (No `dvc_exp_id`, no `metrics` — those live in the GH Release notes if wanted.) |
 | Detector source of truth | `core/detector.yaml` — `{type, name, source, sha256}`, loaded via a typed `load_detector()`. Single mapping, not a registry (YAGNI). |
 | Detector reproducibility | An import script downloads the detector weights from HF and **asserts the SHA-256** matches `detector.yaml`. |
-| Artifact bytes | Private S3: `s3://pyronear-temporal-model/models/<version>/model.zip` (account `894192051958`, region `eu-west-3`). CI gets **read-only** IAM scoped to this bucket/prefix. |
-| Deployable | Docker image with weights **baked in** at build, tagged `temporal-api:<version>`. Self-contained; no runtime S3. **Registry: TBD — follow-up** (pyronear has no confirmed container registry; `ghcr.io` was an unverified assumption). |
-| Release index | One GitHub Release per `vX.Y.Z`: notes + rendered provenance + links to the S3 key and image. No 163 MB asset duplicated into GitHub. **Release automation: follow-up.** |
-| Trigger | Push git tag `vX.Y.Z` → CI builds and publishes. **Follow-up** (depends on the registry decision). |
+| Artifact bytes | **HuggingFace** repo `pyronear/temporal-model`, one `model.zip` at HF revision/tag `v<version>` per release. No S3. (See the [API release spec](2026-06-03-api-release-design.md).) |
+| Deployable | Docker image with weights **baked in** at build, tagged **`pyronear/temporal-model-api:<version>`** on **Docker Hub**. Self-contained; no runtime model fetch. |
+| Release index | Optional GitHub Release per `vX.Y.Z` (notes + rendered provenance + link to the HF revision). Not required to ship images. |
+| Trigger | Push git tag `vX.Y.Z` → CI fetches from HF, bakes, pushes the image. |
 | Deploy / rollback | Pin the image tag; rollback = redeploy the prior tag. No runtime model selection. |
-| Packaging stage | Out of scope (future). This spec's precondition: a versioned `model.zip` with a stamped manifest already exists at the S3 key. |
+| Packaging stage | Out of scope (sibling [packaging spec](2026-06-03-packaging-pipeline-design.md)). Precondition: a `model.zip` is **published** to the HF repo at `v<version>`. |
 
 ## Version identity
 
@@ -173,43 +173,36 @@ Both consumers go through `load_detector()`:
 
 ## Storage & distribution
 
-Three roles, tied together by the one version string:
+Two roles, tied together by the one version string:
 
-- **S3 = bytes.** A dedicated private bucket
-  **`pyronear-temporal-model`** (account `894192051958`, region `eu-west-3`, all
-  Block-Public-Access flags on, default SSE-S3 encryption) holds
-  `s3://pyronear-temporal-model/models/<version>/model.zip`, the canonical
-  archive of every version. Deploy/CI credentials are **read-only**, scoped to this
-  bucket — never the whole `pyro-vision-rd` RD bucket. The API already
-  speaks boto3 with a configurable endpoint, so AWS/OVH/MinIO work unchanged if a
-  runtime fetch is ever wanted; with baked-in images it is not.
-- **Image = deployable.** CI bakes that exact `model.zip` into the API image and
-  tags it `temporal-api:<version>`. The running container needs **no S3 access** —
-  it is self-contained and immutable. Only CI reads S3, at build time. The
-  **registry to push to is undecided** (see below) — but it does not affect the
-  image contents or tagging, only the push target.
-- **GH Release = index.** One Release per `vX.Y.Z` carries human-facing notes, the
-  rendered `provenance`, and links to the S3 key and the image. The bytes are not
-  duplicated into GitHub.
+- **HuggingFace = bytes.** The packaged `model.zip` is released on a HuggingFace
+  model repo **`pyronear/temporal-model`** — symmetric with the detector (also on
+  HF). One `model.zip`, one HF git **revision/tag `v<version>`** per release; `fetch`
+  pins the exact bytes with `revision="v<version>"`. No S3 is used for model
+  release. (The `pyro-vision-rd` S3 remote backs DVC/pipeline data only, unrelated.)
+- **Image = deployable.** CI bakes that exact `model.zip` into the API image
+  (Docker Hub `pyronear/temporal-model-api:<version>`). The running container is
+  self-contained — **no model fetch at runtime**. Only CI fetches from HF, at build
+  time.
 
-> **Deferred to a follow-up:** the **container registry** and the **release
-> automation**. Pyronear has **no confirmed container registry**  
-> the CI workflow that implements the flow below are intentionally **out of this spec**.
+The detailed publish/fetch mechanics, auth, and workflow live in the
+[API release spec](2026-06-03-api-release-design.md); the **packaging pipeline**
+that produces `model.zip` lives in the
+[packaging spec](2026-06-03-packaging-pipeline-design.md).
 
-## Release flow (target shape — automation deferred)
+## Release flow (target shape)
 
-The intended flow, once a registry is chosen: a release is one human action —
-pushing a tag — followed by CI:
+A release is one human action — pushing a tag — followed by CI:
 
 ```
+(precondition) model.zip published to HF pyronear/temporal-model @ tag vX.Y.Z
+
 push git tag vX.Y.Z
   └─► CI:
-        1. pull  s3://pyronear-temporal-model/models/X.Y.Z/model.zip   (read-only creds)
+        1. fetch model.zip from HF @ revision vX.Y.Z     (hf_hub_download)
         2. assert manifest.model_version == X.Y.Z        (fail on mismatch)
         3. build API image with model.zip baked in
-        4. push  <registry>/temporal-api:X.Y.Z            (registry TBD)
-        5. create GitHub Release vX.Y.Z
-             (notes + rendered provenance + links to S3 key & image)
+        4. push  pyronear/temporal-model-api:X.Y.Z
 ```
 
 **Deploy:** pin the image tag (`temporal-api:X.Y.Z`).
@@ -224,25 +217,24 @@ image *is* the version.
 | `core/detector.py` | **New.** `Detector` model + `load_detector()`. |
 | `core/fetch_detector.py` | **New.** CLI: download detector weights from HF, verify SHA-256, write `yolo_weights.pt`. |
 | `core/package.py` | **Extend.** `build_model_package()` accepts/writes `model_version` and `provenance` (with `detector` from `load_detector()`). |
-| CI release workflow | **Follow-up** (depends on registry choice). Tag-triggered: pull from S3 → assert version → build/push image → create Release. |
-| Container registry | **Follow-up.** No confirmed pyronear registry today; choose ghcr / ECR / Scaleway. |
-| S3 bucket / IAM | Bucket **`pyronear-temporal-model`** created (private, `eu-west-3`, account `894192051958`). **Remaining:** read-only deploy/CI policy; optionally enable object versioning. |
+| CI release workflow | Tag-triggered: fetch `model.zip` from HF → assert version → bake into image → push to Docker Hub. See the [API release spec](2026-06-03-api-release-design.md). |
+| Container registry | **Docker Hub** `pyronear/temporal-model-api` (decided). |
+| Artifact storage | **HuggingFace** `pyronear/temporal-model` (revision per version). The earlier S3 bucket `pyronear-temporal-model` is **unused and can be deleted**. |
 | `api` | **No change.** Already reads `manifest.model_version`; can later surface `provenance` via `?verbose=true` or a future `GET /model` (out of scope here). |
 
 ## Out of scope (this spec)
 
 - The **packaging stage** that produces `model.zip` from a trained checkpoint and
-  uploads it to the S3 key. Precondition only: a versioned `model.zip` with a
-  stamped manifest exists at `s3://pyronear-temporal-model/models/<version>/model.zip`.
+  the `publish` step that uploads it to HuggingFace. Precondition only: a `model.zip`
+  is published to `pyronear/temporal-model` at revision `v<version>`.
 - Recording the YOLO model that generated the **training FP labels** (a dataset
   provenance concern, upstream of this repo).
 - Surfacing `provenance` through the API response (API spec territory).
 - A detector **registry** (multiple coexisting detectors) — single mapping until a
   second detector exists.
 - Runtime model selection / hot-swap — incompatible with baked-in images by design.
-- **Container registry selection and release automation (CI workflow)** — deferred
-  to a follow-up; pyronear has no confirmed registry yet. The target release flow
-  is documented above for reference only.
+- The detailed release/publish mechanics — now specified in the
+  [API release spec](2026-06-03-api-release-design.md).
 
 ## Success criteria
 
@@ -255,13 +247,13 @@ image *is* the version.
    against that file.
 3. `core/package.py::build_model_package()` writes `model_version` and
    `provenance` (with `detector` from `load_detector()`) into the manifest.
-4. Each version's `model.zip` is retrievable from
-   `s3://pyronear-temporal-model/models/<version>/`.
+4. Each version's `model.zip` is retrievable from HuggingFace
+   `pyronear/temporal-model` at revision `v<version>`.
 
-**Target (follow-up — registry & release automation):**
+**Target (release automation — see the API release spec):**
 
 5. One semver appears identically in the git tag, the image tag, and
    `manifest.model_version`; CI fails a release on any mismatch.
-6. A release produces `<registry>/temporal-api:<version>` (registry TBD) with
-   weights baked in, runnable with no S3 access.
+6. A release produces `pyronear/temporal-model-api:<version>` with weights baked
+   in, runnable with no model fetch at runtime.
 7. Rollback is "redeploy the previous image tag," with no other change.
