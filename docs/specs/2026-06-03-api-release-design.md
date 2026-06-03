@@ -65,7 +65,7 @@ Established facts (current repo state):
 | Image shape | Model **baked in** — self-contained, immutable, image tag = version. |
 | Artifact home | **HuggingFace** repo `pyronear/temporal-model`; one `model.zip`, one revision/tag `v<version>` per release. No S3. |
 | Model source (build) | `fetch` via `hf_hub_download(repo, "model.zip", revision="v<version>")`; assert `manifest.model_version == <version>`. |
-| Put artifacts on HF | `publish` CLI: **stamp** `model_version = <version>` into the manifest, upload `model.zip`, tag the HF revision `v<version>`. Version declared once, at publish (matching the tag) — not baked in at packaging. |
+| Put artifacts on HF | `publish` CLI: **stamp** `model_version = <version>` into the manifest, upload `model.zip` + the rendered model card (`README.md`), tag the HF revision `v<version>`. Version declared once, at publish (matching the tag) — not baked in at packaging. |
 | Auth | **Public HF repo**, but CI `fetch` uses a read `HF_TOKEN` secret to avoid 429 rate-limits on the 163 MB pull. `publish` uses the maintainer's HF write token locally. No AWS. |
 | Registry | Docker Hub `pyronear/temporal-model-api` (unchanged). |
 | Trigger | `v*` tags **only** — drop the `main`→`latest` build (no ambiguous "latest" model). |
@@ -90,11 +90,13 @@ fetches the model (it's baked in).
   writes the zip to `<path>`. Used by the CI build to place the model at
   `api/models/model.zip`.
 - **`publish --version X.Y.Z --file <model.zip> [--repo R]`**
-  **Stamps** `model_version = X.Y.Z` into the file's manifest (in place), then
-  `HfApi.upload_file(path_in_repo="model.zip", …)` and `create_tag(R,
-  tag="vX.Y.Z")`. This is where the version is *applied* — the artifact from
-  packaging has provenance but no `model_version`. Used to put artifacts *onto* HF
-  (bootstrap now; the packaging stage later).
+  **Stamps** `model_version = X.Y.Z` into a temp copy of the file's manifest, then
+  `HfApi.upload_file(path_in_repo="model.zip", …)`, uploads the **rendered model
+  card** (`render_model_card(X.Y.Z)` → `README.md`, a packaged `{{VERSION}}`
+  template), and `create_tag(R, tag="vX.Y.Z")`. This is where the version is
+  *applied* — the artifact from packaging has provenance but no `model_version`,
+  and the card always advertises the just-published version. Used to put artifacts
+  *onto* HF (bootstrap now; the packaging stage later).
 
 The **git tag is the single source of truth** for the version: `publish` stamps it
 into the manifest and names the HF revision after it, and `fetch` re-checks it at
