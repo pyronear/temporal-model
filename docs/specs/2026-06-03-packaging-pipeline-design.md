@@ -64,8 +64,10 @@ raw train/val seqs ──┘      ├─ load classifier from ckpt
                             └─ build_model_package(ckpt, yolo, config, calibrator, train_git_sha)  [no model_version]
 ```
 
-`eval` then consumes the `model.zip` (it already points at
-`data/06_models/.../model.zip`); the release `publish` step uploads it to HuggingFace.
+`eval` then consumes the `model.zip` (its `data/06_models/.../model.zip.dvc` is a
+local `dvc import-url` of this output — `train` and `eval` are separate DVC
+projects, so the hand-off is explicit; refresh with `make -C eval update-model`);
+the release `publish` step uploads it to HuggingFace.
 
 ## Decisions
 

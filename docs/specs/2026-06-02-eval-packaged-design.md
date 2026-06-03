@@ -123,10 +123,12 @@ stages:
         - data/08_reporting/${item}/vit_dinov2_finetune/confusion_matrix_normalized.png
 ```
 
-**`model.zip` is an external input dependency.** Nothing in this repo packages
-it yet (the `api` package likewise treats `model.zip` as a provided artifact);
-the user supplies it under `data/06_models/vit_dinov2_finetune/model.zip` or
-pulls it via DVC.
+**`model.zip` is wired in from train via a local `dvc import-url`.** The train
+`package` stage produces it (`train/data/06_models/vit_dinov2_finetune/model.zip`);
+`eval/data/06_models/vit_dinov2_finetune/model.zip.dvc` imports that workspace
+output into eval. Refresh after re-packaging with `make update-model` (i.e.
+`dvc update …model.zip.dvc`); collaborators `dvc pull` it from eval's remote once
+pushed.
 
 The stage references no params, so the placeholder `eval/params.yaml` is
 **removed**.

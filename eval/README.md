@@ -21,9 +21,11 @@ as `python -m temporal_model.eval.evaluate`). Depends on `temporal-model-core`.
 ## Pipeline
 
 `dvc.yaml` defines one `evaluate` stage, run `foreach` train/val. It consumes a
-packaged model at `data/06_models/vit_dinov2_finetune/model.zip` (an **external
-input** — nothing in this repo builds it; supply it or pull via DVC) and raw
-sequences under `data/01_raw/datasets/{train,val}/{fp,wildfire}/<seq>/images/`,
+packaged model at `data/06_models/vit_dinov2_finetune/model.zip` — wired in from
+the train `package` stage via a local `dvc import-url` (`model.zip.dvc`); refresh
+it with `make update-model` after re-packaging in train, or `dvc pull` it from
+eval's remote — and raw sequences under
+`data/01_raw/datasets/{train,val}/{fp,wildfire}/<seq>/images/`,
 writing `metrics.json`, `predictions.json`, `dropped.json`, and PR/ROC/confusion
 PNGs under `data/08_reporting/{split}/vit_dinov2_finetune/`.
 
