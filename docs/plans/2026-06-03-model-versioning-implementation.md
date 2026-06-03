@@ -255,12 +255,14 @@ def test_fetch_raises_on_hash_mismatch(tmp_path: Path) -> None:
     )
     out = tmp_path / "yolo_weights.pt"
 
-    with patch(
-        "temporal_model.core.fetch_detector.hf_hub_download",
-        return_value=str(src),
+    with (
+        patch(
+            "temporal_model.core.fetch_detector.hf_hub_download",
+            return_value=str(src),
+        ),
+        pytest.raises(ValueError, match="SHA-256 mismatch"),
     ):
-        with pytest.raises(ValueError, match="SHA-256 mismatch"):
-            fetch_detector(out, det)
+        fetch_detector(out, det)
     assert not out.exists()
 ```
 

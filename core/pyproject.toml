@@ -16,6 +16,7 @@ dependencies = [
     "ultralytics>=8.3",
     "pillow>=10.0",
     "pyyaml>=6.0",
+    "huggingface-hub>=0.23",
 ]
 
 [tool.hatch.build.targets.wheel]
