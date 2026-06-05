@@ -379,6 +379,50 @@ class TestDeviceSelection:
         assert model.device.type == expected
 
 
+class TestLogisticThreshold:
+    def _model(self, classifier, config=TEST_CONFIG):
+        return BboxTubeTemporalModel(
+            yolo_model=MagicMock(), classifier=classifier, config=config
+        )
+
+    def test_get_defaults_to_half_when_absent(
+        self, tiny_classifier: TemporalSmokeClassifier
+    ) -> None:
+        # TEST_CONFIG["decision"] has no logistic_threshold key.
+        assert self._model(tiny_classifier).logistic_threshold == 0.5
+
+    def test_get_returns_configured_value(
+        self, tiny_classifier: TemporalSmokeClassifier
+    ) -> None:
+        cfg = {
+            **TEST_CONFIG,
+            "decision": {**TEST_CONFIG["decision"], "logistic_threshold": 0.8},
+        }
+        assert self._model(tiny_classifier, cfg).logistic_threshold == 0.8
+
+    def test_set_updates_config(self, tiny_classifier: TemporalSmokeClassifier) -> None:
+        model = self._model(tiny_classifier)
+        model.logistic_threshold = 0.7
+        assert model.logistic_threshold == 0.7
+        assert model._cfg["decision"]["logistic_threshold"] == 0.7
+
+    @pytest.mark.parametrize("value", [0.0, 1.0])
+    def test_set_accepts_boundaries(
+        self, tiny_classifier: TemporalSmokeClassifier, value: float
+    ) -> None:
+        model = self._model(tiny_classifier)
+        model.logistic_threshold = value
+        assert model.logistic_threshold == value
+
+    @pytest.mark.parametrize("value", [-0.1, 1.5])
+    def test_set_rejects_out_of_range(
+        self, tiny_classifier: TemporalSmokeClassifier, value: float
+    ) -> None:
+        model = self._model(tiny_classifier)
+        with pytest.raises(ValueError, match=r"logistic_threshold must be in \[0, 1\]"):
+            model.logistic_threshold = value
+
+
 class TestFirstCrossingTrigger:
     def test_first_crossing_trigger_never_exceeds_end_frame(
         self, tiny_classifier: TemporalSmokeClassifier, red_frames: list[Frame]

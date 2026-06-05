@@ -77,6 +77,17 @@ class BboxTubeTemporalModel(TemporalModel):
     def device(self) -> torch.device:
         return self._device
 
+    @property
+    def logistic_threshold(self) -> float:
+        """Probability threshold for the logistic decision rule."""
+        return float(self._cfg["decision"].get("logistic_threshold", 0.5))
+
+    @logistic_threshold.setter
+    def logistic_threshold(self, value: float) -> None:
+        if not 0.0 <= value <= 1.0:
+            raise ValueError(f"logistic_threshold must be in [0, 1], got {value}")
+        self._cfg["decision"]["logistic_threshold"] = float(value)
+
     @classmethod
     def from_package(
         cls,

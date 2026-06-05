@@ -112,7 +112,27 @@ def test_verbose_adds_details_block():
         "aggregation": "max_logit",
         "threshold": 0.5,
         "trigger_tube_id": 7,
+        "threshold_overridden": False,
+        "packaged_threshold": None,
     }
     assert dumped["details"]["preprocessing"]["num_tube_candidates"] == 2
     assert dumped["details"]["tubes"][0]["tube_id"] == 7
     assert dumped["details"]["tubes"][0]["entries"][1]["bbox"] is None
+
+
+def test_verbose_surfaces_threshold_override():
+    out = SimpleNamespace(
+        is_positive=True, trigger_frame_index=3, details=_details([_tube(7, 0.98)])
+    )
+    resp = to_response(
+        out,
+        name="m",
+        version="1.2.0",
+        calibrated=True,
+        verbose=True,
+        threshold_overridden=True,
+        packaged_threshold=0.5,
+    )
+    decision = resp.model_dump(exclude_unset=True)["details"]["decision"]
+    assert decision["threshold_overridden"] is True
+    assert decision["packaged_threshold"] == 0.5

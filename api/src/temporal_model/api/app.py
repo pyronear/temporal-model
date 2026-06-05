@@ -20,6 +20,22 @@ from .settings import settings
 logger = logging.getLogger(__name__)
 
 
+def _configure_logging() -> None:
+    """Route application loggers through uvicorn's handlers at INFO.
+
+    Uvicorn configures its own ``uvicorn.*`` loggers but leaves the root logger
+    untouched, so application ``INFO`` records (e.g. a calibrator-threshold
+    override) are otherwise dropped. Borrow uvicorn's handlers for the
+    ``temporal_model`` package so startup diagnostics surface in the console.
+    """
+    uvicorn_logger = logging.getLogger("uvicorn")
+    app_logger = logging.getLogger("temporal_model")
+    app_logger.setLevel(logging.INFO)
+    if uvicorn_logger.handlers:
+        app_logger.handlers = uvicorn_logger.handlers
+        app_logger.propagate = False
+
+
 class HealthResponse(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
@@ -31,13 +47,18 @@ class HealthResponse(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _configure_logging()
     if not settings.s3_bucket:
         raise RuntimeError(
             "TEMPORAL_API_S3_BUCKET is required but not set; refusing to start"
         )
     app.state.s3_client = make_s3_client(settings)
     try:
-        app.state.runner = ModelRunner.load(Path(settings.model_path), settings.device)
+        app.state.runner = ModelRunner.load(
+            Path(settings.model_path),
+            settings.device,
+            settings.calibrator_threshold,
+        )
     except Exception as exc:  # noqa: BLE001 — degrade to not-ready, report via /health
         logger.warning("model load failed: %s", exc)
         app.state.runner = None
@@ -100,6 +121,8 @@ async def predict(
                 version=runner.version,
                 calibrated=runner.calibrated,
                 verbose=verbose,
+                threshold_overridden=runner.threshold_overridden,
+                packaged_threshold=runner.packaged_threshold,
             )
         except ApiError:
             raise

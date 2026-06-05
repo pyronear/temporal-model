@@ -220,6 +220,7 @@ Extend the existing `pydantic-settings` `Settings` (env prefix `TEMPORAL_API_`):
 |---|---|---|
 | `MODEL_PATH` | `/models/model.zip` | path to the packaged model |
 | `DEVICE` | `None` (auto cuda→mps→cpu) | torch device override |
+| `CALIBRATOR_THRESHOLD` | `None` (use packaged value) | server-side override of the calibrator (logistic) decision threshold, a probability in `[0, 1]`; out-of-range fails startup; ignored (warned) for uncalibrated packages |
 | `S3_BUCKET` | — (required) | bucket holding the frames |
 | `S3_REGION` | `None` | region (e.g. `gra` for OVH) |
 | `S3_ENDPOINT_URL` | `None` | empty = real AWS; set for OVH / MinIO |
@@ -317,8 +318,11 @@ sequence; then `curl` the API.
   caller exists.
 - Per-request bucket / credentials, or cross-bucket reads.
 - Async jobs / queueing / batching across requests.
-- Client-supplied decision threshold override (decision stays server-side per the
-  packaged config; consumers re-threshold using returned `probability`/`logit`).
+- Client-supplied (per-request) decision threshold override (decision stays
+  server-side; consumers re-threshold using returned `probability`/`logit`). Note:
+  a *server-side operator* override via `TEMPORAL_API_CALIBRATOR_THRESHOLD` is
+  supported — it sets one threshold for the whole deployment at startup and is
+  distinct from a per-request override.
 - A `GET /model` descriptor endpoint or architecture fields in responses.
 - Defining the `model_version` scheme (training spec) or migrating the `core`
   inference path.

@@ -50,6 +50,8 @@ class Decision(BaseModel):
     aggregation: Literal["max_logit", "logistic"]
     threshold: float
     trigger_tube_id: int | None
+    threshold_overridden: bool = False
+    packaged_threshold: float | None = None
 
 
 class Preprocessing(BaseModel):
@@ -102,11 +104,20 @@ def _decision_probability(
     return max(probs) if probs else 0.0
 
 
-def _to_details(details: dict[str, Any]) -> Details:
+def _to_details(
+    details: dict[str, Any],
+    *,
+    threshold_overridden: bool,
+    packaged_threshold: float | None,
+) -> Details:
     tubes_block = details["tubes"]
     pre = details["preprocessing"]
     return Details(
-        decision=Decision(**details["decision"]),
+        decision=Decision(
+            **details["decision"],
+            threshold_overridden=threshold_overridden,
+            packaged_threshold=packaged_threshold,
+        ),
         preprocessing=Preprocessing(
             num_frames_input=pre["num_frames_input"],
             num_truncated=pre["num_truncated"],
@@ -118,7 +129,14 @@ def _to_details(details: dict[str, Any]) -> Details:
 
 
 def to_response(
-    out: Any, *, name: str, version: str | None, calibrated: bool, verbose: bool
+    out: Any,
+    *,
+    name: str,
+    version: str | None,
+    calibrated: bool,
+    verbose: bool,
+    threshold_overridden: bool = False,
+    packaged_threshold: float | None = None,
 ) -> PredictResponse:
     """Reshape a core model output into the public response DTO."""
     kwargs: dict[str, Any] = {
@@ -128,5 +146,9 @@ def to_response(
         "model": ModelInfo(name=name, version=version),
     }
     if verbose:
-        kwargs["details"] = _to_details(out.details)
+        kwargs["details"] = _to_details(
+            out.details,
+            threshold_overridden=threshold_overridden,
+            packaged_threshold=packaged_threshold,
+        )
     return PredictResponse(**kwargs)

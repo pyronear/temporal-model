@@ -26,9 +26,15 @@ container mounts `./models:/models` and loads `/models/model.zip`. Without it
 the service starts but `/health` reports `model_loaded: false`.
 
 Configuration via env vars (prefix `TEMPORAL_API_`): `MODEL_PATH`, `DEVICE`,
-`S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT_URL` (empty = real AWS; set for OVH or
-MinIO), `HOST`, `PORT`. AWS/OVH/MinIO credentials come from the standard boto3
-chain (env vars / IAM role).
+`CALIBRATOR_THRESHOLD`, `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT_URL` (empty = real
+AWS; set for OVH or MinIO), `HOST`, `PORT`. AWS/OVH/MinIO credentials come from
+the standard boto3 chain (env vars / IAM role).
+
+`CALIBRATOR_THRESHOLD` (a probability in `[0, 1]`) overrides the packaged
+calibrator decision threshold for every prediction; out-of-range values fail
+startup, and it is ignored (with a warning) for uncalibrated packages. With
+`?verbose=true`, the response's `details.decision` reports `threshold_overridden`
+and the original `packaged_threshold`.
 
 ## Test
 

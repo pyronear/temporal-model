@@ -56,6 +56,8 @@ class FakeRunner:
     name = "bbox-tube-vit-dinov2"
     version = "1.2.0"
     calibrated = True
+    threshold_overridden = False
+    packaged_threshold = None
 
     def __init__(self, output=None, error=None):
         self._output = output
@@ -117,7 +119,19 @@ def test_predict_verbose(client):
         "aggregation": "max_logit",
         "threshold": 0.5,
         "trigger_tube_id": 7,
+        "threshold_overridden": False,
+        "packaged_threshold": None,
     }
+
+
+def test_predict_verbose_surfaces_override(client):
+    client.app.state.runner = FakeRunner(output=_smoke_output())
+    client.app.state.runner.threshold_overridden = True
+    client.app.state.runner.packaged_threshold = 0.5
+    r = client.post("/predict?verbose=true", json={"frames": KEYS})
+    decision = r.json()["details"]["decision"]
+    assert decision["threshold_overridden"] is True
+    assert decision["packaged_threshold"] == 0.5
 
 
 def test_health_unavailable(client):

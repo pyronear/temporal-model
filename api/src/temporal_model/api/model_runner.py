@@ -7,12 +7,15 @@ imported lazily so this module loads while ``core`` is still being migrated.
 """
 
 import asyncio
+import logging
 import zipfile
 from pathlib import Path
 from typing import Any
 
 import yaml
 from starlette.concurrency import run_in_threadpool
+
+logger = logging.getLogger(__name__)
 
 
 def read_manifest(package_path: Path) -> dict[str, Any]:
@@ -41,21 +44,66 @@ class ModelRunner:
     """Holds the loaded model and serializes inference calls."""
 
     def __init__(
-        self, model: Any, *, name: str, version: str | None, calibrated: bool
+        self,
+        model: Any,
+        *,
+        name: str,
+        version: str | None,
+        calibrated: bool,
+        threshold_overridden: bool = False,
+        packaged_threshold: float | None = None,
     ) -> None:
         self._model = model
         self.name = name
         self.version = version
         self.calibrated = calibrated
+        self.threshold_overridden = threshold_overridden
+        self.packaged_threshold = packaged_threshold
         self._lock = asyncio.Lock()
 
     @classmethod
-    def load(cls, package_path: Path, device: str | None) -> "ModelRunner":
+    def load(
+        cls,
+        package_path: Path,
+        device: str | None,
+        calibrator_threshold: float | None = None,
+    ) -> "ModelRunner":
         """Load a model package. Call once at startup — this blocks while the
-        model checkpoint is deserialized; do not call from a request handler."""
+        model checkpoint is deserialized; do not call from a request handler.
+
+        When ``calibrator_threshold`` is set and the package is calibrated, the
+        model's logistic decision threshold is overridden for every prediction.
+        For an uncalibrated package the override has no effect and is ignored
+        with a warning.
+        """
         meta = read_manifest(package_path)
         model = _load_core_model(package_path, device)
-        return cls(model, **meta)
+
+        threshold_overridden = False
+        packaged_threshold = None
+        if calibrator_threshold is not None:
+            if meta["calibrated"]:
+                packaged_threshold = model.logistic_threshold
+                model.logistic_threshold = calibrator_threshold
+                threshold_overridden = True
+                logger.info(
+                    "calibrator threshold overridden: %s -> %s",
+                    packaged_threshold,
+                    calibrator_threshold,
+                )
+            else:
+                logger.warning(
+                    "TEMPORAL_API_CALIBRATOR_THRESHOLD=%s set but model is "
+                    "uncalibrated; ignoring",
+                    calibrator_threshold,
+                )
+
+        return cls(
+            model,
+            **meta,
+            threshold_overridden=threshold_overridden,
+            packaged_threshold=packaged_threshold,
+        )
 
     async def predict(self, frame_paths: list[Path]) -> Any:
         """Run ``predict_sequence`` in a worker thread, one call at a time."""
