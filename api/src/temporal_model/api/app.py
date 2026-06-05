@@ -20,6 +20,26 @@ from .settings import settings
 logger = logging.getLogger(__name__)
 
 
+def _configure_logging() -> None:
+    """Surface ``temporal_model`` INFO logs through uvicorn's console handler.
+
+    Uvicorn configures its own ``uvicorn.*`` loggers but leaves the root logger
+    untouched, so application ``INFO`` records (e.g. a calibrator-threshold
+    override) are otherwise dropped. Attach uvicorn's handler(s) to the
+    ``temporal_model`` package logger.
+
+    Idempotent (safe to call on every lifespan), and propagation is left intact
+    so test log-capture (``caplog``) keeps working. No-op outside uvicorn (e.g.
+    under ``TestClient``), where ``uvicorn`` has no handlers yet.
+    """
+    app_logger = logging.getLogger("temporal_model")
+    if app_logger.level == logging.NOTSET:
+        app_logger.setLevel(logging.INFO)
+    for handler in logging.getLogger("uvicorn").handlers:
+        if handler not in app_logger.handlers:
+            app_logger.addHandler(handler)
+
+
 class HealthResponse(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
@@ -31,13 +51,18 @@ class HealthResponse(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _configure_logging()
     if not settings.s3_bucket:
         raise RuntimeError(
             "TEMPORAL_API_S3_BUCKET is required but not set; refusing to start"
         )
     app.state.s3_client = make_s3_client(settings)
     try:
-        app.state.runner = ModelRunner.load(Path(settings.model_path), settings.device)
+        app.state.runner = ModelRunner.load(
+            Path(settings.model_path),
+            settings.device,
+            settings.calibrator_threshold,
+        )
     except Exception as exc:  # noqa: BLE001 — degrade to not-ready, report via /health
         logger.warning("model load failed: %s", exc)
         app.state.runner = None
@@ -100,6 +125,8 @@ async def predict(
                 version=runner.version,
                 calibrated=runner.calibrated,
                 verbose=verbose,
+                threshold_overridden=runner.threshold_overridden,
+                packaged_threshold=runner.packaged_threshold,
             )
         except ApiError:
             raise

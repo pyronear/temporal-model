@@ -52,6 +52,62 @@ def test_load_uses_lazy_core_model(tmp_path, monkeypatch):
     assert runner.version == "9"
     assert runner.calibrated is True
     assert runner._model is fake_model
+    assert runner.threshold_overridden is False
+    assert runner.packaged_threshold is None
+
+
+class _FakeModel:
+    """Fake core model exposing real logistic_threshold and aggregation."""
+
+    def __init__(self, threshold=0.5, aggregation="logistic"):
+        self._t = threshold
+        self.aggregation = aggregation
+
+    @property
+    def logistic_threshold(self):
+        return self._t
+
+    @logistic_threshold.setter
+    def logistic_threshold(self, value):
+        self._t = value
+
+
+def test_load_applies_override_when_logistic(tmp_path, monkeypatch):
+    path = _make_package(tmp_path, {"variant": "m", "logistic_calibrator": "c.json"})
+    model = _FakeModel(threshold=0.5, aggregation="logistic")
+    monkeypatch.setattr(mr, "_load_core_model", lambda p, d: model)
+
+    runner = ModelRunner.load(path, device="cpu", calibrator_threshold=0.8)
+
+    assert model.logistic_threshold == 0.8
+    assert runner.threshold_overridden is True
+    assert runner.packaged_threshold == 0.5
+
+
+def test_load_ignores_override_when_not_logistic(tmp_path, monkeypatch, caplog):
+    # Calibrator absent and/or max_logit decision: the override does not apply.
+    path = _make_package(tmp_path, {"variant": "old-model"})
+    model = _FakeModel(threshold=0.5, aggregation="max_logit")
+    monkeypatch.setattr(mr, "_load_core_model", lambda p, d: model)
+
+    with caplog.at_level("WARNING"):
+        runner = ModelRunner.load(path, device="cpu", calibrator_threshold=0.8)
+
+    assert model.logistic_threshold == 0.5
+    assert runner.threshold_overridden is False
+    assert runner.packaged_threshold is None
+    assert "logistic" in caplog.text
+
+
+def test_load_no_override_leaves_threshold(tmp_path, monkeypatch):
+    path = _make_package(tmp_path, {"variant": "m", "logistic_calibrator": "c.json"})
+    model = _FakeModel(threshold=0.5, aggregation="logistic")
+    monkeypatch.setattr(mr, "_load_core_model", lambda p, d: model)
+
+    runner = ModelRunner.load(path, device="cpu")
+
+    assert model.logistic_threshold == 0.5
+    assert runner.threshold_overridden is False
 
 
 def test_predict_delegates_to_model():
