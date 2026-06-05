@@ -422,6 +422,17 @@ class TestLogisticThreshold:
         with pytest.raises(ValueError, match=r"logistic_threshold must be in \[0, 1\]"):
             model.logistic_threshold = value
 
+    def test_aggregation_reflects_config(
+        self, tiny_classifier: TemporalSmokeClassifier
+    ) -> None:
+        # TEST_CONFIG uses max_logit; a logistic config reports logistic.
+        assert self._model(tiny_classifier).aggregation == "max_logit"
+        cfg = {
+            **TEST_CONFIG,
+            "decision": {**TEST_CONFIG["decision"], "aggregation": "logistic"},
+        }
+        assert self._model(tiny_classifier, cfg).aggregation == "logistic"
+
 
 class TestFirstCrossingTrigger:
     def test_first_crossing_trigger_never_exceeds_end_frame(

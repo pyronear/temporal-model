@@ -1,3 +1,4 @@
+import logging
 from types import SimpleNamespace
 
 import boto3
@@ -5,7 +6,8 @@ import pytest
 from fastapi.testclient import TestClient
 from moto import mock_aws
 
-from temporal_model.api.app import app
+from temporal_model.api.app import _configure_logging, app
+from temporal_model.api.model_runner import ModelRunner
 from temporal_model.api.settings import settings
 
 BUCKET = "frames"
@@ -192,3 +194,39 @@ def test_startup_fails_without_bucket(monkeypatch):
     monkeypatch.setattr(settings, "s3_bucket", "")
     with pytest.raises(RuntimeError), TestClient(app):
         pass
+
+
+def test_lifespan_passes_calibrator_threshold(monkeypatch):
+    # The lifespan must forward settings.calibrator_threshold into ModelRunner.load
+    # (the FakeRunner-injection tests bypass lifespan, so this seam is otherwise
+    # untested).
+    captured = {}
+
+    def fake_load(package_path, device, calibrator_threshold=None):
+        captured["calibrator_threshold"] = calibrator_threshold
+        return FakeRunner(output=_smoke_output())
+
+    monkeypatch.setattr(settings, "s3_bucket", BUCKET)
+    monkeypatch.setattr(settings, "calibrator_threshold", 0.33)
+    monkeypatch.setattr(ModelRunner, "load", fake_load)
+    with TestClient(app):
+        pass
+    assert captured["calibrator_threshold"] == 0.33
+
+
+def test_configure_logging_idempotent_and_preserves_propagation():
+    # Borrow uvicorn's handler without severing propagation (so caplog keeps
+    # working) and without duplicating handlers on repeated lifespans.
+    app_logger = logging.getLogger("temporal_model")
+    uvicorn_logger = logging.getLogger("uvicorn")
+    handler = logging.StreamHandler()
+    try:
+        uvicorn_logger.addHandler(handler)
+        _configure_logging()
+        _configure_logging()  # idempotent — no duplicate attach
+        assert app_logger.propagate is True
+        assert app_logger.handlers.count(handler) == 1
+        assert app_logger.level == logging.INFO
+    finally:
+        uvicorn_logger.removeHandler(handler)
+        app_logger.removeHandler(handler)

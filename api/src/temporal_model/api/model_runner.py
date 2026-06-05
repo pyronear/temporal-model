@@ -71,10 +71,12 @@ class ModelRunner:
         """Load a model package. Call once at startup — this blocks while the
         model checkpoint is deserialized; do not call from a request handler.
 
-        When ``calibrator_threshold`` is set and the package is calibrated, the
-        model's logistic decision threshold is overridden for every prediction.
-        For an uncalibrated package the override has no effect and is ignored
-        with a warning.
+        When ``calibrator_threshold`` is set and the model uses the logistic
+        decision rule, its threshold is overridden for every prediction. For a
+        model that does not decide on the logistic threshold (``max_logit``
+        aggregation / uncalibrated) the override has no effect and is ignored
+        with a warning — gating on the actual decision rule, not the manifest,
+        so the reported override is never a no-op.
         """
         meta = read_manifest(package_path)
         model = _load_core_model(package_path, device)
@@ -82,7 +84,7 @@ class ModelRunner:
         threshold_overridden = False
         packaged_threshold = None
         if calibrator_threshold is not None:
-            if meta["calibrated"]:
+            if model.aggregation == "logistic":
                 packaged_threshold = model.logistic_threshold
                 model.logistic_threshold = calibrator_threshold
                 threshold_overridden = True
@@ -93,9 +95,10 @@ class ModelRunner:
                 )
             else:
                 logger.warning(
-                    "TEMPORAL_API_CALIBRATOR_THRESHOLD=%s set but model is "
-                    "uncalibrated; ignoring",
+                    "TEMPORAL_API_CALIBRATOR_THRESHOLD=%s set but model does not "
+                    "use a logistic decision (aggregation=%s); ignoring",
                     calibrator_threshold,
+                    model.aggregation,
                 )
 
         return cls(

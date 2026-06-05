@@ -57,10 +57,11 @@ def test_load_uses_lazy_core_model(tmp_path, monkeypatch):
 
 
 class _FakeModel:
-    """Fake core model exposing a real logistic_threshold property."""
+    """Fake core model exposing real logistic_threshold and aggregation."""
 
-    def __init__(self, threshold=0.5):
+    def __init__(self, threshold=0.5, aggregation="logistic"):
         self._t = threshold
+        self.aggregation = aggregation
 
     @property
     def logistic_threshold(self):
@@ -71,9 +72,9 @@ class _FakeModel:
         self._t = value
 
 
-def test_load_applies_override_when_calibrated(tmp_path, monkeypatch):
+def test_load_applies_override_when_logistic(tmp_path, monkeypatch):
     path = _make_package(tmp_path, {"variant": "m", "logistic_calibrator": "c.json"})
-    model = _FakeModel(threshold=0.5)
+    model = _FakeModel(threshold=0.5, aggregation="logistic")
     monkeypatch.setattr(mr, "_load_core_model", lambda p, d: model)
 
     runner = ModelRunner.load(path, device="cpu", calibrator_threshold=0.8)
@@ -83,9 +84,10 @@ def test_load_applies_override_when_calibrated(tmp_path, monkeypatch):
     assert runner.packaged_threshold == 0.5
 
 
-def test_load_ignores_override_when_uncalibrated(tmp_path, monkeypatch, caplog):
+def test_load_ignores_override_when_not_logistic(tmp_path, monkeypatch, caplog):
+    # Calibrator absent and/or max_logit decision: the override does not apply.
     path = _make_package(tmp_path, {"variant": "old-model"})
-    model = _FakeModel(threshold=0.5)
+    model = _FakeModel(threshold=0.5, aggregation="max_logit")
     monkeypatch.setattr(mr, "_load_core_model", lambda p, d: model)
 
     with caplog.at_level("WARNING"):
@@ -94,12 +96,12 @@ def test_load_ignores_override_when_uncalibrated(tmp_path, monkeypatch, caplog):
     assert model.logistic_threshold == 0.5
     assert runner.threshold_overridden is False
     assert runner.packaged_threshold is None
-    assert "uncalibrated" in caplog.text
+    assert "logistic" in caplog.text
 
 
 def test_load_no_override_leaves_threshold(tmp_path, monkeypatch):
     path = _make_package(tmp_path, {"variant": "m", "logistic_calibrator": "c.json"})
-    model = _FakeModel(threshold=0.5)
+    model = _FakeModel(threshold=0.5, aggregation="logistic")
     monkeypatch.setattr(mr, "_load_core_model", lambda p, d: model)
 
     runner = ModelRunner.load(path, device="cpu")

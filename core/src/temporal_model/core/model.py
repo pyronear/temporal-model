@@ -78,6 +78,11 @@ class BboxTubeTemporalModel(TemporalModel):
         return self._device
 
     @property
+    def aggregation(self) -> str:
+        """Decision aggregation rule: ``"max_logit"`` or ``"logistic"``."""
+        return self._cfg["decision"].get("aggregation", "max_logit")
+
+    @property
     def logistic_threshold(self) -> float:
         """Probability threshold for the logistic decision rule."""
         return float(self._cfg["decision"].get("logistic_threshold", 0.5))

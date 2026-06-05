@@ -21,19 +21,23 @@ logger = logging.getLogger(__name__)
 
 
 def _configure_logging() -> None:
-    """Route application loggers through uvicorn's handlers at INFO.
+    """Surface ``temporal_model`` INFO logs through uvicorn's console handler.
 
     Uvicorn configures its own ``uvicorn.*`` loggers but leaves the root logger
     untouched, so application ``INFO`` records (e.g. a calibrator-threshold
-    override) are otherwise dropped. Borrow uvicorn's handlers for the
-    ``temporal_model`` package so startup diagnostics surface in the console.
+    override) are otherwise dropped. Attach uvicorn's handler(s) to the
+    ``temporal_model`` package logger.
+
+    Idempotent (safe to call on every lifespan), and propagation is left intact
+    so test log-capture (``caplog``) keeps working. No-op outside uvicorn (e.g.
+    under ``TestClient``), where ``uvicorn`` has no handlers yet.
     """
-    uvicorn_logger = logging.getLogger("uvicorn")
     app_logger = logging.getLogger("temporal_model")
-    app_logger.setLevel(logging.INFO)
-    if uvicorn_logger.handlers:
-        app_logger.handlers = uvicorn_logger.handlers
-        app_logger.propagate = False
+    if app_logger.level == logging.NOTSET:
+        app_logger.setLevel(logging.INFO)
+    for handler in logging.getLogger("uvicorn").handlers:
+        if handler not in app_logger.handlers:
+            app_logger.addHandler(handler)
 
 
 class HealthResponse(BaseModel):
