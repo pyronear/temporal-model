@@ -11,6 +11,7 @@ import numpy as np
 from PIL import Image
 
 from .data import find_sequence_dir
+from .stabilize import union_window
 
 LABEL_TO_INT = {"fp": 0, "smoke": 1}
 
@@ -68,6 +69,7 @@ def process_tube(
     out_dir: Path,
     context_factor: float,
     patch_size: int,
+    stabilize: bool = True,
 ) -> None:
     record = json.loads(tube_path.read_text())
     sequence_id = record["sequence_id"]
@@ -80,11 +82,17 @@ def process_tube(
     seq_out = out_dir / sequence_id
     seq_out.mkdir(parents=True, exist_ok=True)
 
+    entries = record["tube"]["entries"]
+    window = None
+    if stabilize:
+        observed = [tuple(e["bbox"]) for e in entries if not e["is_gap"]]
+        window = union_window(observed or [tuple(e["bbox"]) for e in entries])
+
     frame_meta: list[dict] = []
-    for entry in record["tube"]["entries"]:
+    for entry in entries:
         frame_id = entry["frame_id"]
         frame_idx = entry["frame_idx"]
-        bbox = entry["bbox"]
+        bbox = window if stabilize else entry["bbox"]
         is_gap = entry["is_gap"]
 
         img_path = images_dir / f"{frame_id}.jpg"
@@ -103,7 +111,7 @@ def process_tube(
                 "frame_idx": frame_idx,
                 "frame_id": frame_id,
                 "is_gap": is_gap,
-                "orig_bbox": list(bbox),
+                "orig_bbox": list(entry["bbox"]),
                 "crop_bbox_pixels": list(crop_box),
                 "filename": filename,
             }
@@ -117,6 +125,7 @@ def process_tube(
         "num_frames": record["num_frames"],
         "context_factor": context_factor,
         "patch_size": patch_size,
+        "stabilize": stabilize,
         "frames": frame_meta,
     }
     (seq_out / "meta.json").write_text(json.dumps(meta, indent=2))
