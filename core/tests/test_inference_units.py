@@ -288,13 +288,21 @@ class TestCropTubePatches:
             ],
         )
         stab, _ = crop_tube_patches(
-            tube, frames, context_factor=1.5, patch_size=224, max_frames=5,
+            tube,
+            frames,
+            context_factor=1.5,
+            patch_size=224,
+            max_frames=5,
             normalization_mean=[0.485, 0.456, 0.406],
             normalization_std=[0.229, 0.224, 0.225],
             stabilize=True,
         )
         per_frame, _ = crop_tube_patches(
-            tube, frames, context_factor=1.5, patch_size=224, max_frames=5,
+            tube,
+            frames,
+            context_factor=1.5,
+            patch_size=224,
+            max_frames=5,
             normalization_mean=[0.485, 0.456, 0.406],
             normalization_std=[0.229, 0.224, 0.225],
             stabilize=False,
@@ -317,7 +325,11 @@ class TestCropTubePatches:
             ],
         )
         default, _ = crop_tube_patches(  # no stabilize arg -> defaults to True
-            tube, frames, context_factor=1.5, patch_size=224, max_frames=5,
+            tube,
+            frames,
+            context_factor=1.5,
+            patch_size=224,
+            max_frames=5,
             normalization_mean=[0.485, 0.456, 0.406],
             normalization_std=[0.229, 0.224, 0.225],
         )
