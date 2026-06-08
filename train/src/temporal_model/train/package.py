@@ -104,6 +104,7 @@ def build_config(
         "model_input": {
             "context_factor": all_params["model_input"]["context_factor"],
             "patch_size": all_params["model_input"]["patch_size"],
+            "stabilize": all_params["model_input"].get("stabilize", True),
             "normalization": _NORMALIZATION,
         },
         "classifier": classifier_kwargs(variant_cfg),

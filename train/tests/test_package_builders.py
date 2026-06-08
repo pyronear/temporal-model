@@ -68,3 +68,27 @@ def test_build_config_shape() -> None:
     assert cfg["decision"]["logistic_threshold"] == 0.52
     assert cfg["decision"]["target_recall"] == 0.95
     assert cfg["model_input"]["normalization"]["mean"] == [0.485, 0.456, 0.406]
+
+
+def test_build_config_bakes_stabilize_from_param() -> None:
+    params = {**PARAMS, "model_input": {**PARAMS["model_input"], "stabilize": True}}
+    cfg = build_config(
+        params,
+        params["train_vit_dinov2_finetune"],
+        threshold=0.4,
+        aggregation="logistic",
+        logistic_threshold=0.52,
+    )
+    assert cfg["model_input"]["stabilize"] is True
+
+
+def test_build_config_stabilize_defaults_true_when_absent() -> None:
+    # PARAMS["model_input"] has no "stabilize" key.
+    cfg = build_config(
+        PARAMS,
+        PARAMS["train_vit_dinov2_finetune"],
+        threshold=0.4,
+        aggregation="logistic",
+        logistic_threshold=0.52,
+    )
+    assert cfg["model_input"]["stabilize"] is True
