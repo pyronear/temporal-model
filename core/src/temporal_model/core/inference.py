@@ -226,17 +226,19 @@ def crop_tube_patches(
 
     window = None
     if stabilize:
-        window = tube_window(
-            [
-                (
-                    (e.detection.cx, e.detection.cy, e.detection.w, e.detection.h)
-                    if e.detection is not None
-                    else None,
-                    e.is_gap,
-                )
-                for e in tube.entries
-            ]
-        )
+        boxes = [
+            (
+                (e.detection.cx, e.detection.cy, e.detection.w, e.detection.h)
+                if e.detection is not None
+                else None,
+                e.is_gap,
+            )
+            for e in tube.entries
+        ]
+        # A tube with no usable detection has no window; leave it None. Every
+        # such entry hits the ``det is None`` skip below, so it is never read.
+        if any(box is not None for box, _ in boxes):
+            window = tube_window(boxes)
 
     for slot, entry in enumerate(tube.entries[:n]):
         det = entry.detection

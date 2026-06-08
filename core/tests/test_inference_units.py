@@ -335,6 +335,30 @@ class TestCropTubePatches:
         )
         assert torch.equal(default[0], default[1])
 
+    def test_stabilize_all_gap_no_detections_does_not_crash(
+        self, gradient_image_sequence: list[Path]
+    ) -> None:
+        # A degenerate tube with no usable detection has no window to compute;
+        # the stabilized path must degrade like the per-frame path (zero patches,
+        # mask all False) instead of raising on union_window([]).
+        frames = [
+            Frame(frame_id=p.stem, image_path=p, timestamp=None)
+            for p in gradient_image_sequence
+        ]
+        tube = _tube(0, [(0, None), (1, None)])
+        patches, mask = crop_tube_patches(
+            tube,
+            frames,
+            context_factor=1.5,
+            patch_size=224,
+            max_frames=5,
+            normalization_mean=[0.485, 0.456, 0.406],
+            normalization_std=[0.229, 0.224, 0.225],
+            stabilize=True,
+        )
+        assert not mask.any()
+        assert torch.all(patches == 0.0)
+
 
 class TestScoreTubes:
     def test_empty_input_returns_empty(self) -> None:
