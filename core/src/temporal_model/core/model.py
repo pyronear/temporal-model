@@ -247,6 +247,7 @@ class BboxTubeTemporalModel(TemporalModel):
                 max_frames=clf_cfg["max_frames"],
                 normalization_mean=mi["normalization"]["mean"],
                 normalization_std=mi["normalization"]["std"],
+                stabilize=mi.get("stabilize", True),
             )
             patches_per_tube.append(p.to(self._device))
             masks_per_tube.append(m.to(self._device))

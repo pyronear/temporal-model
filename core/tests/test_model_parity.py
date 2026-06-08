@@ -12,6 +12,7 @@ Methodology:
 - Assert predict()'s winning-tube logit == reference logit to 1e-5.
 """
 
+import copy
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -29,6 +30,7 @@ from temporal_model.core.model_input import (
     norm_bbox_to_pixel_square,
 )
 from temporal_model.core.protocol import Frame
+from temporal_model.core.stabilize import union_window
 from temporal_model.core.temporal_classifier import TemporalSmokeClassifier
 from temporal_model.core.tubes import (
     build_tubes,
@@ -142,12 +144,32 @@ def _offline_logit_with_cfg(classifier: TemporalSmokeClassifier, cfg: dict) -> f
     frame_paths = sorted((FIXTURE / "images").glob("*.jpg"))
     mean = torch.tensor(mi["normalization"]["mean"]).view(3, 1, 1)
     std = torch.tensor(mi["normalization"]["std"]).view(3, 1, 1)
+    window = None
+    if mi.get("stabilize", True):
+        observed = [
+            (e.detection.cx, e.detection.cy, e.detection.w, e.detection.h)
+            for e in tube.entries
+            if e.detection is not None and not e.is_gap
+        ]
+        if not observed:
+            observed = [
+                (e.detection.cx, e.detection.cy, e.detection.w, e.detection.h)
+                for e in tube.entries
+                if e.detection is not None
+            ]
+        window = union_window(observed)
+
     for slot, entry in enumerate(tube.entries[:t_max]):
         det = entry.detection
         assert det is not None
         img = np.array(Image.open(frame_paths[entry.frame_idx]).convert("RGB"))
         h_img, w_img, _ = img.shape
-        cx, cy, w, h = expand_bbox(det.cx, det.cy, det.w, det.h, mi["context_factor"])
+        box_src = (
+            window if mi.get("stabilize", True) else (det.cx, det.cy, det.w, det.h)
+        )
+        cx, cy, w, h = expand_bbox(
+            box_src[0], box_src[1], box_src[2], box_src[3], mi["context_factor"]
+        )
         box = norm_bbox_to_pixel_square(cx, cy, w, h, w_img, h_img)
         p = crop_and_resize(img, box, mi["patch_size"])
         pt = to_tensor(Image.fromarray(p))
@@ -159,10 +181,13 @@ def _offline_logit_with_cfg(classifier: TemporalSmokeClassifier, cfg: dict) -> f
     return float(logit.item())
 
 
+@pytest.mark.parametrize("stabilize", [False, True])
 def test_parity_logit_matches_transformer(
-    transformer_classifier: TemporalSmokeClassifier,
+    transformer_classifier: TemporalSmokeClassifier, stabilize: bool
 ) -> None:
-    offline = _offline_logit_with_cfg(transformer_classifier, CFG_TRANSFORMER)
+    cfg = copy.deepcopy(CFG_TRANSFORMER)
+    cfg["model_input"]["stabilize"] = stabilize
+    offline = _offline_logit_with_cfg(transformer_classifier, cfg)
 
     frames = [
         Frame(frame_id=p.stem, image_path=p, timestamp=None)
@@ -174,7 +199,7 @@ def test_parity_logit_matches_transformer(
     model = BboxTubeTemporalModel(
         yolo_model=yolo,
         classifier=transformer_classifier,
-        config=CFG_TRANSFORMER,
+        config=cfg,
         device="cpu",
     )
     out = model.predict(frames=frames)

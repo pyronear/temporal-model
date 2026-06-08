@@ -257,7 +257,9 @@ def test_process_tube_default_is_stabilized(tmp_path):
     )
     meta = json.loads((out_dir / seq_id / "meta.json").read_text())
     assert meta["stabilize"] is True
-    assert meta["frames"][0]["crop_bbox_pixels"] == meta["frames"][1]["crop_bbox_pixels"]
+    assert (
+        meta["frames"][0]["crop_bbox_pixels"] == meta["frames"][1]["crop_bbox_pixels"]
+    )
 
 
 def test_process_tube_stabilize_false_is_per_frame(tmp_path):
@@ -282,4 +284,6 @@ def test_process_tube_stabilize_false_is_per_frame(tmp_path):
     meta = json.loads((out_dir / seq_id / "meta.json").read_text())
     assert meta["stabilize"] is False
     # Different per-frame boxes -> different crop windows.
-    assert meta["frames"][0]["crop_bbox_pixels"] != meta["frames"][1]["crop_bbox_pixels"]
+    assert (
+        meta["frames"][0]["crop_bbox_pixels"] != meta["frames"][1]["crop_bbox_pixels"]
+    )
