@@ -26,6 +26,7 @@ build_tubes:
 model_input:
   context_factor: 1.5
   patch_size: 224
+  stabilize: true
 
 package:
   target_recall: 0.95
