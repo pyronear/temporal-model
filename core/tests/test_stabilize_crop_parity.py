@@ -1,13 +1,20 @@
 """End-to-end stabilize crop parity: training crop == inference crop on a gappy tube.
 
 The training path (``model_input.process_tube`` → PNG) and the inference path
-(``inference.crop_tube_patches`` → tensor) compute the stabilized crop window
-through two *separate* adapter layers (dict entries vs ``TubeEntry``/``Detection``)
-over the shared ``stabilize.tube_window`` helper. Those adapters can drift; this
-test feeds both the *same* tube — including a GAP frame whose box sits far outside
-the observed boxes — and asserts the resulting patches are identical. If either
-adapter failed to exclude the gap (or mismatched the other), the windows would
-differ and the patches would diverge.
+(``inference.crop_tube_patches`` → tensor) both crop through the shared
+``stabilize.tube_window`` helper, but each feeds it through its OWN adapter layer
+(dict entries with ``e["bbox"]``/``e["is_gap"]`` vs ``TubeEntry``/``Detection``).
+The window *policy* is shared, so it cannot drift between the two paths; the
+adapters are NOT shared and can. This test guards **adapter parity**: it feeds both
+paths the same tube — including a gap frame whose box sits far outside the observed
+boxes — and asserts identical patches. If one adapter projected entries differently
+from the other (e.g. dropped ``is_gap`` so it stopped excluding the far gap box, or
+mismapped the bbox fields), the two windows would diverge and the patches would
+differ; the far gap box makes such a divergence visible rather than negligible.
+
+Scope: this does NOT verify ``tube_window``'s exclusion policy itself — a bug there
+would shift BOTH paths identically and still pass here. That policy (non-gap union,
+fallback, None handling) is unit-tested in ``test_stabilize.py``.
 """
 
 import json
@@ -25,9 +32,10 @@ from temporal_model.core.types import Detection, Tube, TubeEntry
 _MEAN = [0.485, 0.456, 0.406]
 _STD = [0.229, 0.224, 0.225]
 
-# Frame 1 is a gap with a far-away box (cx=0.9); it must be excluded from the
-# window. Observed boxes (cx 0.4 / 0.6) give a centered window; including the gap
-# would shift it hard right, so the test is sensitive to an exclusion bug.
+# Frame 1 is a gap with a far-away box (cx=0.9). Observed boxes (cx 0.4 / 0.6) give
+# a centered window; an adapter that mishandled the gap (included its box) would
+# shift the window hard right, so any adapter divergence between the two paths is
+# visible rather than negligible.
 _BOXES = [
     ((0.4, 0.5, 0.1, 0.1), False),
     ((0.9, 0.5, 0.2, 0.2), True),
