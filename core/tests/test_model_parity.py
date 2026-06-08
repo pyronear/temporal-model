@@ -30,7 +30,6 @@ from temporal_model.core.model_input import (
     norm_bbox_to_pixel_square,
 )
 from temporal_model.core.protocol import Frame
-from temporal_model.core.stabilize import union_window
 from temporal_model.core.temporal_classifier import TemporalSmokeClassifier
 from temporal_model.core.tubes import (
     build_tubes,
@@ -146,18 +145,23 @@ def _offline_logit_with_cfg(classifier: TemporalSmokeClassifier, cfg: dict) -> f
     std = torch.tensor(mi["normalization"]["std"]).view(3, 1, 1)
     window = None
     if mi.get("stabilize", True):
-        observed = [
+        # Independent oracle: compute the union window from scratch (plain min/max
+        # over observed GT boxes) WITHOUT calling the production stabilize helper,
+        # so this reference can actually catch a bug in crop_tube_patches' window.
+        obs = [
             (e.detection.cx, e.detection.cy, e.detection.w, e.detection.h)
             for e in tube.entries
             if e.detection is not None and not e.is_gap
+        ] or [
+            (e.detection.cx, e.detection.cy, e.detection.w, e.detection.h)
+            for e in tube.entries
+            if e.detection is not None
         ]
-        if not observed:
-            observed = [
-                (e.detection.cx, e.detection.cy, e.detection.w, e.detection.h)
-                for e in tube.entries
-                if e.detection is not None
-            ]
-        window = union_window(observed)
+        x0 = min(cx - bw / 2 for cx, _, bw, _ in obs)
+        y0 = min(cy - bh / 2 for _, cy, _, bh in obs)
+        x1 = max(cx + bw / 2 for cx, _, bw, _ in obs)
+        y1 = max(cy + bh / 2 for _, cy, _, bh in obs)
+        window = ((x0 + x1) / 2, (y0 + y1) / 2, x1 - x0, y1 - y0)
 
     for slot, entry in enumerate(tube.entries[:t_max]):
         det = entry.detection

@@ -11,7 +11,7 @@ import numpy as np
 from PIL import Image
 
 from .data import find_sequence_dir
-from .stabilize import union_window
+from .stabilize import tube_window
 
 LABEL_TO_INT = {"fp": 0, "smoke": 1}
 
@@ -85,8 +85,7 @@ def process_tube(
     entries = record["tube"]["entries"]
     window = None
     if stabilize:
-        observed = [tuple(e["bbox"]) for e in entries if not e["is_gap"]]
-        window = union_window(observed or [tuple(e["bbox"]) for e in entries])
+        window = tube_window([(tuple(e["bbox"]), e["is_gap"]) for e in entries])
 
     frame_meta: list[dict] = []
     for entry in entries:
