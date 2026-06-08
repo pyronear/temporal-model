@@ -15,6 +15,7 @@ from torchvision.transforms.functional import to_tensor
 from .logistic_calibrator import LogisticCalibrator, extract_features
 from .model_input import crop_and_resize, expand_bbox, norm_bbox_to_pixel_square
 from .protocol import Frame
+from .stabilize import union_window
 from .tubes import (
     build_tubes,
     merge_colocated_tubes,
@@ -207,6 +208,7 @@ def crop_tube_patches(
     max_frames: int,
     normalization_mean: list[float],
     normalization_std: list[float],
+    stabilize: bool = True,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Crop patches for a single tube, padded/truncated to ``max_frames``.
 
@@ -222,6 +224,21 @@ def crop_tube_patches(
     mean_t = torch.tensor(normalization_mean).view(3, 1, 1)
     std_t = torch.tensor(normalization_std).view(3, 1, 1)
 
+    window = None
+    if stabilize:
+        observed = [
+            (e.detection.cx, e.detection.cy, e.detection.w, e.detection.h)
+            for e in tube.entries
+            if e.detection is not None and not e.is_gap
+        ]
+        if not observed:
+            observed = [
+                (e.detection.cx, e.detection.cy, e.detection.w, e.detection.h)
+                for e in tube.entries
+                if e.detection is not None
+            ]
+        window = union_window(observed)
+
     for slot, entry in enumerate(tube.entries[:n]):
         det = entry.detection
         if det is None:
@@ -231,7 +248,10 @@ def crop_tube_patches(
         image = np.array(Image.open(frame.image_path).convert("RGB"))
         img_h, img_w, _ = image.shape
 
-        cx, cy, w, h = expand_bbox(det.cx, det.cy, det.w, det.h, context_factor)
+        box_src = window if stabilize else (det.cx, det.cy, det.w, det.h)
+        cx, cy, w, h = expand_bbox(
+            box_src[0], box_src[1], box_src[2], box_src[3], context_factor
+        )
         box = norm_bbox_to_pixel_square(cx, cy, w, h, img_w, img_h)
         patch_np = crop_and_resize(image, box, patch_size)
         patch_t = to_tensor(Image.fromarray(patch_np))  # CHW float32 [0,1]

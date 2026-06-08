@@ -192,6 +192,21 @@ def red_image_sequence(tmp_path: Path) -> list[Path]:
     return paths
 
 
+@pytest.fixture()
+def gradient_image_sequence(tmp_path: Path) -> list[Path]:
+    """Three 128x128 horizontal-gradient JPGs (x-varying), so different crop
+    windows produce different patches. All three frames are identical, so a
+    fixed (stabilized) window crops identically across frames."""
+    paths = []
+    ramp = np.tile(np.linspace(0, 255, 128, dtype=np.uint8), (128, 1))
+    img = np.stack([ramp, ramp, ramp], axis=-1)
+    for i in range(3):
+        p = tmp_path / f"frame_{i:02d}.jpg"
+        Image.fromarray(img).save(p, format="JPEG", quality=95)
+        paths.append(p)
+    return paths
+
+
 class TestCropTubePatches:
     def test_output_shape(self, red_image_sequence: list[Path]) -> None:
         frames = [
@@ -256,6 +271,57 @@ class TestCropTubePatches:
         )
         assert patches.shape == (2, 3, 224, 224)
         assert mask.tolist() == [True, True]
+
+    def test_stabilize_uses_constant_union_window(
+        self, gradient_image_sequence: list[Path]
+    ) -> None:
+        frames = [
+            Frame(frame_id=p.stem, image_path=p, timestamp=None)
+            for p in gradient_image_sequence
+        ]
+        # Two frames, boxes at different x; union window is centered between them.
+        tube = _tube(
+            0,
+            [
+                (0, _det(cx=0.3, cy=0.5, w=0.1, h=0.1)),
+                (1, _det(cx=0.7, cy=0.5, w=0.1, h=0.1)),
+            ],
+        )
+        stab, _ = crop_tube_patches(
+            tube, frames, context_factor=1.5, patch_size=224, max_frames=5,
+            normalization_mean=[0.485, 0.456, 0.406],
+            normalization_std=[0.229, 0.224, 0.225],
+            stabilize=True,
+        )
+        per_frame, _ = crop_tube_patches(
+            tube, frames, context_factor=1.5, patch_size=224, max_frames=5,
+            normalization_mean=[0.485, 0.456, 0.406],
+            normalization_std=[0.229, 0.224, 0.225],
+            stabilize=False,
+        )
+        # Stabilized: both real frames share the same fixed window -> identical patches.
+        assert torch.equal(stab[0], stab[1])
+        # Per-frame: different boxes -> different patches.
+        assert not torch.equal(per_frame[0], per_frame[1])
+
+    def test_default_is_stabilized(self, gradient_image_sequence: list[Path]) -> None:
+        frames = [
+            Frame(frame_id=p.stem, image_path=p, timestamp=None)
+            for p in gradient_image_sequence
+        ]
+        tube = _tube(
+            0,
+            [
+                (0, _det(cx=0.3, cy=0.5, w=0.1, h=0.1)),
+                (1, _det(cx=0.7, cy=0.5, w=0.1, h=0.1)),
+            ],
+        )
+        default, _ = crop_tube_patches(  # no stabilize arg -> defaults to True
+            tube, frames, context_factor=1.5, patch_size=224, max_frames=5,
+            normalization_mean=[0.485, 0.456, 0.406],
+            normalization_std=[0.229, 0.224, 0.225],
+        )
+        assert torch.equal(default[0], default[1])
 
 
 class TestScoreTubes:
