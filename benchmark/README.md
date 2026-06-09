@@ -15,22 +15,42 @@ design spec: `docs/specs/2026-06-09-benchmark-package-design.md`.
 
 ## What it measures
 
-`predict()` runs a six-stage pipeline. The benchmark times each stage
-separately, so a single run tells you *which* stage dominates — not just the
-total latency.
+### The model, in one breath
 
-| stage | what happens | typically heavy on |
-|---------|--------------------------------------------------|--------------------|
-| `pad` | truncate to `max_frames`, pad short sequences | nothing (µs) |
-| `yolo` | one batched YOLO detection call over all frames | GPU / CPU |
-| `tubes` | greedy IoU tube building + filtering | nothing (µs) |
-| `crop` | open each frame from disk, crop/resize patches | disk IO + CPU |
-| `vit` | one batched ViT (DINOv2) classifier forward | GPU / CPU |
-| `trigger` | re-score tube prefixes to find first-crossing | GPU / CPU |
+The temporal smoke classifier decides whether a short sequence of frames from
+one camera contains smoke. End to end, `predict()` does:
 
-The split shifts a lot with hardware: on a GPU, `yolo` usually dominates; on a
-CPU VM, `vit` and `trigger` grow relative to it. Surfacing that flip is the
-whole point.
+```
+frames ─▶ YOLO detects boxes ─▶ link boxes into temporal "tubes"
+       ─▶ crop each tube's frames to 224×224 patches
+       ─▶ score each tube with a ViT (DINOv2) classifier ─▶ decision + trigger frame
+```
+
+A **tube** is one candidate smoke plume tracked across frames (boxes in
+consecutive frames linked by IoU). The model emits one logit per tube and, for a
+positive, the **trigger frame** — the earliest frame at which it would have
+fired (this is what time-to-detection is measured from).
+
+### The six timed stages
+
+The benchmark times each stage of `predict()` separately, so a single run tells
+you *which* stage dominates — not just the total latency.
+
+| stage | what it does | why it costs |
+|-----------|----------------------------------------------------------------|-------------------------------|
+| `pad` | truncate the sequence to `max_frames`; if too short, duplicate frames to a minimum length | pure Python list ops — microseconds |
+| `yolo` | one batched YOLO11 detection call over **all** frames at once, producing candidate boxes per frame | a CNN forward over full-resolution frames — heavy |
+| `tubes` | link per-frame boxes into tubes (greedy IoU tracking), then filter/merge/interpolate them | small array bookkeeping — microseconds |
+| `crop` | for every kept tube, open each frame **from disk** (PIL), crop around the box, resize to 224×224, normalize | image decode + disk IO + CPU resize |
+| `vit` | one batched ViT (DINOv2 backbone + transformer head) forward scoring all tubes' full-length patch stacks | a transformer forward — heavy |
+| `trigger` | re-score growing **prefixes** of each qualifying tube to find the earliest firing frame (the trigger) — a serial loop of extra ViT forwards | repeated classifier calls — grows with tube length |
+
+The split shifts a lot with hardware. On a GPU the single big `yolo` forward
+dominates (~86%) and the classifier side is cheap; on a CPU VM the picture flips
+— `vit` plus the serial `trigger` loop become ~40% of latency, because each of
+those extra forwards is no longer nearly free. **Surfacing that flip is the whole
+point**, and it points straight at what to optimize on a given machine (e.g. the
+`trigger` loop's repeated forwards on CPU).
 
 ### How the timing works
 
