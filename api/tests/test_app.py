@@ -65,9 +65,14 @@ class FakeRunner:
         self._output = output
         self._error = error
 
-    async def predict(self, paths):
+    async def predict(self, paths, *, timer=None, profile=None):
         if self._error:
             raise self._error
+        if timer is not None:
+            with timer.stage("detector"):
+                pass
+        if profile is not None:
+            profile.update(n_frames=len(paths), cache_hits=0, cache_misses=len(paths))
         return self._output
 
 
@@ -232,3 +237,21 @@ def test_configure_logging_idempotent_and_preserves_propagation():
     finally:
         uvicorn_logger.removeHandler(handler)
         app_logger.removeHandler(handler)
+
+
+def test_predict_profiling_off_by_default(client):
+    r = client.post("/predict?verbose=true", json={"frames": KEYS})
+    assert r.status_code == 200
+    assert r.json()["details"].get("profiling") is None
+
+
+def test_predict_profiling_on_surfaces_block(client, monkeypatch):
+    monkeypatch.setattr(settings, "profile", True)
+    r = client.post("/predict?verbose=true", json={"frames": KEYS})
+    assert r.status_code == 200
+    prof = r.json()["details"]["profiling"]
+    assert "s3_fetch" in prof["stages_ms"]
+    assert "detector" in prof["stages_ms"]
+    assert prof["n_frames"] == len(KEYS)
+    assert prof["cache_misses"] == len(KEYS)
+    assert prof["total_ms"] >= 0.0
