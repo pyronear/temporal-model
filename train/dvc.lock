@@ -53,18 +53,26 @@ stages:
       --min-detected-entries 2 --merge-iomin 0.3 --merge-prox-factor 1.0 
       --merge-max-gap 10
     deps:
-    - path: ../core/src/temporal_model/core/data.py
+    - path: ../core/src/temporal_model/core/labels.py
       hash: md5
-      md5: b907e5a0baedb93775446678c2cce034
-      size: 5078
+      md5: 66210787af9d9ac75c171874b8698425
+      size: 3371
+    - path: ../core/src/temporal_model/core/protocol.py
+      hash: md5
+      md5: 2d44441b0b89790f11b845406ebd6026
+      size: 5560
+    - path: ../core/src/temporal_model/core/sequences.py
+      hash: md5
+      md5: 52023f25efee8db079a744636b832969
+      size: 1613
     - path: ../core/src/temporal_model/core/tubes.py
       hash: md5
-      md5: 9426ca83132d1d4822d014c492b7015a
-      size: 18257
+      md5: 51f1631de5173929370bd4532e2565a8
+      size: 18438
     - path: ../core/src/temporal_model/core/types.py
       hash: md5
-      md5: 71917e49ebe4659d6b1f5cb0f29a5747
-      size: 1693
+      md5: 9f9be553d10cb269a067cd4fe7cb8a51
+      size: 1422
     - path: data/01_raw/datasets/train
       hash: md5
       md5: caf37d4bf513efd49b9617378fff1ffa.dir
@@ -72,8 +80,8 @@ stages:
       nfiles: 89870
     - path: src/temporal_model/train/build_tubes.py
       hash: md5
-      md5: 96b7885fab251111708bd2f76f28c0cf
-      size: 7078
+      md5: 61fdf917c3fd93320b73139327332f6e
+      size: 7104
     params:
       params.yaml:
         build_tubes:
@@ -98,18 +106,26 @@ stages:
       --min-detected-entries 2 --merge-iomin 0.3 --merge-prox-factor 1.0 
       --merge-max-gap 10
     deps:
-    - path: ../core/src/temporal_model/core/data.py
+    - path: ../core/src/temporal_model/core/labels.py
       hash: md5
-      md5: b907e5a0baedb93775446678c2cce034
-      size: 5078
+      md5: 66210787af9d9ac75c171874b8698425
+      size: 3371
+    - path: ../core/src/temporal_model/core/protocol.py
+      hash: md5
+      md5: 2d44441b0b89790f11b845406ebd6026
+      size: 5560
+    - path: ../core/src/temporal_model/core/sequences.py
+      hash: md5
+      md5: 52023f25efee8db079a744636b832969
+      size: 1613
     - path: ../core/src/temporal_model/core/tubes.py
       hash: md5
-      md5: 9426ca83132d1d4822d014c492b7015a
-      size: 18257
+      md5: 51f1631de5173929370bd4532e2565a8
+      size: 18438
     - path: ../core/src/temporal_model/core/types.py
       hash: md5
-      md5: 71917e49ebe4659d6b1f5cb0f29a5747
-      size: 1693
+      md5: 9f9be553d10cb269a067cd4fe7cb8a51
+      size: 1422
     - path: data/01_raw/datasets/val
       hash: md5
       md5: 409ed7d0573adcb3be98f7ceab63cf25.dir
@@ -117,8 +133,8 @@ stages:
       nfiles: 8752
     - path: src/temporal_model/train/build_tubes.py
       hash: md5
-      md5: 96b7885fab251111708bd2f76f28c0cf
-      size: 7078
+      md5: 61fdf917c3fd93320b73139327332f6e
+      size: 7104
     params:
       params.yaml:
         build_tubes:
@@ -142,14 +158,18 @@ stages:
       --output-dir data/05_model_input/train --context-factor 1.5 --patch-size 
       224 --stabilize true
     deps:
-    - path: ../core/src/temporal_model/core/model_input.py
+    - path: ../core/src/temporal_model/core/crop.py
       hash: md5
-      md5: 3839d575be202f1c01ccb153c839622b
-      size: 3881
+      md5: ac007c4aa7fc43c331313a7d504df7d1
+      size: 1608
+    - path: ../core/src/temporal_model/core/sequences.py
+      hash: md5
+      md5: 52023f25efee8db079a744636b832969
+      size: 1613
     - path: ../core/src/temporal_model/core/stabilize.py
       hash: md5
-      md5: acf5b133a726f5dde337b66ad0c9960f
-      size: 2177
+      md5: c91e53f9a8c4c806e9330b5874462e73
+      size: 2227
     - path: data/01_raw/datasets/train
       hash: md5
       md5: caf37d4bf513efd49b9617378fff1ffa.dir
@@ -162,8 +182,12 @@ stages:
       nfiles: 2910
     - path: src/temporal_model/train/build_model_input.py
       hash: md5
-      md5: 866e0fe99007915c7de4009100238d43
-      size: 4138
+      md5: 08014908422b4240dc88f46e9232f180
+      size: 4140
+    - path: src/temporal_model/train/crop_patches.py
+      hash: md5
+      md5: 8ad324d6d5ee30bb18b2480e875c583c
+      size: 3017
     params:
       params.yaml:
         model_input:
@@ -182,14 +206,18 @@ stages:
       data/05_model_input/val --context-factor 1.5 --patch-size 224 --stabilize 
       true
     deps:
-    - path: ../core/src/temporal_model/core/model_input.py
+    - path: ../core/src/temporal_model/core/crop.py
       hash: md5
-      md5: 3839d575be202f1c01ccb153c839622b
-      size: 3881
+      md5: ac007c4aa7fc43c331313a7d504df7d1
+      size: 1608
+    - path: ../core/src/temporal_model/core/sequences.py
+      hash: md5
+      md5: 52023f25efee8db079a744636b832969
+      size: 1613
     - path: ../core/src/temporal_model/core/stabilize.py
       hash: md5
-      md5: acf5b133a726f5dde337b66ad0c9960f
-      size: 2177
+      md5: c91e53f9a8c4c806e9330b5874462e73
+      size: 2227
     - path: data/01_raw/datasets/val
       hash: md5
       md5: 409ed7d0573adcb3be98f7ceab63cf25.dir
@@ -202,8 +230,12 @@ stages:
       nfiles: 292
     - path: src/temporal_model/train/build_model_input.py
       hash: md5
-      md5: 866e0fe99007915c7de4009100238d43
-      size: 4138
+      md5: 08014908422b4240dc88f46e9232f180
+      size: 4140
+    - path: src/temporal_model/train/crop_patches.py
+      hash: md5
+      md5: 8ad324d6d5ee30bb18b2480e875c583c
+      size: 3017
     params:
       params.yaml:
         model_input:
@@ -224,8 +256,8 @@ stages:
     deps:
     - path: ../core/src/temporal_model/core/temporal_classifier.py
       hash: md5
-      md5: 9a854621a96447b0682d9191c39f6440
-      size: 7062
+      md5: e50940dafd63ad3e5065d3deee3a7c2f
+      size: 7136
     - path: data/05_model_input/train
       hash: md5
       md5: a1d549c88d37c3bb84ec06d541fff939.dir
@@ -326,38 +358,38 @@ stages:
     cmd: uv run python -m temporal_model.train.package --variant 
       vit_dinov2_finetune --output data/06_models/vit_dinov2_finetune/model.zip
     deps:
-    - path: ../core/src/temporal_model/core/data.py
-      hash: md5
-      md5: b907e5a0baedb93775446678c2cce034
-      size: 5078
     - path: ../core/src/temporal_model/core/detector.yaml
       hash: md5
       md5: ba07c2480d91b7ffdbf8f1967df095f4
       size: 481
     - path: ../core/src/temporal_model/core/inference.py
       hash: md5
-      md5: 401b977db8bb41cf14da0dfc0f4dee82
-      size: 17341
+      md5: a55a93ec1c487b3388afd6ce750fe73a
+      size: 17200
     - path: ../core/src/temporal_model/core/logistic_calibrator.py
       hash: md5
-      md5: 40122f278fee865a7da300c1772df4f8
-      size: 4243
+      md5: fc8f3b5f18e59e0c72edc1cf973d1cb2
+      size: 5062
     - path: ../core/src/temporal_model/core/model.py
       hash: md5
-      md5: 446558b7ee0e9d37d157b70e46666426
-      size: 11816
+      md5: c110350c234d927df9029dc7cc0e4da2
+      size: 12375
     - path: ../core/src/temporal_model/core/package.py
       hash: md5
-      md5: 78d9a257839a1f13d7a9dcb385b1fb90
-      size: 9980
+      md5: 0987f6a16146a03d3222c4a900261e08
+      size: 10096
+    - path: ../core/src/temporal_model/core/sequences.py
+      hash: md5
+      md5: 52023f25efee8db079a744636b832969
+      size: 1613
     - path: ../core/src/temporal_model/core/stabilize.py
       hash: md5
-      md5: acf5b133a726f5dde337b66ad0c9960f
-      size: 2177
+      md5: c91e53f9a8c4c806e9330b5874462e73
+      size: 2227
     - path: ../core/src/temporal_model/core/tubes.py
       hash: md5
-      md5: 9426ca83132d1d4822d014c492b7015a
-      size: 18257
+      md5: 51f1631de5173929370bd4532e2565a8
+      size: 18438
     - path: data/01_raw/datasets/train
       hash: md5
       md5: caf37d4bf513efd49b9617378fff1ffa.dir
@@ -396,12 +428,12 @@ stages:
       size: 2511
     - path: src/temporal_model/train/package.py
       hash: md5
-      md5: ef2908666b1b116314724cd8b68a5ecd
-      size: 11143
+      md5: 49692a94b459a59a0804382baa18cae4
+      size: 11141
     - path: src/temporal_model/train/package_predict.py
       hash: md5
-      md5: 0e314fd21aebe8273812760284831619
-      size: 2125
+      md5: 72341b820819bc1a3509ab2832e82596
+      size: 2130
     - path: src/temporal_model/train/val_predict.py
       hash: md5
       md5: cd28d9e2879024c2e58da0cc17c86512
