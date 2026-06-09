@@ -35,7 +35,7 @@ package:
     confidence_threshold: 0.1
     iou_nms: 0.2
     image_size: 1024
-    pad_to_min_frames: 20
+    pad_to_min_frames: 6
     pad_strategy: symmetric
   aggregation:
     vit_dinov2_finetune: logistic
