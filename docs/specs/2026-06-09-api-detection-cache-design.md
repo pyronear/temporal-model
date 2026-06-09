@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-09
 **Status:** Approved (brainstorm)
-**Scope:** `api` (cache, orchestration, S3 timeouts, latency logging) + a small
+**Scope:** `api` (detection cache, orchestration, cache observability) + a small
 pure detection-injection seam in `core`. No model behavior change.
 
 ## Goal
@@ -11,8 +11,9 @@ Cut the redundant compute the temporal-model API does when a client re-calls
 `POST /predict` on a sequence that grows by one frame every 30 s. Today every
 call re-runs YOLO over the **entire** sequence; we want each frame detected
 **once** and its detections reused on subsequent calls — exactly, with no
-accuracy change — so the API comfortably absorbs production load and HTTP
-connections do not time out.
+accuracy change — so the API comfortably absorbs production load. (Cheaper calls
+also reduce HTTP connection-timeout risk, but explicit timeout handling is out of
+scope here.)
 
 ## Background / current state
 
@@ -55,10 +56,7 @@ lands on that intent.
    is pure repetition of deterministic work.
 2. **Correlated bursts.** A real plume trips up to **3 nearby cameras at once**,
    all on the expensive (has-tubes) path, all serialized behind the one lock —
-   the worst moment to be slow.
-3. **Connection timeouts.** Each request holds an HTTP connection for
-   `S3 fetch + queue wait + prediction`. Under the single lock, one slow request
-   stalls those behind it; a timeout can trigger a client retry → more load.
+   the worst moment to be slow. Cheaper per-call work drains that queue faster.
 
 ## Non-goals (explicitly out of scope)
 
@@ -76,6 +74,8 @@ cameras, single process, short sequences):
   detection; a burst *is* the event you must serve.
 - **Async job pattern (202 + poll/webhook)** — changes the synchronous contract
   the black-box client depends on; over-engineering here.
+- **S3 fetch timeout safety** (bounded boto3 connect/read timeouts + retries) —
+  deferred for now; not part of this cache work.
 - **Whole-response / per-sequence cache** — clients send a longer sequence each
   call, so it rarely hits.
 - **Putting the cache in `core`** — it is a serving optimization; in `core` it
@@ -138,24 +138,12 @@ out = self._model.predict(frames, frame_detections=dets)
 Note: padding duplicates frames but they **share a `frame_id`**, so duplicates
 collapse to one cache entry and one detection — a small bonus.
 
-### 3. API — bounded S3 fetch (timeout safety)
+### 3. API — cache observability
 
-`fetch_frames` already runs **outside** the inference lock, so a slow fetch
-delays only its own request. Bound it so a stuck object fails fast and
-deterministically instead of holding the connection open:
-
-- Configure the boto3 client with explicit `connect_timeout` / `read_timeout`
-  and a small bounded retry (`botocore.config.Config`).
-- Env knobs (defaults small, e.g. 3 s / 5 s, 2 retries):
-  `TEMPORAL_API_S3_CONNECT_TIMEOUT`, `TEMPORAL_API_S3_READ_TIMEOUT`,
-  `TEMPORAL_API_S3_MAX_RETRIES`.
-
-### 4. API — latency / cache observability
-
-Log per-call: total latency, the `StageTimer` stage breakdown, sequence length,
-and detection-cache hits/misses. This is what tells us, with measured numbers,
-how far we are from the cadence ceiling (`per-call latency × regional-cam-count
-< 30 s`) and lets ops set client/proxy timeouts above the real worst case.
+Log per-call: detection-cache hits/misses, sequence length, and total latency.
+This confirms the cache is working (hit rate climbs as a sequence grows) and
+surfaces how per-call cost scales — enough to validate the feature without any
+additional metrics infrastructure.
 
 ### Optional extension (note, not v1)
 
@@ -168,7 +156,7 @@ cheap.
 ## Data flow
 
 ```
-POST /predict ─▶ fetch_frames (outside lock, bounded timeouts)
+POST /predict ─▶ fetch_frames (outside lock)
               ─▶ runner.predict (under lock):
                    load_sequence → cache lookup → detect(misses) → cache update
                    → predict(frames, frame_detections=…) → decision
@@ -199,16 +187,12 @@ POST /predict ─▶ fetch_frames (outside lock, bounded timeouts)
   `model.detect` only with the new frame(s).
 - Response is identical with the cache on vs off (`size=0`).
 - LRU eviction at capacity; cache reset on model reload.
-- S3 client built with the configured timeouts/retries.
 
 ## Configuration summary (new `TEMPORAL_API_*`)
 
 | Var | Default | Meaning |
 |---|---|---|
 | `DETECTION_CACHE_SIZE` | `4096` | LRU capacity; `0` disables |
-| `S3_CONNECT_TIMEOUT` | `3` | boto3 connect timeout (s) |
-| `S3_READ_TIMEOUT` | `5` | boto3 read timeout (s) |
-| `S3_MAX_RETRIES` | `2` | bounded S3 retries |
 
 ## Acceptance criteria
 
@@ -218,6 +202,4 @@ POST /predict ─▶ fetch_frames (outside lock, bounded timeouts)
   vs the pre-change behavior, for all parity inputs.
 - `core` default path (`predict(frames)`, no injection) is unchanged;
   `benchmark`/`eval` timings unaffected.
-- A stuck S3 object fails within the configured timeout rather than hanging the
-  connection.
-- Per-call latency + cache-hit logging is emitted.
+- Per-call cache-hit + latency logging is emitted.
