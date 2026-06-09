@@ -2,6 +2,7 @@
 
 import argparse
 import logging
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -14,8 +15,9 @@ from .run_core import resolve_device, run_core
 
 
 def _run_core_cmd(args: argparse.Namespace) -> None:
-    if args.threads is not None:
-        torch.set_num_threads(args.threads)
+    threads = args.threads or os.cpu_count()
+    if threads is not None:
+        torch.set_num_threads(threads)
     device = resolve_device(args.device)
 
     with ResourceSampler(interval=args.sample_interval) as sampler:
@@ -58,7 +60,7 @@ def main() -> None:
         "--threads",
         type=int,
         default=None,
-        help="torch.set_num_threads(); default = torch default",
+        help="torch.set_num_threads(); default = all CPU cores (os.cpu_count())",
     )
     core.add_argument("--sample-interval", type=float, default=0.1)
     core.add_argument("--out", type=Path, default=Path("data/08_reporting"))

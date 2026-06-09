@@ -93,7 +93,7 @@ in the store and writes a results dir under `data/08_reporting/`.
 | `--reps` | `5` | timed repetitions per sequence |
 | `--warmup` | `3` | warmup sequences (discarded) |
 | `--limit` | *(all)* | cap number of sequences (quick runs) |
-| `--threads` | torch default | `torch.set_num_threads()` |
+| `--threads` | all CPU cores | `torch.set_num_threads()` (`os.cpu_count()`) |
 | `--sample-interval` | `0.1` | resource sampler period (s) |
 | `--out` | `data/08_reporting` | output parent dir |
 | `--timestamp` | `run` | label for the results dir |
