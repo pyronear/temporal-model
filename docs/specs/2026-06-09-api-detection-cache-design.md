@@ -1,0 +1,223 @@
+# API detection cache: stop re-detecting frames a growing sequence has already seen
+
+**Date:** 2026-06-09
+**Status:** Approved (brainstorm)
+**Scope:** `api` (cache, orchestration, S3 timeouts, latency logging) + a small
+pure detection-injection seam in `core`. No model behavior change.
+
+## Goal
+
+Cut the redundant compute the temporal-model API does when a client re-calls
+`POST /predict` on a sequence that grows by one frame every 30 s. Today every
+call re-runs YOLO over the **entire** sequence; we want each frame detected
+**once** and its detections reused on subsequent calls — exactly, with no
+accuracy change — so the API comfortably absorbs production load and HTTP
+connections do not time out.
+
+## Background / current state
+
+The pipeline is stateless. `POST /predict` (`api/app.py`) fetches frames from S3
+and calls `runner.predict(paths)` (`api/model_runner.py`), which serializes
+inference behind one `asyncio.Lock` and runs the model in a worker thread.
+
+The model follows a template-method contract (`core/protocol.py`):
+
+```
+predict_sequence(paths) → load_sequence(paths) -> list[Frame] → predict(frames)
+```
+
+`predict(frames, *, timer=None, compute_trigger=False)` runs the stages
+(`core/model.py`): `pad → detector → tubes → crop → classifier → trigger_search`.
+Two facts from the recent refactor shape this design:
+
+- **`trigger_search` is eval-only now.** Prod calls with `compute_trigger=False`,
+  so the hot path is `detector → tubes → crop → classifier` plus a cheap inline
+  decision (see `docs/specs/2026-06-09-trigger-search-eval-only-design.md`).
+- The **detector stage dominates**. It is `run_yolo_on_frames(yolo, truncated,
+  …) -> list[FrameDetections]` (`core/inference.py`), a single batched YOLO call
+  over all frames. In the common **no-smoke** case there are no kept tubes, so
+  `crop`/`classifier` are skipped and the detector is essentially the *entire*
+  per-call cost.
+
+`FrameDetections` (`core/types.py`, public via `core/__init__.py`) is
+`{frame_idx, frame_id, timestamp, detections: list[Detection]}` — pure data, no
+tensors, a handful of floats per box. `Frame.frame_id` is the filename stem,
+a **stable per-frame identity** carrying site + timestamp.
+
+`protocol.TemporalModel.load_sequence`'s docstring already names
+*"attach cached YOLO detections"* as an intended override point — the seam below
+lands on that intent.
+
+## Problem
+
+1. **O(N²) regrowth per camera.** A sequence that grows to N frames is detected
+   1 + 2 + … + N times across N calls. N is capped short (~10–30) but the waste
+   is pure repetition of deterministic work.
+2. **Correlated bursts.** A real plume trips up to **3 nearby cameras at once**,
+   all on the expensive (has-tubes) path, all serialized behind the one lock —
+   the worst moment to be slow.
+3. **Connection timeouts.** Each request holds an HTTP connection for
+   `S3 fetch + queue wait + prediction`. Under the single lock, one slow request
+   stalls those behind it; a timeout can trigger a client retry → more load.
+
+## Non-goals (explicitly out of scope)
+
+Ruled out during brainstorming as unnecessary at this scale (≤3 correlated
+cameras, single process, short sequences):
+
+- **Per-camera positive-latch** (freeze verdict after first positive) — gated on
+  unknown client post-positive behavior; not needed for capacity. Revisit only
+  if load grows and we confirm client semantics.
+- **Classifier / tube prefix reuse** — adding frames can retroactively change
+  tube composition (merges, gap interpolation); unsafe and not worth it at N≤30.
+- **Worker pool / removing the lock** — on CPU one prediction already uses all
+  cores; pooling would just time-slice. GPU inference is not reentrant.
+- **Backpressure / load-shedding (429/503 on volume)** — wrong for fire
+  detection; a burst *is* the event you must serve.
+- **Async job pattern (202 + poll/webhook)** — changes the synchronous contract
+  the black-box client depends on; over-engineering here.
+- **Whole-response / per-sequence cache** — clients send a longer sequence each
+  call, so it rarely hits.
+- **Putting the cache in `core`** — it is a serving optimization; in `core` it
+  would make the model stateful and corrupt `benchmark`/`eval` timings.
+
+## Design
+
+State lives in the API; `core` stays pure and deterministic.
+
+### 1. `core` seam — pure detection injection (no state)
+
+Add to `BboxTubeTemporalModel`:
+
+- **`detect(frames: list[Frame]) -> list[FrameDetections]`** — a thin public
+  wrapper exposing the existing detector stage (`run_yolo_on_frames` with the
+  model's configured `confidence_threshold`/`iou_nms`/`image_size`/device). Pure.
+- **`predict(frames, *, frame_detections: dict[str, FrameDetections] | None =
+  None, timer=None, compute_trigger=False)`** — in the `detector` stage:
+  - if `frame_detections is None`: behave exactly as today (full
+    `run_yolo_on_frames`);
+  - otherwise: for each (post-pad `truncated`) frame, reuse
+    `frame_detections[frame.frame_id]` when present, collect the misses, run
+    `run_yolo_on_frames` on the **miss subset only**, and merge — preserving the
+    truncated frame order. Each reused `FrameDetections` is **re-stamped** with
+    its current positional `frame_idx` (the cached `frame_idx` is from a prior
+    call and must not leak).
+
+`predict_sequence` and the `TemporalModel` protocol are **not** threaded with the
+new parameter (YAGNI — only the API orchestrates injection, and it holds a
+concrete `BboxTubeTemporalModel`). `benchmark`/`eval` keep calling the
+no-injection path, so their detector timings stay honest. Default-path output is
+bit-for-bit unchanged.
+
+### 2. API — detection cache in `ModelRunner`
+
+`ModelRunner` gains an LRU keyed by `frame_id`, valued by `FrameDetections`:
+
+- **Capacity:** default **4096** entries (~4–8 MB; negligible vs the model).
+  Configurable via `TEMPORAL_API_DETECTION_CACHE_SIZE` (`0` disables the cache →
+  always full detection, for parity/debug).
+- **Implementation:** a small size-bounded LRU (`collections.OrderedDict` or
+  `cachetools.LRUCache`).
+- **Lifetime / invalidation:** the cache lives on the `ModelRunner` instance,
+  which is created at load and replaced on model reload — so a new model wipes
+  the cache for free. Detection config is fixed per loaded model, so it is **not**
+  part of the key.
+
+`runner.predict` orchestration (entirely under the existing inference lock, so
+cache reads/writes and the YOLO call are serialized and thread-safe):
+
+```python
+frames = self._model.load_sequence(paths)
+misses = [f for f in frames if f.frame_id not in self._cache]
+for fd in self._model.detect(misses):        # YOLO on misses only (often 1)
+    self._cache[fd.frame_id] = fd
+dets = {f.frame_id: self._cache[f.frame_id] for f in frames}
+out = self._model.predict(frames, frame_detections=dets)
+```
+
+Note: padding duplicates frames but they **share a `frame_id`**, so duplicates
+collapse to one cache entry and one detection — a small bonus.
+
+### 3. API — bounded S3 fetch (timeout safety)
+
+`fetch_frames` already runs **outside** the inference lock, so a slow fetch
+delays only its own request. Bound it so a stuck object fails fast and
+deterministically instead of holding the connection open:
+
+- Configure the boto3 client with explicit `connect_timeout` / `read_timeout`
+  and a small bounded retry (`botocore.config.Config`).
+- Env knobs (defaults small, e.g. 3 s / 5 s, 2 retries):
+  `TEMPORAL_API_S3_CONNECT_TIMEOUT`, `TEMPORAL_API_S3_READ_TIMEOUT`,
+  `TEMPORAL_API_S3_MAX_RETRIES`.
+
+### 4. API — latency / cache observability
+
+Log per-call: total latency, the `StageTimer` stage breakdown, sequence length,
+and detection-cache hits/misses. This is what tells us, with measured numbers,
+how far we are from the cadence ceiling (`per-call latency × regional-cam-count
+< 30 s`) and lets ops set client/proxy timeouts above the real worst case.
+
+### Optional extension (note, not v1)
+
+With detections cached, the no-smoke path has no kept tubes and never opens the
+image bytes (`crop` is skipped). We *could* skip the S3 download for already-seen
+frames and fetch lazily only for frames a kept tube touches — cutting network
+latency too. Deferred: it adds control flow for a case the cache already makes
+cheap.
+
+## Data flow
+
+```
+POST /predict ─▶ fetch_frames (outside lock, bounded timeouts)
+              ─▶ runner.predict (under lock):
+                   load_sequence → cache lookup → detect(misses) → cache update
+                   → predict(frames, frame_detections=…) → decision
+              ─▶ reshape DTO ─▶ 200
+```
+
+## Edge cases & correctness
+
+- **Positional `frame_idx`:** reused entries re-stamped to current position.
+- **Partial hits:** miss subset detected; merge preserves order.
+- **Padding:** duplicate frames share `frame_id` → deduped in cache.
+- **Cache disabled (`size=0`):** behaves exactly like today.
+- **Thread-safety:** all cache access is under the inference `asyncio.Lock`.
+- **Determinism:** `predict(frames, frame_detections=detect(frames))` must equal
+  `predict(frames)` for the same input — pinned by a parity test.
+
+## Testing
+
+**core**
+- `detect(frames)` returns the same `FrameDetections` as `run_yolo_on_frames`.
+- Parity: `predict(frames, frame_detections=detect(frames))` ==
+  `predict(frames)` (bit-for-bit `is_positive`, `probability`, details).
+- Miss-only detection: with a mock YOLO, assert it is called with exactly the
+  uncached subset, and reused entries are re-stamped to correct `frame_idx`.
+
+**api**
+- Cache hit avoids re-detection: second call on a grown sequence invokes
+  `model.detect` only with the new frame(s).
+- Response is identical with the cache on vs off (`size=0`).
+- LRU eviction at capacity; cache reset on model reload.
+- S3 client built with the configured timeouts/retries.
+
+## Configuration summary (new `TEMPORAL_API_*`)
+
+| Var | Default | Meaning |
+|---|---|---|
+| `DETECTION_CACHE_SIZE` | `4096` | LRU capacity; `0` disables |
+| `S3_CONNECT_TIMEOUT` | `3` | boto3 connect timeout (s) |
+| `S3_READ_TIMEOUT` | `5` | boto3 read timeout (s) |
+| `S3_MAX_RETRIES` | `2` | bounded S3 retries |
+
+## Acceptance criteria
+
+- A grown-by-one re-call detects only the new frame(s); detector cost per call
+  in the no-smoke case is ~constant rather than O(N).
+- API responses are byte-identical with the cache enabled vs disabled, and
+  vs the pre-change behavior, for all parity inputs.
+- `core` default path (`predict(frames)`, no injection) is unchanged;
+  `benchmark`/`eval` timings unaffected.
+- A stuck S3 object fails within the configured timeout rather than hanging the
+  connection.
+- Per-call latency + cache-hit logging is emitted.
