@@ -18,7 +18,7 @@ import torch
 # The stages of BboxTubeTemporalModel.predict(), in order. Single source of
 # truth: predict() names its stage_ctx blocks with these, and the benchmark
 # reads them back per-stage.
-STAGES = ("pad", "yolo", "tubes", "crop", "vit", "trigger")
+STAGES = ("pad", "detector", "tubes", "crop", "classifier", "trigger_search")
 
 
 def _sync_fn_for(device: torch.device | None) -> Callable[[], None] | None:

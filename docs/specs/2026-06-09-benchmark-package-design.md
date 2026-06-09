@@ -137,7 +137,7 @@ calls `torch.cuda.synchronize()` at each stage boundary so GPU stage times are
 real (not just kernel-launch times). These syncs run **only when profiling is
 on**.
 
-Stage names: `pad`, `yolo`, `tubes`, `crop`, `vit`, `trigger`.
+Stage names: `pad`, `detector`, `tubes`, `crop`, `classifier`, `trigger_search`.
 
 > This is the only change outside the new package. `predict()`'s signature in
 > the `TemporalModel` protocol gains the optional keyword; all existing callers
@@ -205,7 +205,7 @@ def run_core(store_dir, model_path, *, device, reps, warmup, limit) -> pd.DataFr
 - For each sequence (optionally capped by `limit`), run `reps` timed
   `predict(frames, timer=StageTimer(device))` calls.
 - Emit **one raw row per (sequence, rep)**: `key, label, frame_count,
-  n_kept_tubes, rep, total_ms`, one column per stage (`pad/yolo/tubes/crop/vit/
+  n_kept_tubes, rep, total_ms`, one column per stage (`pad/detector/tubes/crop/classifier/
   trigger`_ms), plus a `failed` flag for sequences that raise (recorded, not
   fatal). `n_kept_tubes` comes from the prediction `details`.
 

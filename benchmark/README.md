@@ -39,18 +39,18 @@ you *which* stage dominates — not just the total latency.
 | stage | what it does | why it costs |
 |-----------|----------------------------------------------------------------|-------------------------------|
 | `pad` | truncate the sequence to `max_frames`; if too short, duplicate frames to a minimum length | pure Python list ops — microseconds |
-| `yolo` | one batched YOLO11 detection call over **all** frames at once, producing candidate boxes per frame | a CNN forward over full-resolution frames — heavy |
+| `detector` | one batched YOLO11 detection call over **all** frames at once, producing candidate boxes per frame | a CNN forward over full-resolution frames — heavy |
 | `tubes` | link per-frame boxes into tubes (greedy IoU tracking), then filter/merge/interpolate them | small array bookkeeping — microseconds |
 | `crop` | for every kept tube, open each frame **from disk** (PIL), crop around the box, resize to 224×224, normalize | image decode + disk IO + CPU resize |
-| `vit` | one batched ViT (DINOv2 backbone + transformer head) forward scoring all tubes' full-length patch stacks | a transformer forward — heavy |
-| `trigger` | re-score growing **prefixes** of each qualifying tube to find the earliest firing frame (the trigger) — a serial loop of extra ViT forwards | repeated classifier calls — grows with tube length |
+| `classifier` | one batched forward of the tube classifier (ViT/DINOv2 backbone + transformer head) scoring all tubes' full-length patch stacks | a transformer forward — heavy |
+| `trigger_search` | re-score growing **prefixes** of each qualifying tube to find the earliest firing frame (the trigger) — a serial loop of extra classifier forwards | repeated classifier calls — grows with tube length |
 
-The split shifts a lot with hardware. On a GPU the single big `yolo` forward
+The split shifts a lot with hardware. On a GPU the single big `detector` forward
 dominates (~86%) and the classifier side is cheap; on a CPU VM the picture flips
-— `vit` plus the serial `trigger` loop become ~40% of latency, because each of
-those extra forwards is no longer nearly free. **Surfacing that flip is the whole
-point**, and it points straight at what to optimize on a given machine (e.g. the
-`trigger` loop's repeated forwards on CPU).
+— `classifier` plus the serial `trigger_search` loop become ~40% of latency, because
+each of those extra forwards is no longer nearly free. **Surfacing that flip is the
+whole point**, and it points straight at what to optimize on a given machine (e.g.
+the `trigger_search` loop's repeated forwards on CPU).
 
 ### How the timing works
 

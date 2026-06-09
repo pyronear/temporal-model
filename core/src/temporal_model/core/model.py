@@ -199,7 +199,7 @@ class BboxTubeTemporalModel(TemporalModel):
                     ) from e
                 truncated, padded_indices = pad_fn(truncated, min_length=pad_min)
 
-        with stage_ctx(timer, "yolo"):
+        with stage_ctx(timer, "detector"):
             frame_dets = run_yolo_on_frames(
                 self._yolo,
                 truncated,
@@ -259,14 +259,14 @@ class BboxTubeTemporalModel(TemporalModel):
                 patches_per_tube.append(p.to(self._device))
                 masks_per_tube.append(m.to(self._device))
 
-        with stage_ctx(timer, "vit"):
+        with stage_ctx(timer, "classifier"):
             logits = score_tubes(
                 self._classifier,
                 patches_per_tube=patches_per_tube,
                 masks_per_tube=masks_per_tube,
             )
 
-        with stage_ctx(timer, "trigger"):
+        with stage_ctx(timer, "trigger_search"):
             is_positive, trigger, trigger_tube_id, per_tube_first_crossing = (
                 find_first_crossing_trigger(
                     classifier=self._classifier,

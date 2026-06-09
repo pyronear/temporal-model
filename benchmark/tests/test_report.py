@@ -6,7 +6,7 @@ import pandas as pd
 
 from temporal_model.benchmark.report import summarize
 
-STAGES = ["pad", "yolo", "tubes", "crop", "vit", "trigger"]
+STAGES = ["pad", "detector", "tubes", "crop", "classifier", "trigger_search"]
 
 
 def _row(key, total, **stage_ms):
@@ -26,9 +26,9 @@ def _row(key, total, **stage_ms):
 def test_summarize_latency_percentiles_and_counts():
     df = pd.DataFrame(
         [
-            _row("a", 100.0, vit=80.0, yolo=20.0),
-            _row("b", 200.0, vit=160.0, yolo=40.0),
-            _row("c", 300.0, vit=240.0, yolo=60.0),
+            _row("a", 100.0, classifier=80.0, detector=20.0),
+            _row("b", 200.0, classifier=160.0, detector=40.0),
+            _row("c", 300.0, classifier=240.0, detector=60.0),
         ]
     )
     s = summarize(df)
@@ -37,14 +37,14 @@ def test_summarize_latency_percentiles_and_counts():
     assert s["total_ms"]["p50"] == 200.0
     # frames/sec uses mean latency over total frames; just assert it's positive.
     assert s["throughput"]["sequences_per_sec"] > 0
-    # vit dominates the mean stage share.
-    assert s["stage_share_pct"]["vit"] > s["stage_share_pct"]["yolo"]
+    # classifier dominates the mean stage share.
+    assert s["stage_share_pct"]["classifier"] > s["stage_share_pct"]["detector"]
 
 
 def test_summarize_counts_failures_and_excludes_them():
     df = pd.DataFrame(
         [
-            _row("a", 100.0, vit=100.0),
+            _row("a", 100.0, classifier=100.0),
             {"key": "b", "rep": 0, "failed": True},
         ]
     )

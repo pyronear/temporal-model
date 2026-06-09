@@ -482,7 +482,14 @@ class TestStageTimerIntegration:
         timer = StageTimer()
         model.predict(frames=red_frames, timer=timer)
         timings = timer.as_dict()
-        assert {"pad", "yolo", "tubes", "crop", "vit", "trigger"} <= set(timings)
+        assert {
+            "pad",
+            "detector",
+            "tubes",
+            "crop",
+            "classifier",
+            "trigger_search",
+        } <= set(timings)
         assert all(v >= 0.0 for v in timings.values())
 
     def test_predict_without_timer_is_unaffected(
