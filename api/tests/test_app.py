@@ -232,3 +232,20 @@ def test_configure_logging_idempotent_and_preserves_propagation():
     finally:
         uvicorn_logger.removeHandler(handler)
         app_logger.removeHandler(handler)
+
+
+def test_lifespan_uncalibrated_model_degrades_to_unavailable(monkeypatch):
+    # An uncalibrated package raises UncalibratedModelError at load (core gate);
+    # the lifespan handler must degrade to not-ready rather than crashing.
+    from temporal_model.core.package import UncalibratedModelError
+
+    def fake_load(*args, **kwargs):
+        raise UncalibratedModelError("load_model_package: model is not calibrated")
+
+    monkeypatch.setattr(settings, "s3_bucket", BUCKET)
+    monkeypatch.setattr(ModelRunner, "load", fake_load)
+    with TestClient(app) as c:
+        r = c.get("/health")
+    assert r.status_code == 200
+    assert r.json()["status"] == "unavailable"
+    assert r.json()["model_loaded"] is False
