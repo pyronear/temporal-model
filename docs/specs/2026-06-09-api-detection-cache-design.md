@@ -10,10 +10,11 @@ pure detection-injection seam in `core`. No model behavior change.
 Cut the redundant compute the temporal-model API does when a client re-calls
 `POST /predict` on a sequence that grows by one frame every 30 s. Today every
 call re-runs YOLO over the **entire** sequence; we want each frame detected
-**once** and its detections reused on subsequent calls — exactly, with no
-accuracy change — so the API comfortably absorbs production load. (Cheaper calls
-also reduce HTTP connection-timeout risk, but explicit timeout handling is out of
-scope here.)
+**once** and its detections reused on subsequent calls — with no change to the
+verdict — so the API comfortably absorbs production load. (Cheaper calls also
+reduce HTTP connection-timeout risk, but explicit timeout handling is out of
+scope here.) See **Numerical determinism** below for the precise equivalence
+guarantee.
 
 ## Background / current state
 
@@ -160,10 +161,32 @@ POST /predict ─▶ fetch_frames (outside lock)
 - **Positional `frame_idx`:** reused entries re-stamped to current position.
 - **Partial hits:** miss subset detected; merge preserves order.
 - **Padding:** duplicate frames share `frame_id` → deduped in cache.
-- **Cache disabled (`size=0`):** behaves exactly like today.
+- **Cache disabled (`size=0`):** bit-for-bit identical to today (each call
+  detects the whole sequence in one batch, exactly as before).
 - **Thread-safety:** all cache access is under the inference `asyncio.Lock`.
-- **Determinism:** `predict(frames, frame_detections=detect(frames))` must equal
-  `predict(frames)` for the same input — pinned by a parity test.
+
+## Numerical determinism
+
+The cache reuses the exact `FrameDetections` it stored, so within a single call
+`predict(frames, frame_detections=detect(frames))` is **bit-for-bit identical**
+to `predict(frames)` (same YOLO batch, pinned by a parity test with a
+deterministic stub detector).
+
+Across calls it is **not** bit-for-bit identical to a single-shot run of the
+whole sequence, and that is expected: YOLO is **not batch-size-invariant** (CPU
+measurement: detections of the same frame differ by ~`7e-7` between a batch of 8
+and frame-by-frame batches; run-to-run at a fixed batch is exactly `0`). A warm
+cache detected each frame in a small batch when it first arrived, whereas a
+cold full-sequence run detects them all in one batch — so the calibrated
+`probability` can differ by ~`1e-9`. The **binary verdict (`is_smoke`) is
+unaffected.**
+
+This is a property of the growing-sequence deployment, **not** of the cache:
+even without the cache, the client sends a longer sequence each tick, so the
+detector already runs at a different batch size every call. The cache changes
+*which* batch grouping is used, not whether it varies. The guarantee we provide
+is therefore: **identical verdict; probability equal up to YOLO's inherent
+batch-size float nondeterminism (~`1e-9`).**
 
 ## Testing
 
@@ -177,7 +200,8 @@ POST /predict ─▶ fetch_frames (outside lock)
 **api**
 - Cache hit avoids re-detection: second call on a grown sequence invokes
   `model.detect` only with the new frame(s).
-- Response is identical with the cache on vs off (`size=0`).
+- Response is identical with the cache disabled (`size=0`) vs the pre-change
+  path.
 - LRU eviction at capacity; cache reset on model reload.
 
 ## Configuration summary (new `TEMPORAL_API_*`)
@@ -190,8 +214,11 @@ POST /predict ─▶ fetch_frames (outside lock)
 
 - A grown-by-one re-call detects only the new frame(s); detector cost per call
   in the no-smoke case is ~constant rather than O(N).
-- API responses are byte-identical with the cache enabled vs disabled, and
-  vs the pre-change behavior, for all parity inputs.
+- With the cache **disabled** (`size=0`), responses are byte-identical to the
+  pre-change behavior.
+- With the cache **enabled**, the verdict (`is_smoke`) matches the cache-off
+  run and `probability` matches up to YOLO's batch-size nondeterminism
+  (~`1e-9`) — see Numerical determinism.
 - `core` default path (`predict(frames)`, no injection) is unchanged;
   `benchmark`/`eval` timings unaffected.
 - Per-call cache-hit + latency logging is emitted.
