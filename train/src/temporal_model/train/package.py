@@ -298,6 +298,7 @@ def main() -> None:
         output_path=args.output,
         calibrator=calibrator,
         train_git_sha=_git_sha(),
+        allow_uncalibrated=(aggregation != "logistic"),
     )
     print(
         f"[package] wrote {args.output} | variant={args.variant} "
