@@ -12,12 +12,12 @@ import torch
 from PIL import Image
 from torchvision.transforms.functional import to_tensor
 
+from .crop import crop_and_resize, expand_bbox, norm_bbox_to_pixel_square
 from .logistic_calibrator import (
     LogisticCalibrator,
     extract_features,
     tube_feature_dict,
 )
-from .model_input import crop_and_resize, expand_bbox, norm_bbox_to_pixel_square
 from .protocol import Frame
 from .stabilize import tube_window
 from .tubes import (

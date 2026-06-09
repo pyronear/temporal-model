@@ -15,7 +15,7 @@ import shutil
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
-from temporal_model.core.model_input import LABEL_TO_INT, process_tube
+from temporal_model.train.crop_patches import LABEL_TO_INT, process_tube
 
 
 def _to_bool(value: str) -> bool:

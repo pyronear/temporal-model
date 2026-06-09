@@ -38,7 +38,7 @@ def tube_window(
     (non-``None``) boxes. Raises ``ValueError`` if no box is available.
 
     Centralizes the stabilize crop-window *policy* so the training crop
-    (``model_input.process_tube``) and the inference crop
+    (``train.crop_patches.process_tube``) and the inference crop
     (``inference.crop_tube_patches``) cannot drift apart — train/inference window
     parity is the property the whole feature relies on.
     """
