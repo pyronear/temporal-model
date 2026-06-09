@@ -1,6 +1,7 @@
 """Tests for the pure config/kwarg builders in package.py."""
 
 from temporal_model.train.package import (
+    allow_uncalibrated_for,
     build_config,
     classifier_kwargs,
     tubes_config,
@@ -92,3 +93,11 @@ def test_build_config_stabilize_defaults_true_when_absent() -> None:
         logistic_threshold=0.52,
     )
     assert cfg["model_input"]["stabilize"] is True
+
+
+def test_allow_uncalibrated_only_for_non_logistic() -> None:
+    # The real opt-out wired into build_model_package in package.py:
+    # logistic enforces calibration (no opt-out); everything else opts out.
+    assert allow_uncalibrated_for("logistic") is False
+    assert allow_uncalibrated_for("max_logit") is True
+    assert allow_uncalibrated_for("anything_else") is True

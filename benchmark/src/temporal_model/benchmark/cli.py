@@ -28,6 +28,7 @@ def _run_core_cmd(args: argparse.Namespace) -> None:
             reps=args.reps,
             warmup=args.warmup,
             limit=args.limit,
+            allow_uncalibrated=args.allow_uncalibrated,
         )
     resources = pd.DataFrame(sampler.timeline())
 
@@ -56,6 +57,11 @@ def main() -> None:
     core.add_argument("--reps", type=int, default=5)
     core.add_argument("--warmup", type=int, default=3)
     core.add_argument("--limit", type=int, default=None)
+    core.add_argument(
+        "--allow-uncalibrated",
+        action="store_true",
+        help="Permit benchmarking an uncalibrated model package (default: refuse).",
+    )
     core.add_argument(
         "--threads",
         type=int,
