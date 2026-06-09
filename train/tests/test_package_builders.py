@@ -1,5 +1,8 @@
 """Tests for the pure config/kwarg builders in package.py."""
 
+import pytest
+
+from temporal_model.core.package import UncalibratedModelError, require_calibrated
 from temporal_model.train.package import (
     build_config,
     classifier_kwargs,
@@ -94,21 +97,17 @@ def test_build_config_stabilize_defaults_true_when_absent() -> None:
     assert cfg["model_input"]["stabilize"] is True
 
 
-import pytest
-
-from temporal_model.core.package import UncalibratedModelError, require_calibrated
-
-
 @pytest.mark.parametrize(
     "aggregation,calibrator_present,should_raise",
     [
-        ("logistic", True, False),     # calibrated -> build allowed
-        ("logistic", False, True),     # bug: logistic intended but no calibrator -> FAIL
-        ("max_logit", False, False),   # intentional uncalibrated -> opted out
-        ("max_logit", True, False),    # opted out regardless
+        ("logistic", True, False),  # calibrated -> build allowed
+        ("logistic", False, True),  # logistic intended but no calibrator -> FAIL
+        ("max_logit", False, False),  # intentional uncalibrated -> opted out
+        ("max_logit", True, False),  # opted out regardless
     ],
 )
 def test_train_optout_expression(aggregation, calibrator_present, should_raise) -> None:
+    # Mirrors the build_model_package opt-out expression in train/package.py.
     calibrator = object() if calibrator_present else None
     allow_uncalibrated = aggregation != "logistic"
     if should_raise and not allow_uncalibrated:
@@ -116,4 +115,3 @@ def test_train_optout_expression(aggregation, calibrator_present, should_raise) 
             require_calibrated(calibrator, aggregation, context="build_model_package")
     elif not allow_uncalibrated:
         require_calibrated(calibrator, aggregation, context="build_model_package")
-    # allow_uncalibrated True -> build_model_package would skip the check; nothing to assert

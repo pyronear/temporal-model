@@ -47,7 +47,7 @@ class UncalibratedModelError(ValueError):
 
 
 def is_calibrated(calibrator: LogisticCalibrator | None, aggregation: str) -> bool:
-    """A package is calibrated iff a calibrator is bundled AND the decision is logistic."""
+    """Calibrated iff a calibrator is bundled AND the decision is logistic."""
     return calibrator is not None and aggregation == "logistic"
 
 

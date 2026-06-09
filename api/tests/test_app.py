@@ -9,6 +9,7 @@ from moto import mock_aws
 from temporal_model.api.app import _configure_logging, app
 from temporal_model.api.model_runner import ModelRunner
 from temporal_model.api.settings import settings
+from temporal_model.core.package import UncalibratedModelError
 
 BUCKET = "frames"
 KEYS = ["cam12/adf_2023-05-23T17-18-01.jpg", "cam12/adf_2023-05-23T17-18-31.jpg"]
@@ -237,8 +238,6 @@ def test_configure_logging_idempotent_and_preserves_propagation():
 def test_lifespan_uncalibrated_model_degrades_to_unavailable(monkeypatch):
     # An uncalibrated package raises UncalibratedModelError at load (core gate);
     # the lifespan handler must degrade to not-ready rather than crashing.
-    from temporal_model.core.package import UncalibratedModelError
-
     def fake_load(*args, **kwargs):
         raise UncalibratedModelError("load_model_package: model is not calibrated")
 

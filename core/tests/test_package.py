@@ -548,9 +548,8 @@ class TestBuildCalibrationGate:
     def test_build_allows_calibrated_by_default(
         self, tmp_path: Path, dummy_yolo_weights: Path, dummy_classifier_ckpt: Path
     ) -> None:
-        cfg = {k: dict(v) if isinstance(v, dict) else v for k, v in SAMPLE_CONFIG.items()}
-        cfg["decision"] = dict(cfg["decision"])
-        cfg["decision"]["aggregation"] = "logistic"
+        cfg = {**SAMPLE_CONFIG}
+        cfg["decision"] = {**SAMPLE_CONFIG["decision"], "aggregation": "logistic"}
         out = build_model_package(
             yolo_weights_path=dummy_yolo_weights,
             classifier_ckpt_path=dummy_classifier_ckpt,
