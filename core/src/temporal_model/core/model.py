@@ -41,6 +41,9 @@ _PAD_STRATEGIES = {
     "uniform": pad_frames_uniform,
 }
 
+DEFAULT_AGGREGATION = "max_logit"
+DEFAULT_LOGISTIC_THRESHOLD = 0.5
+
 
 def _select_device(device: str | torch.device | None) -> torch.device:
     """Resolve the requested device, auto-picking the best available when None.
@@ -85,12 +88,14 @@ class BboxTubeTemporalModel(TemporalModel):
     @property
     def aggregation(self) -> str:
         """Decision aggregation rule: ``"max_logit"`` or ``"logistic"``."""
-        return self._cfg["decision"].get("aggregation", "max_logit")
+        return self._cfg["decision"].get("aggregation", DEFAULT_AGGREGATION)
 
     @property
     def logistic_threshold(self) -> float:
         """Probability threshold for the logistic decision rule."""
-        return float(self._cfg["decision"].get("logistic_threshold", 0.5))
+        return float(
+            self._cfg["decision"].get("logistic_threshold", DEFAULT_LOGISTIC_THRESHOLD)
+        )
 
     @logistic_threshold.setter
     def logistic_threshold(self, value: float) -> None:
@@ -138,7 +143,7 @@ class BboxTubeTemporalModel(TemporalModel):
         clf_cfg = self._cfg["classifier"]
         dec = self._cfg["decision"]
 
-        aggregation = dec.get("aggregation", "max_logit")
+        aggregation = dec.get("aggregation", DEFAULT_AGGREGATION)
         effective_threshold = (
             float(dec["logistic_threshold"])
             if aggregation == "logistic"
@@ -281,7 +286,9 @@ class BboxTubeTemporalModel(TemporalModel):
                     aggregation=aggregation,
                     threshold=float(dec["threshold"]),
                     calibrator=self._calibrator,
-                    logistic_threshold=float(dec.get("logistic_threshold", 0.5)),
+                    logistic_threshold=float(
+                        dec.get("logistic_threshold", DEFAULT_LOGISTIC_THRESHOLD)
+                    ),
                     min_prefix_length=tubes_cfg["infer_min_tube_length"],
                 )
             )
