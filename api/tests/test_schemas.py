@@ -52,6 +52,24 @@ def test_request_rejects_scheme():
         PredictRequest(frames=["s3://bucket/a.jpg"])
 
 
+def test_request_bucket_defaults_to_none():
+    assert PredictRequest(frames=["a.jpg"]).bucket is None
+
+
+def test_request_accepts_bucket():
+    assert PredictRequest(frames=["a.jpg"], bucket="my-bucket").bucket == "my-bucket"
+
+
+def test_request_rejects_empty_bucket():
+    with pytest.raises(ValidationError):
+        PredictRequest(frames=["a.jpg"], bucket="")
+
+
+def test_request_rejects_bucket_url():
+    with pytest.raises(ValidationError):
+        PredictRequest(frames=["a.jpg"], bucket="s3://my-bucket")
+
+
 def test_smoke_uses_max_kept_probability():
     # Trigger tube (id 7) has the LOWER prob; reported value is the max (0.91).
     out = SimpleNamespace(

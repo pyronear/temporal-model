@@ -1,8 +1,9 @@
 """S3 frame fetching.
 
 Downloads frame objects (by key) into a per-request temp directory, preserving
-each key's basename and the requested order. Credentials and bucket come from
-settings / the boto3 chain — never from the request.
+each key's basename and the requested order. Credentials come from the boto3
+chain. The bucket is resolved per request (request ``bucket`` field, falling
+back to settings) and passed in by the caller.
 """
 
 from pathlib import Path
