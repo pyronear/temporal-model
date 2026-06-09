@@ -1,0 +1,71 @@
+"""Tests for benchmark aggregation."""
+
+import json
+
+import pandas as pd
+
+from temporal_model.benchmark.report import summarize
+
+STAGES = ["pad", "detector", "tubes", "crop", "classifier", "trigger_search"]
+
+
+def _row(key, total, **stage_ms):
+    r = {
+        "key": key,
+        "rep": 0,
+        "failed": False,
+        "frame_count": 6,
+        "n_kept_tubes": 1,
+        "total_ms": total,
+    }
+    for s in STAGES:
+        r[f"{s}_ms"] = stage_ms.get(s, 0.0)
+    return r
+
+
+def test_summarize_latency_percentiles_and_counts():
+    df = pd.DataFrame(
+        [
+            _row("a", 100.0, classifier=80.0, detector=20.0),
+            _row("b", 200.0, classifier=160.0, detector=40.0),
+            _row("c", 300.0, classifier=240.0, detector=60.0),
+        ]
+    )
+    s = summarize(df)
+    assert s["n_sequences"] == 3
+    assert s["n_failed"] == 0
+    assert s["total_ms"]["p50"] == 200.0
+    # frames/sec uses mean latency over total frames; just assert it's positive.
+    assert s["throughput"]["sequences_per_sec"] > 0
+    # classifier dominates the mean stage share.
+    assert s["stage_share_pct"]["classifier"] > s["stage_share_pct"]["detector"]
+
+
+def test_summarize_counts_failures_and_excludes_them():
+    df = pd.DataFrame(
+        [
+            _row("a", 100.0, classifier=100.0),
+            {"key": "b", "rep": 0, "failed": True},
+        ]
+    )
+    s = summarize(df)
+    assert s["n_sequences"] == 2
+    assert s["n_failed"] == 1
+    assert s["total_ms"]["p50"] == 100.0  # failed row excluded from latency
+
+
+def test_summarize_all_failed_is_safe():
+    # Every sequence failed → bare dicts with no timing columns at all.
+    df = pd.DataFrame(
+        [
+            {"key": "a", "rep": 0, "failed": True},
+            {"key": "b", "rep": 0, "failed": True},
+        ]
+    )
+    s = summarize(df)
+    assert s["n_sequences"] == 2
+    assert s["n_failed"] == 2
+    assert s["total_ms"]["p50"] == 0.0
+    assert s["throughput"]["sequences_per_sec"] == 0.0
+    # Must stay valid JSON — no NaN tokens leaking in.
+    assert json.loads(json.dumps(s)) == s

@@ -29,6 +29,7 @@ from .inference import (
 from .logistic_calibrator import LogisticCalibrator, extract_features
 from .package import ModelPackage, load_model_package
 from .protocol import Frame, TemporalModel, TemporalModelOutput
+from .stage_timer import StageTimer, stage_ctx
 from .tubes import build_tubes
 
 _PAD_STRATEGIES = {
@@ -124,7 +125,9 @@ class BboxTubeTemporalModel(TemporalModel):
         """
         return cls.from_package(archive_path, device=device)
 
-    def predict(self, frames: list[Frame]) -> TemporalModelOutput:
+    def predict(
+        self, frames: list[Frame], *, timer: StageTimer | None = None
+    ) -> TemporalModelOutput:
         infer = self._cfg["infer"]
         tubes_cfg = self._cfg["tubes"]
         mi = self._cfg["model_input"]
@@ -179,48 +182,51 @@ class BboxTubeTemporalModel(TemporalModel):
                 ),
             )
 
-        truncated = frames[: clf_cfg["max_frames"]]
-        n_truncated = original_len - len(truncated)
+        with stage_ctx(timer, "pad"):
+            truncated = frames[: clf_cfg["max_frames"]]
+            n_truncated = original_len - len(truncated)
 
-        padded_indices: list[int] = []
-        pad_min = int(infer.get("pad_to_min_frames", 0))
-        if pad_min > 0 and len(truncated) < pad_min:
-            strategy = infer.get("pad_strategy", "symmetric")
-            try:
-                pad_fn = _PAD_STRATEGIES[strategy]
-            except KeyError as e:
-                raise ValueError(
-                    f"unknown pad_strategy {strategy!r}; "
-                    f"expected one of {sorted(_PAD_STRATEGIES)}"
-                ) from e
-            truncated, padded_indices = pad_fn(truncated, min_length=pad_min)
+            padded_indices: list[int] = []
+            pad_min = int(infer.get("pad_to_min_frames", 0))
+            if pad_min > 0 and len(truncated) < pad_min:
+                strategy = infer.get("pad_strategy", "symmetric")
+                try:
+                    pad_fn = _PAD_STRATEGIES[strategy]
+                except KeyError as e:
+                    raise ValueError(
+                        f"unknown pad_strategy {strategy!r}; "
+                        f"expected one of {sorted(_PAD_STRATEGIES)}"
+                    ) from e
+                truncated, padded_indices = pad_fn(truncated, min_length=pad_min)
 
-        frame_dets = run_yolo_on_frames(
-            self._yolo,
-            truncated,
-            confidence_threshold=infer["confidence_threshold"],
-            iou_nms=infer["iou_nms"],
-            image_size=infer["image_size"],
-            device=self._device,
-        )
+        with stage_ctx(timer, "detector"):
+            frame_dets = run_yolo_on_frames(
+                self._yolo,
+                truncated,
+                confidence_threshold=infer["confidence_threshold"],
+                iou_nms=infer["iou_nms"],
+                image_size=infer["image_size"],
+                device=self._device,
+            )
 
-        # Pre-merge (raw) candidates count, for the details JSON.
-        candidate_tubes = build_tubes(
-            frame_dets,
-            iou_threshold=tubes_cfg["iou_threshold"],
-            max_misses=tubes_cfg["max_misses"],
-        )
-        kept = build_tubes_for_inference(
-            frame_dets,
-            iou_threshold=tubes_cfg["iou_threshold"],
-            max_misses=tubes_cfg["max_misses"],
-            min_tube_length=tubes_cfg["infer_min_tube_length"],
-            min_detected_entries=tubes_cfg["min_detected_entries"],
-            interpolate_gaps=tubes_cfg["interpolate_gaps"],
-            merge_iomin=tubes_cfg.get("merge_iomin"),
-            merge_prox_factor=tubes_cfg.get("merge_prox_factor"),
-            merge_max_gap=tubes_cfg.get("merge_max_gap"),
-        )
+        with stage_ctx(timer, "tubes"):
+            # Pre-merge (raw) candidates count, for the details JSON.
+            candidate_tubes = build_tubes(
+                frame_dets,
+                iou_threshold=tubes_cfg["iou_threshold"],
+                max_misses=tubes_cfg["max_misses"],
+            )
+            kept = build_tubes_for_inference(
+                frame_dets,
+                iou_threshold=tubes_cfg["iou_threshold"],
+                max_misses=tubes_cfg["max_misses"],
+                min_tube_length=tubes_cfg["infer_min_tube_length"],
+                min_detected_entries=tubes_cfg["min_detected_entries"],
+                interpolate_gaps=tubes_cfg["interpolate_gaps"],
+                merge_iomin=tubes_cfg.get("merge_iomin"),
+                merge_prox_factor=tubes_cfg.get("merge_prox_factor"),
+                merge_max_gap=tubes_cfg.get("merge_max_gap"),
+            )
 
         if not kept:
             return TemporalModelOutput(
@@ -238,40 +244,43 @@ class BboxTubeTemporalModel(TemporalModel):
 
         patches_per_tube: list[torch.Tensor] = []
         masks_per_tube: list[torch.Tensor] = []
-        for t in kept:
-            p, m = crop_tube_patches(
-                t,
-                truncated,
-                context_factor=mi["context_factor"],
-                patch_size=mi["patch_size"],
-                max_frames=clf_cfg["max_frames"],
-                normalization_mean=mi["normalization"]["mean"],
-                normalization_std=mi["normalization"]["std"],
-                stabilize=mi.get("stabilize", True),
-            )
-            patches_per_tube.append(p.to(self._device))
-            masks_per_tube.append(m.to(self._device))
+        with stage_ctx(timer, "crop"):
+            for t in kept:
+                p, m = crop_tube_patches(
+                    t,
+                    truncated,
+                    context_factor=mi["context_factor"],
+                    patch_size=mi["patch_size"],
+                    max_frames=clf_cfg["max_frames"],
+                    normalization_mean=mi["normalization"]["mean"],
+                    normalization_std=mi["normalization"]["std"],
+                    stabilize=mi.get("stabilize", True),
+                )
+                patches_per_tube.append(p.to(self._device))
+                masks_per_tube.append(m.to(self._device))
 
-        logits = score_tubes(
-            self._classifier,
-            patches_per_tube=patches_per_tube,
-            masks_per_tube=masks_per_tube,
-        )
-
-        is_positive, trigger, trigger_tube_id, per_tube_first_crossing = (
-            find_first_crossing_trigger(
-                classifier=self._classifier,
-                tubes=kept,
+        with stage_ctx(timer, "classifier"):
+            logits = score_tubes(
+                self._classifier,
                 patches_per_tube=patches_per_tube,
                 masks_per_tube=masks_per_tube,
-                full_logits=logits,
-                aggregation=aggregation,
-                threshold=float(dec["threshold"]),
-                calibrator=self._calibrator,
-                logistic_threshold=float(dec.get("logistic_threshold", 0.5)),
-                min_prefix_length=tubes_cfg["infer_min_tube_length"],
             )
-        )
+
+        with stage_ctx(timer, "trigger_search"):
+            is_positive, trigger, trigger_tube_id, per_tube_first_crossing = (
+                find_first_crossing_trigger(
+                    classifier=self._classifier,
+                    tubes=kept,
+                    patches_per_tube=patches_per_tube,
+                    masks_per_tube=masks_per_tube,
+                    full_logits=logits,
+                    aggregation=aggregation,
+                    threshold=float(dec["threshold"]),
+                    calibrator=self._calibrator,
+                    logistic_threshold=float(dec.get("logistic_threshold", 0.5)),
+                    min_prefix_length=tubes_cfg["infer_min_tube_length"],
+                )
+            )
 
         logits_list: list[float] = logits.tolist()
 

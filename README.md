@@ -10,7 +10,7 @@ that emits one logit per tube.
 
 ## Packages
 
-Four independent packages, each with its own `pyproject.toml` and `tests/`.
+Five independent packages, each with its own `pyproject.toml` and `tests/`.
 
 | Path | Import | Purpose |
 |------|--------|---------|
@@ -18,8 +18,9 @@ Four independent packages, each with its own `pyproject.toml` and `tests/`.
 | `train/` | `temporal_model.train` | DVC training pipeline. Depends on `core`. |
 | `eval/`  | `temporal_model.eval`  | DVC evaluation pipeline (packaged-model protocol metrics). Depends on `core`. |
 | `api/`   | `temporal_model.api`   | FastAPI serving layer, shipped as a Docker service. Depends on `core`. |
+| `benchmark/` | `temporal_model.benchmark` | Latency/throughput/resource benchmark with a per-stage `predict()` breakdown, runnable across VMs. Depends on `core`. |
 
-`train`/`eval`/`api` depend on `core` via a `uv` path source
+`train`/`eval`/`api`/`benchmark` depend on `core` via a `uv` path source
 (`temporal-model-core = { path = "../core", editable = true }`). `core` and
 `train` pull in PyTorch / timm / ultralytics, so their first `uv sync` is large.
 
@@ -47,6 +48,20 @@ pulls v0.1.0 from the public HuggingFace repo; override with
 `make fetch-model MODEL_VERSION=x.y.z`). The compose stack ships local-dev MinIO
 defaults (bucket `frames`, `minioadmin` creds); with the model present
 `/health` reports `model_loaded: true`.
+
+### Benchmark the model
+
+```bash
+make fetch-model                                  # ensure api/models/model.zip exists
+cd benchmark && make install && dvc pull          # deps + pyro-annotator store
+uv run temporal-benchmark core --model ../api/models/model.zip
+```
+
+Times each stage of `predict()` (yolo / tubes / crop+IO / vit / trigger) over
+the pyro-annotator sequence store and writes a self-describing report under
+`benchmark/data/08_reporting/<host>-<timestamp>/`. Designed to run on different
+VMs for comparison — see `benchmark/README.md` and the `scripts/` provision /
+push / pull helpers.
 
 ## Origin
 
