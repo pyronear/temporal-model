@@ -41,10 +41,13 @@ class _FakeModel:
     seq name prefix.
     """
 
+    last_compute_trigger = None
+
     def load_sequence(self, frames):
         return [Frame(frame_id=p.stem, image_path=p, timestamp=None) for p in frames]
 
-    def predict(self, frames):
+    def predict(self, frames, *, compute_trigger=False):
+        type(self).last_compute_trigger = compute_trigger
         # Decide based on how many frames we got — purely to vary outputs.
         is_pos = len(frames) >= 3
         kept = (
@@ -116,6 +119,9 @@ def test_evaluate_packaged_writes_expected_outputs(tmp_path, monkeypatch):
 
     evaluate_packaged.main()
 
+    # Eval must request the trigger output — TTD needs trigger_frame_index.
+    assert _FakeModel.last_compute_trigger is True
+
     assert (output_dir / "metrics.json").is_file()
     assert (output_dir / "predictions.json").is_file()
     assert (output_dir / "dropped.json").is_file()
@@ -163,7 +169,7 @@ def test_evaluate_packaged_strict_errors_abort(tmp_path, monkeypatch):
     _make_sequence(sequences_dir, "wildfire", "wf_seq", n_frames=3)
 
     class _BrokenModel(_FakeModel):
-        def predict(self, frames):
+        def predict(self, frames, *, compute_trigger=False):
             raise RuntimeError("simulated inference crash")
 
     monkeypatch.setattr(
