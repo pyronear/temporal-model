@@ -264,9 +264,7 @@ class BboxTubeTemporalModel(TemporalModel):
             if frame_detections is None:
                 frame_dets = self.detect(truncated)
             else:
-                frame_dets = self._resolve_frame_detections(
-                    truncated, frame_detections
-                )
+                frame_dets = self._resolve_frame_detections(truncated, frame_detections)
 
         with stage_ctx(timer, "tubes"):
             # Pre-merge (raw) candidates count, for the details JSON.

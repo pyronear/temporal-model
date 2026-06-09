@@ -23,8 +23,8 @@ def test_get_marks_recently_used():
     c = DetectionCache(capacity=2)
     c.put("a", 1)
     c.put("b", 2)
-    c.get("a")      # "a" now most-recently-used
-    c.put("c", 3)   # evicts "b", not "a"
+    c.get("a")  # "a" now most-recently-used
+    c.put("c", 3)  # evicts "b", not "a"
     assert "a" in c
     assert "b" not in c
     assert "c" in c
