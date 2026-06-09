@@ -26,6 +26,7 @@ Four independent packages, each with its own `pyproject.toml` and `tests/`.
 ## Quick start
 
 ```bash
+make                # list all available targets (same as `make help`)
 make install        # uv sync across all four packages
 make test           # pytest across all four packages
 make lint           # ruff check across all four packages
