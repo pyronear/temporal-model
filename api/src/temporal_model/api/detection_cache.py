@@ -2,6 +2,14 @@
 
 Keyed by ``frame_id``. Values are stored opaquely (the caller decides the type).
 ``capacity <= 0`` disables the cache: nothing is stored, so every lookup misses.
+
+Correctness assumption: ``frame_id`` must be **globally unique** across cameras
+and time, since this cache is shared by all requests. Pyronear frame filenames
+embed site + timestamp (``<prefix>_<YYYY-MM-DDTHH-MM-SS>``), so their stems are
+unique — but a deployment whose filenames are not site-qualified would let one
+camera's detections be served for another's. The model already treats
+``frame_id`` as identity within a sequence; this only extends that across
+requests.
 """
 
 from collections import OrderedDict
