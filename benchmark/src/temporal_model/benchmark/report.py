@@ -193,3 +193,84 @@ def _render_markdown(summary: dict) -> str:
         "![resources](plots/resources.png)",
     ]
     return "\n".join(lines) + "\n"
+
+
+def _api_stage_cols(df: pd.DataFrame) -> list[str]:
+    return [
+        c for c in df.columns if c.endswith("_ms") and c not in ("e2e_ms", "total_ms")
+    ]
+
+
+def _summarize_pass(pdf: pd.DataFrame) -> dict:
+    ok = pdf[pdf["http_status"] == 200]
+    e2e = ok["e2e_ms"] if not ok.empty else pd.Series(dtype=float)
+    stage_cols = _api_stage_cols(pdf)
+    stage_means = {
+        c[:-3]: round(float(ok[c].mean()), 3) if (not ok.empty and c in ok) else 0.0
+        for c in stage_cols
+    }
+    hits = float(ok["cache_hits"].sum()) if "cache_hits" in ok else 0.0
+    misses = float(ok["cache_misses"].sum()) if "cache_misses" in ok else 0.0
+    hit_rate = hits / (hits + misses) if (hits + misses) else 0.0
+    mean_e2e = float(e2e.mean()) if not e2e.empty else 0.0
+    return {
+        "n_requests": int(len(pdf)),
+        "n_errors": int((pdf["http_status"] != 200).sum()),
+        "e2e_ms": {
+            "p50": round(float(e2e.quantile(0.50)), 3) if not e2e.empty else 0.0,
+            "p90": round(float(e2e.quantile(0.90)), 3) if not e2e.empty else 0.0,
+            "p99": round(float(e2e.quantile(0.99)), 3) if not e2e.empty else 0.0,
+            "mean": round(mean_e2e, 3),
+        },
+        "stage_ms_mean": stage_means,
+        "cache_hit_rate": round(hit_rate, 4),
+        "throughput_req_per_sec": round(1000.0 / mean_e2e, 3) if mean_e2e else 0.0,
+    }
+
+
+def summarize_api(df: pd.DataFrame) -> dict:
+    """Aggregate API benchmark rows, split by cache pass (cold/warm)."""
+    passes = {p: _summarize_pass(df[df["pass"] == p]) for p in df["pass"].unique()}
+    return {"passes": passes, "n_requests": int(len(df))}
+
+
+def write_api_report(
+    df: pd.DataFrame,
+    resources: pd.DataFrame,
+    machine: dict,
+    out_dir: Path,
+) -> dict:
+    """Write raw.parquet, resources.parquet, summary.json, report.md for the API run."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(out_dir / "raw.parquet")
+    resources.to_parquet(out_dir / "resources.parquet")
+    summary = summarize_api(df)
+    summary["machine"] = machine
+    (out_dir / "summary.json").write_text(json.dumps(summary, indent=2))
+    (out_dir / "report.md").write_text(_render_api_markdown(summary))
+    return summary
+
+
+def _render_api_markdown(summary: dict) -> str:
+    m = summary["machine"]
+    lines = [
+        f"# API e2e benchmark — {m['hostname']}",
+        "",
+        f"- CPU: {m['cpu_model']} ({m['cpu_count_physical']} cores) · "
+        f"device {m['device']} · {m['ram_total_gb']} GB",
+        "",
+    ]
+    for name, p in summary["passes"].items():
+        e = p["e2e_ms"]
+        lines += [
+            f"## {name} pass",
+            f"- requests: {p['n_requests']} (errors: {p['n_errors']})",
+            f"- e2e ms: p50 {e['p50']} · p90 {e['p90']} · p99 {e['p99']} · "
+            f"mean {e['mean']}",
+            f"- throughput: {p['throughput_req_per_sec']} req/s · "
+            f"cache hit rate {p['cache_hit_rate']}",
+            "- stage means (ms): "
+            + " · ".join(f"{s} {v}" for s, v in p["stage_ms_mean"].items()),
+            "",
+        ]
+    return "\n".join(lines) + "\n"
