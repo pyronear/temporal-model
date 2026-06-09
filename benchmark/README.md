@@ -11,13 +11,14 @@ Phase 1 covers the **core in-process** path. See
 
 ```bash
 make install                       # uv sync (installs core editable)
+dvc pull                           # fetch the pyro-annotator store into data/03_primary
 temporal-benchmark core \
-    --store data/sequences \
-    --model ../api/models/model.zip \
-    --out results
+    --model ../api/models/model.zip
 ```
 
-Outputs a self-describing dir `results/<host>-<timestamp>/` with `raw.parquet`,
+Data follows the Kedro-style layers used across this repo: the input sequence
+store lives in `data/03_primary/sequences/` (DVC-tracked) and each run writes a
+self-describing dir `data/08_reporting/<host>-<timestamp>/` with `raw.parquet`,
 `resources.parquet`, `summary.json`, `plots/*.png`, and `report.md`.
 
 ## On a VM

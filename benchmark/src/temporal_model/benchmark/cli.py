@@ -48,7 +48,7 @@ def main() -> None:
     sub = ap.add_subparsers(dest="command", required=True)
 
     core = sub.add_parser("core", help="in-process predict() stage breakdown")
-    core.add_argument("--store", type=Path, required=True)
+    core.add_argument("--store", type=Path, default=Path("data/03_primary/sequences"))
     core.add_argument("--model", type=Path, required=True)
     core.add_argument("--device", default="auto", help="cpu, cuda, or auto")
     core.add_argument("--reps", type=int, default=5)
@@ -61,7 +61,7 @@ def main() -> None:
         help="torch.set_num_threads(); default = torch default",
     )
     core.add_argument("--sample-interval", type=float, default=0.1)
-    core.add_argument("--out", type=Path, default=Path("results"))
+    core.add_argument("--out", type=Path, default=Path("data/08_reporting"))
     core.add_argument(
         "--timestamp",
         default="run",

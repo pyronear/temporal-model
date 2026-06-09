@@ -3,8 +3,8 @@
 # Run from the benchmark/ dir. Usage: push_data.sh <ssh-host>
 set -euo pipefail
 HOST="${1:?usage: push_data.sh <ssh-host>}"
-SRC="data/sequences/pyro-annotator/"
-DST="$HOST:~/temporal-model/benchmark/data/sequences/pyro-annotator/"
+SRC="data/03_primary/sequences/pyro-annotator/"
+DST="$HOST:~/temporal-model/benchmark/data/03_primary/sequences/pyro-annotator/"
 test -d "$SRC" || { echo "missing $SRC (run 'dvc pull' first)"; exit 1; }
 rsync -az --info=progress2 "$SRC" "$DST"
 echo "pushed dataset to $HOST"
