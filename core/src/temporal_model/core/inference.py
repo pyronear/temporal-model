@@ -5,6 +5,7 @@ Each helper corresponds to one stage of the six-stage pipeline described in
 ``predict()`` is thin and each stage is unit-testable in isolation.
 """
 
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
@@ -36,6 +37,7 @@ __all__ = [
     "filter_and_interpolate_tubes",
     "crop_tube_patches",
     "score_tubes",
+    "make_decision_fn",
     "find_first_crossing_trigger",
     "build_tubes_for_inference",
 ]
@@ -301,6 +303,41 @@ def score_tubes(
         return classifier(patches, mask)
 
 
+def make_decision_fn(
+    aggregation: str,
+    *,
+    threshold: float,
+    calibrator: LogisticCalibrator | None,
+    logistic_threshold: float,
+) -> Callable[[float, Tube, int], bool]:
+    """Build the per-tube positive-decision predicate for an aggregation rule.
+
+    Returns ``decides_positive(logit, tube, n_tubes) -> bool``. Shared by the
+    full-tube decision (production fast path) and the prefix re-scoring loop
+    (:func:`find_first_crossing_trigger`), so both agree on the rule.
+
+    Raises:
+        ValueError: unknown ``aggregation`` or ``"logistic"`` without a
+            calibrator.
+    """
+    if aggregation == "max_logit":
+
+        def decides_positive(logit: float, _tube: Tube, _n_tubes: int) -> bool:
+            return logit >= threshold
+
+        return decides_positive
+    if aggregation == "logistic":
+        if calibrator is None:
+            raise ValueError("aggregation='logistic' requires a fitted calibrator")
+
+        def decides_positive(logit: float, tube: Tube, n_tubes: int) -> bool:
+            features = extract_features(tube_feature_dict(tube, logit), n_tubes=n_tubes)
+            return bool(calibrator.predict_proba(features) >= logistic_threshold)
+
+        return decides_positive
+    raise ValueError(f"unknown aggregation: {aggregation!r}")
+
+
 def find_first_crossing_trigger(
     *,
     classifier: Any,
@@ -358,21 +395,12 @@ def find_first_crossing_trigger(
     if not tubes:
         return False, None, None, {}
 
-    if aggregation == "max_logit":
-
-        def decides_positive(logit: float, _tube_prefix: Tube, _n_tubes: int) -> bool:
-            return logit >= threshold
-    elif aggregation == "logistic":
-        if calibrator is None:
-            raise ValueError("aggregation='logistic' requires a fitted calibrator")
-
-        def decides_positive(logit: float, tube_prefix: Tube, n_tubes: int) -> bool:
-            features = extract_features(
-                tube_feature_dict(tube_prefix, logit), n_tubes=n_tubes
-            )
-            return bool(calibrator.predict_proba(features) >= logistic_threshold)
-    else:
-        raise ValueError(f"unknown aggregation: {aggregation!r}")
+    decides_positive = make_decision_fn(
+        aggregation,
+        threshold=threshold,
+        calibrator=calibrator,
+        logistic_threshold=logistic_threshold,
+    )
 
     n_tubes = len(tubes)
 

@@ -99,7 +99,7 @@ def main() -> None:
             continue
         label = "smoke" if is_wf_sequence(seq_dir) else "fp"
         frames = model.load_sequence(frame_paths)
-        output = model.predict(frames)
+        output = model.predict(frames, compute_trigger=True)
         records.append(
             build_record(
                 sequence_dir=seq_dir,

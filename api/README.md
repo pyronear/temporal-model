@@ -9,7 +9,8 @@ Import as `temporal_model.api`. Depends on `temporal-model-core`.
 
 - `GET /health` — readiness + loaded model name/version.
 - `POST /predict` — body `{ "frames": ["<s3-key>", ...] }` (ordered S3 keys);
-  returns `{ is_smoke, probability, trigger_frame_index, model }`.
+  returns `{ is_smoke, probability, model }` (`probability` = max kept-tube
+  calibrated probability, `null` if uncalibrated).
   `POST /predict?verbose=true` adds a `details` block (decision, preprocessing,
   per-tube tracks). See `docs/specs/2026-06-02-api-service-design.md` for the
   full contract.

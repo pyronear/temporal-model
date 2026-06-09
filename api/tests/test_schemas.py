@@ -52,16 +52,18 @@ def test_request_rejects_scheme():
         PredictRequest(frames=["s3://bucket/a.jpg"])
 
 
-def test_smoke_default_uses_trigger_tube_probability():
+def test_smoke_uses_max_kept_probability():
+    # Trigger tube (id 7) has the LOWER prob; reported value is the max (0.91).
     out = SimpleNamespace(
-        is_positive=True, trigger_frame_index=3, details=_details([_tube(7, 0.98)])
+        is_positive=True,
+        trigger_frame_index=3,
+        details=_details([_tube(7, 0.62), _tube(2, 0.91)]),
     )
     resp = to_response(out, name="m", version="1.2.0", calibrated=True, verbose=False)
     dumped = resp.model_dump(exclude_unset=True)
     assert dumped == {
         "is_smoke": True,
-        "probability": 0.98,
-        "trigger_frame_index": 3,
+        "probability": 0.91,
         "model": {"name": "m", "version": "1.2.0"},
     }
 
@@ -75,7 +77,6 @@ def test_negative_uses_max_kept_probability():
     resp = to_response(out, name="m", version="1.2.0", calibrated=True, verbose=False)
     assert resp.probability == 0.41
     assert resp.is_smoke is False
-    assert resp.trigger_frame_index is None
 
 
 def test_negative_no_tubes_is_zero_when_calibrated():
@@ -94,14 +95,6 @@ def test_uncalibrated_probability_is_null():
     assert resp.probability is None
 
 
-def test_smoke_trigger_tube_missing_returns_none():
-    details = _details([_tube(7, 0.98)])
-    details["decision"]["trigger_tube_id"] = 999  # not among kept tubes
-    out = SimpleNamespace(is_positive=True, trigger_frame_index=3, details=details)
-    resp = to_response(out, name="m", version="1.2.0", calibrated=True, verbose=False)
-    assert resp.probability is None
-
-
 def test_verbose_adds_details_block():
     out = SimpleNamespace(
         is_positive=True, trigger_frame_index=3, details=_details([_tube(7, 0.98)])
@@ -111,7 +104,6 @@ def test_verbose_adds_details_block():
     assert dumped["details"]["decision"] == {
         "aggregation": "max_logit",
         "threshold": 0.5,
-        "trigger_tube_id": 7,
         "threshold_overridden": False,
         "packaged_threshold": None,
     }

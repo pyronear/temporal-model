@@ -14,6 +14,7 @@ from temporal_model.core.inference import (
     crop_tube_patches,
     filter_and_interpolate_tubes,
     find_first_crossing_trigger,
+    make_decision_fn,
     run_yolo_on_frames,
     score_tubes,
 )
@@ -772,3 +773,25 @@ class TestBuildTubesForInference:
             merge_max_gap=10,
         )
         assert len(tubes) == 2  # would be 1 if merge ran
+
+
+def test_make_decision_fn_max_logit():
+    decides = make_decision_fn(
+        "max_logit", threshold=0.5, calibrator=None, logistic_threshold=0.5
+    )
+    assert decides(0.6, None, 1) is True
+    assert decides(0.4, None, 1) is False
+
+
+def test_make_decision_fn_unknown_aggregation_raises():
+    with pytest.raises(ValueError, match="unknown aggregation"):
+        make_decision_fn(
+            "bogus", threshold=0.0, calibrator=None, logistic_threshold=0.5
+        )
+
+
+def test_make_decision_fn_logistic_requires_calibrator():
+    with pytest.raises(ValueError, match="requires a fitted calibrator"):
+        make_decision_fn(
+            "logistic", threshold=0.0, calibrator=None, logistic_threshold=0.5
+        )
