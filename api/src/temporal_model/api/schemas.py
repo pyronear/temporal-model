@@ -12,6 +12,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class PredictRequest(BaseModel):
     frames: list[str]
+    # Optional per-request S3 bucket. Falls back to settings.s3_bucket when
+    # omitted (alert-api stacks use per-org dynamic bucket names that no single
+    # setting can cover).
+    bucket: str | None = None
 
     @field_validator("frames")
     @classmethod
@@ -21,6 +25,17 @@ class PredictRequest(BaseModel):
         for key in v:
             if "://" in key:
                 raise ValueError(f"frame key must be a bare S3 key, not a URL: {key!r}")
+        return v
+
+    @field_validator("bucket")
+    @classmethod
+    def _validate_bucket(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if not v:
+            raise ValueError("bucket must not be empty")
+        if "://" in v:
+            raise ValueError(f"bucket must be a bare name, not a URL: {v!r}")
         return v
 
 
