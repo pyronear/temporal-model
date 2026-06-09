@@ -89,6 +89,7 @@ def built_archive(
         config=SAMPLE_CONFIG,
         variant="vit_dinov2_finetune",
         output_path=out,
+        allow_uncalibrated=True,
     )
     return out
 
@@ -222,6 +223,7 @@ def real_tiny_archive(
         config=real_tiny_config,
         variant="tiny",
         output_path=out,
+        allow_uncalibrated=True,
     )
     return out
 
@@ -347,6 +349,7 @@ class TestCalibratorBundling:
             variant="tiny",
             output_path=out,
             calibrator=cal,
+            allow_uncalibrated=True,
         )
 
         with zipfile.ZipFile(out, "r") as zf:
@@ -382,6 +385,7 @@ class TestCalibratorBundling:
             variant="tiny",
             output_path=out,
             calibrator=cal,
+            allow_uncalibrated=True,
         )
 
         # Rewrite the zip with tampered coefficients.
@@ -417,6 +421,7 @@ class TestProvenance:
             variant="vit_dinov2_finetune",
             output_path=out,
             model_version="1.4.0",
+            allow_uncalibrated=True,
         )
         with zipfile.ZipFile(out, "r") as zf:
             manifest = yaml.safe_load(zf.read(MANIFEST_FILENAME))
@@ -456,6 +461,7 @@ class TestProvenance:
             variant="vit_dinov2_finetune",
             output_path=out,
             train_git_sha="abc1234",
+            allow_uncalibrated=True,
         )
         with zipfile.ZipFile(out, "r") as zf:
             manifest = yaml.safe_load(zf.read(MANIFEST_FILENAME))
@@ -486,3 +492,61 @@ class TestRequireCalibrated:
 
     def test_error_is_a_valueerror(self) -> None:
         assert issubclass(UncalibratedModelError, ValueError)
+
+
+class TestBuildCalibrationGate:
+    def test_build_rejects_uncalibrated_by_default(
+        self, tmp_path: Path, dummy_yolo_weights: Path, dummy_classifier_ckpt: Path
+    ) -> None:
+        # SAMPLE_CONFIG is max_logit and no calibrator -> uncalibrated.
+        with pytest.raises(UncalibratedModelError, match="not calibrated"):
+            build_model_package(
+                yolo_weights_path=dummy_yolo_weights,
+                classifier_ckpt_path=dummy_classifier_ckpt,
+                config=SAMPLE_CONFIG,
+                variant="vit_dinov2_finetune",
+                output_path=tmp_path / "out.zip",
+            )
+
+    def test_build_rejects_calibrator_with_max_logit(
+        self, tmp_path: Path, dummy_yolo_weights: Path, dummy_classifier_ckpt: Path
+    ) -> None:
+        # Calibrator present but aggregation is max_logit -> still uncalibrated.
+        with pytest.raises(UncalibratedModelError):
+            build_model_package(
+                yolo_weights_path=dummy_yolo_weights,
+                classifier_ckpt_path=dummy_classifier_ckpt,
+                config=SAMPLE_CONFIG,  # aggregation == "max_logit"
+                variant="v",
+                output_path=tmp_path / "out.zip",
+                calibrator=_make_calibrator(),
+            )
+
+    def test_build_allows_uncalibrated_when_opted_in(
+        self, tmp_path: Path, dummy_yolo_weights: Path, dummy_classifier_ckpt: Path
+    ) -> None:
+        out = build_model_package(
+            yolo_weights_path=dummy_yolo_weights,
+            classifier_ckpt_path=dummy_classifier_ckpt,
+            config=SAMPLE_CONFIG,
+            variant="v",
+            output_path=tmp_path / "out.zip",
+            allow_uncalibrated=True,
+        )
+        assert out.exists()
+
+    def test_build_allows_calibrated_by_default(
+        self, tmp_path: Path, dummy_yolo_weights: Path, dummy_classifier_ckpt: Path
+    ) -> None:
+        cfg = {k: dict(v) if isinstance(v, dict) else v for k, v in SAMPLE_CONFIG.items()}
+        cfg["decision"] = dict(cfg["decision"])
+        cfg["decision"]["aggregation"] = "logistic"
+        out = build_model_package(
+            yolo_weights_path=dummy_yolo_weights,
+            classifier_ckpt_path=dummy_classifier_ckpt,
+            config=cfg,
+            variant="v",
+            output_path=tmp_path / "out.zip",
+            calibrator=_make_calibrator(),
+        )
+        assert out.exists()

@@ -106,6 +106,7 @@ def build_model_package(
     model_version: str | None = None,
     train_git_sha: str | None = None,
     calibrator: LogisticCalibrator | None = None,
+    allow_uncalibrated: bool = False,
 ) -> Path:
     """Bundle YOLO weights + classifier checkpoint + config into a .zip archive.
 
@@ -123,12 +124,16 @@ def build_model_package(
         calibrator: Optional fitted :class:`LogisticCalibrator`. When
             provided, its JSON payload is bundled into the archive and
             the manifest gets a ``logistic_calibrator`` pointer.
+        allow_uncalibrated: When False (default), refuse to build a package
+            that is not calibrated (no calibrator or non-logistic decision).
 
     Returns:
         The resolved ``output_path``.
 
     Raises:
         FileNotFoundError: If either input file is missing.
+        UncalibratedModelError: If the package is uncalibrated and
+            ``allow_uncalibrated`` is False.
     """
     if not yolo_weights_path.exists():
         raise FileNotFoundError(f"YOLO weights not found: {yolo_weights_path}")
@@ -136,6 +141,10 @@ def build_model_package(
         raise FileNotFoundError(
             f"Classifier checkpoint not found: {classifier_ckpt_path}"
         )
+
+    if not allow_uncalibrated:
+        aggregation = config.get("decision", {}).get("aggregation", "max_logit")
+        require_calibrated(calibrator, aggregation, context="build_model_package")
 
     manifest = {
         "format_version": FORMAT_VERSION,
