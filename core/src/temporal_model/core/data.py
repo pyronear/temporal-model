@@ -1,13 +1,10 @@
 """Data I/O utilities for sequence discovery and ground-truth labelling."""
 
 import json
-import re
-from datetime import datetime
 from pathlib import Path
 
+from .protocol import parse_timestamp
 from .types import Detection, FrameDetections
-
-_TIMESTAMP_RE = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})")
 
 
 def list_sequences(split_dir: Path) -> list[Path]:
@@ -52,20 +49,6 @@ def get_sorted_frames(sequence_dir: Path) -> list[Path]:
     if not images_dir.is_dir():
         return []
     return sorted(images_dir.glob("*.jpg"), key=lambda p: p.stem)
-
-
-def parse_timestamp(frame_id: str) -> datetime | None:
-    """Extract a timestamp from a Pyronear-style frame ID.
-
-    Expects the frame ID to contain ``YYYY-MM-DDTHH-MM-SS``.
-    """
-    match = _TIMESTAMP_RE.search(frame_id)
-    if not match:
-        return None
-    try:
-        return datetime.strptime(match.group(1), "%Y-%m-%dT%H-%M-%S")
-    except ValueError:
-        return None
 
 
 def load_detections(sequence_dir: Path, frame_id: str) -> list[Detection]:

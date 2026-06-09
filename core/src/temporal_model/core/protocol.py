@@ -57,7 +57,7 @@ class TemporalModelOutput:
 _TIMESTAMP_RE = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})$")
 
 
-def _try_parse_timestamp(frame_id: str) -> datetime | None:
+def parse_timestamp(frame_id: str) -> datetime | None:
     """Attempt to extract a timestamp from a Pyronear-style frame ID.
 
     Expects the frame ID to end with a timestamp segment matching
@@ -119,7 +119,7 @@ class TemporalModel(ABC):
             Frame(
                 frame_id=p.stem,
                 image_path=p,
-                timestamp=_try_parse_timestamp(p.stem),
+                timestamp=parse_timestamp(p.stem),
             )
             for p in frames
         ]
