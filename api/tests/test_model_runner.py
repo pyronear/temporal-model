@@ -1,11 +1,14 @@
 import asyncio
 import zipfile
+from pathlib import Path
 from types import SimpleNamespace
 
 import yaml
 
 from temporal_model.api import model_runner as mr
 from temporal_model.api.model_runner import ModelRunner, read_manifest
+from temporal_model.core.protocol import Frame
+from temporal_model.core.types import FrameDetections
 
 
 def _make_package(tmp_path, manifest: dict):
@@ -110,16 +113,62 @@ def test_load_no_override_leaves_threshold(tmp_path, monkeypatch):
     assert runner.threshold_overridden is False
 
 
-def test_predict_delegates_to_model():
-    captured = {}
+class _OrchestrationModel:
+    """Fake core model recording how detection is invoked across calls."""
 
-    class FakeModel:
-        def predict_sequence(self, paths):
-            captured["paths"] = paths
-            return "OUT"
+    def __init__(self):
+        self.detect_calls: list[list[str]] = []
+        self.predict_calls: list[set[str]] = []
 
-    runner = ModelRunner(FakeModel(), name="m", version="1", calibrated=True)
-    result = asyncio.run(runner.predict(["a.jpg", "b.jpg"]))
+    def load_sequence(self, paths):
+        return [
+            Frame(frame_id=Path(p).stem, image_path=Path(p), timestamp=None)
+            for p in paths
+        ]
 
-    assert result == "OUT"
-    assert captured["paths"] == ["a.jpg", "b.jpg"]
+    def detect(self, frames):
+        self.detect_calls.append([f.frame_id for f in frames])
+        return [
+            FrameDetections(
+                frame_idx=i, frame_id=f.frame_id, timestamp=None, detections=[]
+            )
+            for i, f in enumerate(frames)
+        ]
+
+    def predict(self, frames, *, frame_detections=None):
+        self.predict_calls.append(set(frame_detections or {}))
+        return SimpleNamespace(frame_ids=[f.frame_id for f in frames])
+
+
+def test_predict_resolves_all_detections_for_model():
+    model = _OrchestrationModel()
+    runner = ModelRunner(model, name="m", version="1", calibrated=True)
+    out = asyncio.run(runner.predict(["c/x_00.jpg", "c/x_01.jpg"]))
+
+    assert out.frame_ids == ["x_00", "x_01"]
+    # predict() receives detections for every frame in the sequence.
+    assert model.predict_calls[-1] == {"x_00", "x_01"}
+
+
+def test_predict_caches_and_reuses_detections():
+    model = _OrchestrationModel()
+    runner = ModelRunner(
+        model, name="m", version="1", calibrated=True, detection_cache_size=4096
+    )
+    asyncio.run(runner.predict(["c/x_00.jpg", "c/x_01.jpg"]))
+    asyncio.run(runner.predict(["c/x_00.jpg", "c/x_01.jpg", "c/x_02.jpg"]))
+
+    assert model.detect_calls[0] == ["x_00", "x_01"]
+    assert model.detect_calls[1] == ["x_02"]  # only the new frame re-detected
+
+
+def test_predict_cache_disabled_detects_every_frame():
+    model = _OrchestrationModel()
+    runner = ModelRunner(
+        model, name="m", version="1", calibrated=True, detection_cache_size=0
+    )
+    asyncio.run(runner.predict(["c/x_00.jpg", "c/x_01.jpg"]))
+    asyncio.run(runner.predict(["c/x_00.jpg", "c/x_01.jpg", "c/x_02.jpg"]))
+
+    assert model.detect_calls[0] == ["x_00", "x_01"]
+    assert model.detect_calls[1] == ["x_00", "x_01", "x_02"]  # full each call
