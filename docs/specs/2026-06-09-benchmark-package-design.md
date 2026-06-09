@@ -274,10 +274,14 @@ temporal-benchmark api  --url http://host:8000 --store <dir>   # Phase 2
 the target VM this is cpu. `--threads` sets `torch.set_num_threads()` (default:
 torch's own default); the effective value is recorded in the machine metadata.
 
-### Output layout (self-describing per run)
+### Data layout (Kedro layers)
+
+Data follows the repo's Kedro-style numbered layers (as in `train`/`eval`): the
+input store lives in `03_primary`, run outputs in `08_reporting`.
 
 ```
-benchmark/results/<host>-<timestamp>/
+benchmark/data/03_primary/sequences/pyro-annotator/   # input store (DVC-tracked)
+benchmark/data/08_reporting/<host>-<timestamp>/        # one self-describing dir per run
 ├── raw.parquet        # one row per (sequence, rep)
 ├── resources.parquet  # sampler timeline
 ├── summary.json       # machine meta + aggregates
@@ -285,15 +289,17 @@ benchmark/results/<host>-<timestamp>/
 └── report.md
 ```
 
-`<timestamp>` is supplied by the CLI at invocation; results dirs are not DVC
-tracked (they are per-VM outputs, committed selectively or kept locally).
+`<timestamp>` is supplied by the CLI at invocation; `08_reporting` is gitignored
+(per-VM outputs, committed selectively or kept locally).
 
 ### Dataset provisioning (DVC + rsync transport)
 
-DVC is the **in-repo source of truth**: copy the `pyro-annotator` source into
-`benchmark/data/sequences/pyro-annotator/`, `dvc add` it, and push to this
-package's remote (`s3://pyro-vision-rd/dvc/temporal-model/benchmark/`). A
-developer machine gets the data with `dvc pull`.
+DVC is the **in-repo source of truth**: the `pyro-annotator` source is copied
+into `benchmark/data/03_primary/sequences/pyro-annotator/` and `dvc add`-ed; the
+repo's blanket `**/data/**` ignore means the small `.dvc` pointer is force-added
+(`git add -f`). It is pushed to this package's remote
+(`s3://pyro-vision-rd/dvc/temporal-model/benchmark/`). A developer machine gets
+the data with `dvc pull`.
 
 **Transport to a VM is rsync, not dvc** — VMs are not assumed to have dvc or S3
 credentials. The ~562 MB set is rsync-pushed from a machine that already has it
