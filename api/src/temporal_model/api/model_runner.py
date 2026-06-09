@@ -16,6 +16,8 @@ from typing import Any
 import yaml
 from starlette.concurrency import run_in_threadpool
 
+from temporal_model.core.stage_timer import StageTimer, stage_ctx
+
 from .detection_cache import DetectionCache
 
 logger = logging.getLogger(__name__)
@@ -115,16 +117,30 @@ class ModelRunner:
             detection_cache_size=detection_cache_size,
         )
 
-    async def predict(self, frame_paths: list[Path]) -> Any:
+    async def predict(
+        self,
+        frame_paths: list[Path],
+        *,
+        timer: StageTimer | None = None,
+        profile: dict[str, Any] | None = None,
+    ) -> Any:
         """Resolve detections (cache + detect misses) then run the model.
 
         The whole orchestration runs in a worker thread under the lock, so the
-        cache is accessed by one prediction at a time.
+        cache is accessed by one prediction at a time. When ``timer``/``profile``
+        are supplied, the ``detector`` stage is timed and cache counts recorded.
         """
         async with self._lock:
-            return await run_in_threadpool(self._predict_sync, frame_paths)
+            return await run_in_threadpool(
+                self._predict_sync, frame_paths, timer, profile
+            )
 
-    def _predict_sync(self, frame_paths: list[Path]) -> Any:
+    def _predict_sync(
+        self,
+        frame_paths: list[Path],
+        timer: StageTimer | None = None,
+        profile: dict[str, Any] | None = None,
+    ) -> Any:
         started = time.perf_counter()
         frames = self._model.load_sequence(frame_paths)
         resolved: dict[str, Any] = {}
@@ -134,10 +150,16 @@ class ModelRunner:
                 resolved[f.frame_id] = self._cache.get(f.frame_id)
             else:
                 misses.append(f)
-        for fd in self._model.detect(misses):
+        with stage_ctx(timer, "detector"):
+            detected = self._model.detect(misses)
+        for fd in detected:
             self._cache.put(fd.frame_id, fd)
             resolved[fd.frame_id] = fd
-        out = self._model.predict(frames, frame_detections=resolved)
+        out = self._model.predict(frames, frame_detections=resolved, timer=timer)
+        if profile is not None:
+            profile["n_frames"] = len(frames)
+            profile["cache_hits"] = len(frames) - len(misses)
+            profile["cache_misses"] = len(misses)
         logger.info(
             "predict: %d/%d cache hits, seq_len=%d, cache_size=%d, %.0fms",
             len(frames) - len(misses),
