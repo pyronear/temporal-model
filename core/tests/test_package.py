@@ -19,8 +19,11 @@ from temporal_model.core.package import (
     LOGISTIC_CALIBRATOR_FILENAME,
     MANIFEST_FILENAME,
     YOLO_WEIGHTS_FILENAME,
+    UncalibratedModelError,
     build_model_package,
+    is_calibrated,
     load_model_package,
+    require_calibrated,
 )
 from temporal_model.core.temporal_classifier import TemporalSmokeClassifier
 
@@ -86,6 +89,7 @@ def built_archive(
         config=SAMPLE_CONFIG,
         variant="vit_dinov2_finetune",
         output_path=out,
+        allow_uncalibrated=True,
     )
     return out
 
@@ -219,6 +223,7 @@ def real_tiny_archive(
         config=real_tiny_config,
         variant="tiny",
         output_path=out,
+        allow_uncalibrated=True,
     )
     return out
 
@@ -233,7 +238,9 @@ class TestLoadRoundtrip:
         real_tiny_config: dict,
     ) -> None:
         mock_yolo.return_value = MagicMock(name="FakeYOLO")
-        pkg = load_model_package(real_tiny_archive, extract_dir=tmp_path / "ext")
+        pkg = load_model_package(
+            real_tiny_archive, extract_dir=tmp_path / "ext", allow_uncalibrated=True
+        )
         assert pkg.config == real_tiny_config
 
     @patch("temporal_model.core.package.load_yolo")
@@ -242,7 +249,9 @@ class TestLoadRoundtrip:
     ) -> None:
         sentinel = MagicMock(name="FakeYOLO")
         mock_yolo.return_value = sentinel
-        pkg = load_model_package(real_tiny_archive, extract_dir=tmp_path / "ext")
+        pkg = load_model_package(
+            real_tiny_archive, extract_dir=tmp_path / "ext", allow_uncalibrated=True
+        )
         assert pkg.yolo_model is sentinel
 
     @patch("temporal_model.core.package.load_yolo")
@@ -253,7 +262,9 @@ class TestLoadRoundtrip:
         tmp_path: Path,
     ) -> None:
         mock_yolo.return_value = MagicMock(name="FakeYOLO")
-        pkg = load_model_package(real_tiny_archive, extract_dir=tmp_path / "ext")
+        pkg = load_model_package(
+            real_tiny_archive, extract_dir=tmp_path / "ext", allow_uncalibrated=True
+        )
 
         patches = torch.zeros(1, 4, 3, 224, 224)
         mask = torch.tensor([[True, True, True, True]])
@@ -321,7 +332,9 @@ class TestCalibratorBundling:
             manifest = yaml.safe_load(zf.read(MANIFEST_FILENAME))
             assert "logistic_calibrator" not in manifest
 
-        pkg = load_model_package(real_tiny_archive, extract_dir=tmp_path / "ext")
+        pkg = load_model_package(
+            real_tiny_archive, extract_dir=tmp_path / "ext", allow_uncalibrated=True
+        )
         assert pkg.calibrator is None
 
     @patch("temporal_model.core.package.load_yolo")
@@ -344,6 +357,7 @@ class TestCalibratorBundling:
             variant="tiny",
             output_path=out,
             calibrator=cal,
+            allow_uncalibrated=True,
         )
 
         with zipfile.ZipFile(out, "r") as zf:
@@ -352,7 +366,9 @@ class TestCalibratorBundling:
             manifest = yaml.safe_load(zf.read(MANIFEST_FILENAME))
             assert manifest["logistic_calibrator"] == LOGISTIC_CALIBRATOR_FILENAME
 
-        pkg = load_model_package(out, extract_dir=tmp_path / "ext")
+        pkg = load_model_package(
+            out, extract_dir=tmp_path / "ext", allow_uncalibrated=True
+        )
         assert pkg.calibrator is not None
         assert pkg.calibrator.features == cal.features
         np.testing.assert_allclose(pkg.calibrator.coefficients, cal.coefficients)
@@ -379,6 +395,7 @@ class TestCalibratorBundling:
             variant="tiny",
             output_path=out,
             calibrator=cal,
+            allow_uncalibrated=True,
         )
 
         # Rewrite the zip with tampered coefficients.
@@ -414,6 +431,7 @@ class TestProvenance:
             variant="vit_dinov2_finetune",
             output_path=out,
             model_version="1.4.0",
+            allow_uncalibrated=True,
         )
         with zipfile.ZipFile(out, "r") as zf:
             manifest = yaml.safe_load(zf.read(MANIFEST_FILENAME))
@@ -453,7 +471,137 @@ class TestProvenance:
             variant="vit_dinov2_finetune",
             output_path=out,
             train_git_sha="abc1234",
+            allow_uncalibrated=True,
         )
         with zipfile.ZipFile(out, "r") as zf:
             manifest = yaml.safe_load(zf.read(MANIFEST_FILENAME))
         assert manifest["provenance"]["train_git_sha"] == "abc1234"
+
+
+class TestIsCalibrated:
+    def test_calibrator_and_logistic_is_calibrated(self) -> None:
+        assert is_calibrated(_make_calibrator(), "logistic") is True
+
+    def test_calibrator_but_max_logit_is_uncalibrated(self) -> None:
+        assert is_calibrated(_make_calibrator(), "max_logit") is False
+
+    def test_no_calibrator_logistic_is_uncalibrated(self) -> None:
+        assert is_calibrated(None, "logistic") is False
+
+    def test_no_calibrator_max_logit_is_uncalibrated(self) -> None:
+        assert is_calibrated(None, "max_logit") is False
+
+
+class TestRequireCalibrated:
+    def test_passes_when_calibrated(self) -> None:
+        require_calibrated(_make_calibrator(), "logistic", context="x")  # no raise
+
+    def test_raises_when_uncalibrated(self) -> None:
+        with pytest.raises(UncalibratedModelError, match="not calibrated"):
+            require_calibrated(None, "max_logit", context="ctx")
+
+    def test_error_is_a_valueerror(self) -> None:
+        assert issubclass(UncalibratedModelError, ValueError)
+
+
+class TestBuildCalibrationGate:
+    def test_build_rejects_uncalibrated_by_default(
+        self, tmp_path: Path, dummy_yolo_weights: Path, dummy_classifier_ckpt: Path
+    ) -> None:
+        # SAMPLE_CONFIG is max_logit and no calibrator -> uncalibrated.
+        with pytest.raises(UncalibratedModelError, match="not calibrated"):
+            build_model_package(
+                yolo_weights_path=dummy_yolo_weights,
+                classifier_ckpt_path=dummy_classifier_ckpt,
+                config=SAMPLE_CONFIG,
+                variant="vit_dinov2_finetune",
+                output_path=tmp_path / "out.zip",
+            )
+
+    def test_build_rejects_calibrator_with_max_logit(
+        self, tmp_path: Path, dummy_yolo_weights: Path, dummy_classifier_ckpt: Path
+    ) -> None:
+        # Calibrator present but aggregation is max_logit -> still uncalibrated.
+        with pytest.raises(UncalibratedModelError):
+            build_model_package(
+                yolo_weights_path=dummy_yolo_weights,
+                classifier_ckpt_path=dummy_classifier_ckpt,
+                config=SAMPLE_CONFIG,  # aggregation == "max_logit"
+                variant="v",
+                output_path=tmp_path / "out.zip",
+                calibrator=_make_calibrator(),
+            )
+
+    def test_build_allows_uncalibrated_when_opted_in(
+        self, tmp_path: Path, dummy_yolo_weights: Path, dummy_classifier_ckpt: Path
+    ) -> None:
+        out = build_model_package(
+            yolo_weights_path=dummy_yolo_weights,
+            classifier_ckpt_path=dummy_classifier_ckpt,
+            config=SAMPLE_CONFIG,
+            variant="v",
+            output_path=tmp_path / "out.zip",
+            allow_uncalibrated=True,
+        )
+        assert out.exists()
+
+    def test_build_allows_calibrated_by_default(
+        self, tmp_path: Path, dummy_yolo_weights: Path, dummy_classifier_ckpt: Path
+    ) -> None:
+        cfg = {**SAMPLE_CONFIG}
+        cfg["decision"] = {**SAMPLE_CONFIG["decision"], "aggregation": "logistic"}
+        out = build_model_package(
+            yolo_weights_path=dummy_yolo_weights,
+            classifier_ckpt_path=dummy_classifier_ckpt,
+            config=cfg,
+            variant="v",
+            output_path=tmp_path / "out.zip",
+            calibrator=_make_calibrator(),
+        )
+        assert out.exists()
+
+
+class TestLoadCalibrationGate:
+    @patch("temporal_model.core.package.load_yolo")
+    def test_load_rejects_uncalibrated_by_default(
+        self, mock_yolo: MagicMock, real_tiny_archive: Path, tmp_path: Path
+    ) -> None:
+        mock_yolo.return_value = MagicMock(name="FakeYOLO")
+        # real_tiny_archive is max_logit, no calibrator -> uncalibrated.
+        with pytest.raises(UncalibratedModelError, match="not calibrated"):
+            load_model_package(real_tiny_archive, extract_dir=tmp_path / "ext")
+
+    @patch("temporal_model.core.package.load_yolo")
+    def test_load_allows_uncalibrated_when_opted_in(
+        self, mock_yolo: MagicMock, real_tiny_archive: Path, tmp_path: Path
+    ) -> None:
+        mock_yolo.return_value = MagicMock(name="FakeYOLO")
+        pkg = load_model_package(
+            real_tiny_archive, extract_dir=tmp_path / "ext", allow_uncalibrated=True
+        )
+        assert pkg.calibrator is None
+
+    @patch("temporal_model.core.package.load_yolo")
+    def test_load_allows_calibrated_by_default(
+        self,
+        mock_yolo: MagicMock,
+        tmp_path: Path,
+        dummy_yolo_weights: Path,
+        real_tiny_classifier_ckpt: Path,
+        real_tiny_config: dict,
+    ) -> None:
+        mock_yolo.return_value = MagicMock(name="FakeYOLO")
+        cfg = dict(real_tiny_config)
+        cfg["decision"] = dict(cfg["decision"])
+        cfg["decision"]["aggregation"] = "logistic"
+        out = tmp_path / "cal.zip"
+        build_model_package(
+            yolo_weights_path=dummy_yolo_weights,
+            classifier_ckpt_path=real_tiny_classifier_ckpt,
+            config=cfg,
+            variant="tiny",
+            output_path=out,
+            calibrator=_make_calibrator(),
+        )
+        pkg = load_model_package(out, extract_dir=tmp_path / "ext")
+        assert pkg.calibrator is not None

@@ -24,10 +24,14 @@ from .logistic_calibrator import LogisticCalibrator
 from .temporal_classifier import TemporalSmokeClassifier
 
 __all__ = [
+    "DEFAULT_AGGREGATION",
     "ModelPackage",
+    "UncalibratedModelError",
     "build_model_package",
+    "is_calibrated",
     "load_model_package",
     "load_yolo",
+    "require_calibrated",
 ]
 
 FORMAT_VERSION = 1
@@ -37,6 +41,36 @@ CLASSIFIER_CKPT_FILENAME = "classifier.ckpt"
 CONFIG_FILENAME = "config.yaml"
 LOGISTIC_CALIBRATOR_FILENAME = "logistic_calibrator.json"
 DEFAULT_EXTRACT_DIR = Path(".cache/temporal_model_core")
+DEFAULT_AGGREGATION = "max_logit"
+
+
+class UncalibratedModelError(ValueError):
+    """Raised when a model package is not calibrated and the caller did not opt out."""
+
+
+def _aggregation_of(config: dict[str, Any]) -> str:
+    """Decision aggregation rule from a package config (defaults to max_logit)."""
+    return config.get("decision", {}).get("aggregation", DEFAULT_AGGREGATION)
+
+
+def is_calibrated(calibrator: LogisticCalibrator | None, aggregation: str) -> bool:
+    """Calibrated iff a calibrator is bundled AND the decision is logistic."""
+    return calibrator is not None and aggregation == "logistic"
+
+
+def require_calibrated(
+    calibrator: LogisticCalibrator | None,
+    aggregation: str,
+    *,
+    context: str,
+) -> None:
+    """Raise :class:`UncalibratedModelError` unless the package is calibrated."""
+    if not is_calibrated(calibrator, aggregation):
+        raise UncalibratedModelError(
+            f"{context}: model is not calibrated "
+            f"(calibrator={'present' if calibrator is not None else 'missing'}, "
+            f"aggregation={aggregation!r}); pass allow_uncalibrated=True to override"
+        )
 
 
 @dataclass
@@ -79,6 +113,7 @@ def build_model_package(
     model_version: str | None = None,
     train_git_sha: str | None = None,
     calibrator: LogisticCalibrator | None = None,
+    allow_uncalibrated: bool = False,
 ) -> Path:
     """Bundle YOLO weights + classifier checkpoint + config into a .zip archive.
 
@@ -96,12 +131,16 @@ def build_model_package(
         calibrator: Optional fitted :class:`LogisticCalibrator`. When
             provided, its JSON payload is bundled into the archive and
             the manifest gets a ``logistic_calibrator`` pointer.
+        allow_uncalibrated: When False (default), refuse to build a package
+            that is not calibrated (no calibrator or non-logistic decision).
 
     Returns:
         The resolved ``output_path``.
 
     Raises:
         FileNotFoundError: If either input file is missing.
+        UncalibratedModelError: If the package is uncalibrated and
+            ``allow_uncalibrated`` is False.
     """
     if not yolo_weights_path.exists():
         raise FileNotFoundError(f"YOLO weights not found: {yolo_weights_path}")
@@ -109,6 +148,10 @@ def build_model_package(
         raise FileNotFoundError(
             f"Classifier checkpoint not found: {classifier_ckpt_path}"
         )
+
+    if not allow_uncalibrated:
+        aggregation = _aggregation_of(config)
+        require_calibrated(calibrator, aggregation, context="build_model_package")
 
     manifest = {
         "format_version": FORMAT_VERSION,
@@ -215,17 +258,23 @@ def _load_classifier(
 def load_model_package(
     package_path: Path,
     extract_dir: Path = DEFAULT_EXTRACT_DIR,
+    *,
+    allow_uncalibrated: bool = False,
 ) -> ModelPackage:
     """Load a packaged model archive.
 
     Args:
         package_path: Path to a ``.zip`` built by :func:`build_model_package`.
         extract_dir: Where to extract YOLO weights and classifier ckpt.
+        allow_uncalibrated: When False (default), refuse to load a package
+            that is not calibrated (no calibrator or non-logistic decision).
 
     Raises:
         FileNotFoundError: if ``package_path`` does not exist.
         KeyError: if the archive is missing expected entries.
         ValueError: if ``format_version`` is unsupported.
+        UncalibratedModelError: if the package is uncalibrated and
+            ``allow_uncalibrated`` is False.
     """
     if not package_path.exists():
         raise FileNotFoundError(f"Archive not found: {package_path}")
@@ -267,6 +316,10 @@ def load_model_package(
                 sanity_checks=list(payload.get("sanity_checks", [])),
             )
             calibrator.verify_sanity_checks()
+
+    if not allow_uncalibrated:
+        aggregation = _aggregation_of(config)
+        require_calibrated(calibrator, aggregation, context="load_model_package")
 
     yolo_model = load_yolo(extract_dir / yolo_name)
     classifier = _load_classifier(extract_dir / ckpt_name, config["classifier"])
