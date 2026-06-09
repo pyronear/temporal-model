@@ -119,8 +119,11 @@ class BboxTubeTemporalModel(TemporalModel):
         package_path: Path,
         *,
         device: str | torch.device | None = None,
+        allow_uncalibrated: bool = False,
     ) -> Self:
-        pkg: ModelPackage = load_model_package(package_path)
+        pkg: ModelPackage = load_model_package(
+            package_path, allow_uncalibrated=allow_uncalibrated
+        )
         return cls(
             yolo_model=pkg.yolo_model,
             classifier=pkg.classifier,
@@ -135,6 +138,7 @@ class BboxTubeTemporalModel(TemporalModel):
         archive_path: Path,
         *,
         device: str | torch.device | None = None,
+        allow_uncalibrated: bool = False,
     ) -> Self:
         """Alias for :meth:`from_package`.
 
@@ -142,7 +146,9 @@ class BboxTubeTemporalModel(TemporalModel):
         refer to the archive by a generic name independent of the internal
         packaging terminology.
         """
-        return cls.from_package(archive_path, device=device)
+        return cls.from_package(
+            archive_path, device=device, allow_uncalibrated=allow_uncalibrated
+        )
 
     def detect(self, frames: list[Frame]) -> list[FrameDetections]:
         """Run the companion YOLO detector over ``frames`` (one batched call).

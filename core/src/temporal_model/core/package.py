@@ -251,17 +251,23 @@ def _load_classifier(
 def load_model_package(
     package_path: Path,
     extract_dir: Path = DEFAULT_EXTRACT_DIR,
+    *,
+    allow_uncalibrated: bool = False,
 ) -> ModelPackage:
     """Load a packaged model archive.
 
     Args:
         package_path: Path to a ``.zip`` built by :func:`build_model_package`.
         extract_dir: Where to extract YOLO weights and classifier ckpt.
+        allow_uncalibrated: When False (default), refuse to load a package
+            that is not calibrated (no calibrator or non-logistic decision).
 
     Raises:
         FileNotFoundError: if ``package_path`` does not exist.
         KeyError: if the archive is missing expected entries.
         ValueError: if ``format_version`` is unsupported.
+        UncalibratedModelError: if the package is uncalibrated and
+            ``allow_uncalibrated`` is False.
     """
     if not package_path.exists():
         raise FileNotFoundError(f"Archive not found: {package_path}")
@@ -303,6 +309,10 @@ def load_model_package(
                 sanity_checks=list(payload.get("sanity_checks", [])),
             )
             calibrator.verify_sanity_checks()
+
+    if not allow_uncalibrated:
+        aggregation = config.get("decision", {}).get("aggregation", "max_logit")
+        require_calibrated(calibrator, aggregation, context="load_model_package")
 
     yolo_model = load_yolo(extract_dir / yolo_name)
     classifier = _load_classifier(extract_dir / ckpt_name, config["classifier"])

@@ -238,7 +238,9 @@ class TestLoadRoundtrip:
         real_tiny_config: dict,
     ) -> None:
         mock_yolo.return_value = MagicMock(name="FakeYOLO")
-        pkg = load_model_package(real_tiny_archive, extract_dir=tmp_path / "ext")
+        pkg = load_model_package(
+            real_tiny_archive, extract_dir=tmp_path / "ext", allow_uncalibrated=True
+        )
         assert pkg.config == real_tiny_config
 
     @patch("temporal_model.core.package.load_yolo")
@@ -247,7 +249,9 @@ class TestLoadRoundtrip:
     ) -> None:
         sentinel = MagicMock(name="FakeYOLO")
         mock_yolo.return_value = sentinel
-        pkg = load_model_package(real_tiny_archive, extract_dir=tmp_path / "ext")
+        pkg = load_model_package(
+            real_tiny_archive, extract_dir=tmp_path / "ext", allow_uncalibrated=True
+        )
         assert pkg.yolo_model is sentinel
 
     @patch("temporal_model.core.package.load_yolo")
@@ -258,7 +262,9 @@ class TestLoadRoundtrip:
         tmp_path: Path,
     ) -> None:
         mock_yolo.return_value = MagicMock(name="FakeYOLO")
-        pkg = load_model_package(real_tiny_archive, extract_dir=tmp_path / "ext")
+        pkg = load_model_package(
+            real_tiny_archive, extract_dir=tmp_path / "ext", allow_uncalibrated=True
+        )
 
         patches = torch.zeros(1, 4, 3, 224, 224)
         mask = torch.tensor([[True, True, True, True]])
@@ -326,7 +332,9 @@ class TestCalibratorBundling:
             manifest = yaml.safe_load(zf.read(MANIFEST_FILENAME))
             assert "logistic_calibrator" not in manifest
 
-        pkg = load_model_package(real_tiny_archive, extract_dir=tmp_path / "ext")
+        pkg = load_model_package(
+            real_tiny_archive, extract_dir=tmp_path / "ext", allow_uncalibrated=True
+        )
         assert pkg.calibrator is None
 
     @patch("temporal_model.core.package.load_yolo")
@@ -358,7 +366,9 @@ class TestCalibratorBundling:
             manifest = yaml.safe_load(zf.read(MANIFEST_FILENAME))
             assert manifest["logistic_calibrator"] == LOGISTIC_CALIBRATOR_FILENAME
 
-        pkg = load_model_package(out, extract_dir=tmp_path / "ext")
+        pkg = load_model_package(
+            out, extract_dir=tmp_path / "ext", allow_uncalibrated=True
+        )
         assert pkg.calibrator is not None
         assert pkg.calibrator.features == cal.features
         np.testing.assert_allclose(pkg.calibrator.coefficients, cal.coefficients)
@@ -550,3 +560,49 @@ class TestBuildCalibrationGate:
             calibrator=_make_calibrator(),
         )
         assert out.exists()
+
+
+class TestLoadCalibrationGate:
+    @patch("temporal_model.core.package.load_yolo")
+    def test_load_rejects_uncalibrated_by_default(
+        self, mock_yolo: MagicMock, real_tiny_archive: Path, tmp_path: Path
+    ) -> None:
+        mock_yolo.return_value = MagicMock(name="FakeYOLO")
+        # real_tiny_archive is max_logit, no calibrator -> uncalibrated.
+        with pytest.raises(UncalibratedModelError, match="not calibrated"):
+            load_model_package(real_tiny_archive, extract_dir=tmp_path / "ext")
+
+    @patch("temporal_model.core.package.load_yolo")
+    def test_load_allows_uncalibrated_when_opted_in(
+        self, mock_yolo: MagicMock, real_tiny_archive: Path, tmp_path: Path
+    ) -> None:
+        mock_yolo.return_value = MagicMock(name="FakeYOLO")
+        pkg = load_model_package(
+            real_tiny_archive, extract_dir=tmp_path / "ext", allow_uncalibrated=True
+        )
+        assert pkg.calibrator is None
+
+    @patch("temporal_model.core.package.load_yolo")
+    def test_load_allows_calibrated_by_default(
+        self,
+        mock_yolo: MagicMock,
+        tmp_path: Path,
+        dummy_yolo_weights: Path,
+        real_tiny_classifier_ckpt: Path,
+        real_tiny_config: dict,
+    ) -> None:
+        mock_yolo.return_value = MagicMock(name="FakeYOLO")
+        cfg = dict(real_tiny_config)
+        cfg["decision"] = dict(cfg["decision"])
+        cfg["decision"]["aggregation"] = "logistic"
+        out = tmp_path / "cal.zip"
+        build_model_package(
+            yolo_weights_path=dummy_yolo_weights,
+            classifier_ckpt_path=real_tiny_classifier_ckpt,
+            config=cfg,
+            variant="tiny",
+            output_path=out,
+            calibrator=_make_calibrator(),
+        )
+        pkg = load_model_package(out, extract_dir=tmp_path / "ext")
+        assert pkg.calibrator is not None
