@@ -12,7 +12,11 @@ import torch
 from PIL import Image
 from torchvision.transforms.functional import to_tensor
 
-from .logistic_calibrator import LogisticCalibrator, extract_features
+from .logistic_calibrator import (
+    LogisticCalibrator,
+    extract_features,
+    tube_feature_dict,
+)
 from .model_input import crop_and_resize, expand_bbox, norm_bbox_to_pixel_square
 from .protocol import Frame
 from .stabilize import tube_window
@@ -352,20 +356,9 @@ def find_first_crossing_trigger(
             raise ValueError("aggregation='logistic' requires a fitted calibrator")
 
         def decides_positive(logit: float, tube_prefix: Tube, n_tubes: int) -> bool:
-            tube_dict = {
-                "logit": logit,
-                "start_frame": tube_prefix.start_frame,
-                "end_frame": tube_prefix.end_frame,
-                "entries": [
-                    {
-                        "confidence": (
-                            e.detection.confidence if e.detection is not None else None
-                        )
-                    }
-                    for e in tube_prefix.entries
-                ],
-            }
-            features = extract_features(tube_dict, n_tubes=n_tubes)
+            features = extract_features(
+                tube_feature_dict(tube_prefix, logit), n_tubes=n_tubes
+            )
             return bool(calibrator.predict_proba(features) >= logistic_threshold)
     else:
         raise ValueError(f"unknown aggregation: {aggregation!r}")

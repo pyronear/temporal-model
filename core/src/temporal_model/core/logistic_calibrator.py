@@ -14,6 +14,8 @@ from typing import Self
 
 import numpy as np
 
+from .types import Tube
+
 
 @dataclass(frozen=True)
 class LogisticCalibrator:
@@ -104,6 +106,28 @@ def _tube_len(tube: dict) -> int:
 def _tube_mean_conf(tube: dict) -> float:
     confs = [e["confidence"] for e in tube["entries"] if e["confidence"] is not None]
     return sum(confs) / len(confs) if confs else 0.0
+
+
+def tube_feature_dict(tube: Tube, logit: float) -> dict:
+    """Build the loose dict consumed by :func:`extract_features` from a Tube.
+
+    Single source of the calibrator's in-memory feature shape; used by both
+    the inference logistic branch and the per-tube probability annotation in
+    ``BboxTubeTemporalModel.predict``.
+    """
+    return {
+        "logit": logit,
+        "start_frame": tube.start_frame,
+        "end_frame": tube.end_frame,
+        "entries": [
+            {
+                "confidence": (
+                    e.detection.confidence if e.detection is not None else None
+                )
+            }
+            for e in tube.entries
+        ],
+    }
 
 
 def extract_features(tube: dict, n_tubes: int) -> np.ndarray:

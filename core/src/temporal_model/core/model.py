@@ -26,7 +26,11 @@ from .inference import (
     run_yolo_on_frames,
     score_tubes,
 )
-from .logistic_calibrator import LogisticCalibrator, extract_features
+from .logistic_calibrator import (
+    LogisticCalibrator,
+    extract_features,
+    tube_feature_dict,
+)
 from .package import ModelPackage, load_model_package
 from .protocol import Frame, TemporalModel, TemporalModelOutput
 from .stage_timer import StageTimer, stage_ctx
@@ -287,20 +291,7 @@ class BboxTubeTemporalModel(TemporalModel):
         def _probability_for(tube_idx: int, raw_logit: float) -> float | None:
             if self._calibrator is None:
                 return None
-            tube = kept[tube_idx]
-            tube_dict = {
-                "logit": raw_logit,
-                "start_frame": tube.start_frame,
-                "end_frame": tube.end_frame,
-                "entries": [
-                    {
-                        "confidence": (
-                            e.detection.confidence if e.detection is not None else None
-                        )
-                    }
-                    for e in tube.entries
-                ],
-            }
+            tube_dict = tube_feature_dict(kept[tube_idx], raw_logit)
             features = extract_features(tube_dict, n_tubes=len(kept))
             return float(self._calibrator.predict_proba(features))
 
