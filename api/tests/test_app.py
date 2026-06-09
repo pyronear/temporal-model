@@ -102,7 +102,6 @@ def test_predict_default(client):
     assert r.json() == {
         "is_smoke": True,
         "probability": 0.98,
-        "trigger_frame_index": 3,
         "model": {"name": "bbox-tube-vit-dinov2", "version": "1.2.0"},
     }
 
@@ -115,12 +114,10 @@ def test_predict_verbose(client):
     assert body["details"]["tubes"][0]["tube_id"] == 7
     assert body["is_smoke"] is True
     assert body["probability"] == 0.98
-    assert body["trigger_frame_index"] == 3
     assert body["model"] == {"name": "bbox-tube-vit-dinov2", "version": "1.2.0"}
     assert body["details"]["decision"] == {
         "aggregation": "max_logit",
         "threshold": 0.5,
-        "trigger_tube_id": 7,
         "threshold_overridden": False,
         "packaged_threshold": None,
     }

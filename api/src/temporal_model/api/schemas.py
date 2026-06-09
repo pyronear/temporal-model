@@ -42,14 +42,12 @@ class Tube(BaseModel):
     end_frame: int
     logit: float
     probability: float | None
-    first_crossing_frame: int | None
     entries: list[FrameEntry]
 
 
 class Decision(BaseModel):
     aggregation: Literal["max_logit", "logistic"]
     threshold: float
-    trigger_tube_id: int | None
     threshold_overridden: bool = False
     packaged_threshold: float | None = None
 
@@ -77,7 +75,6 @@ class PredictResponse(BaseModel):
 
     is_smoke: bool
     probability: float | None
-    trigger_frame_index: int | None
     model: ModelInfo
     details: Details | None = None
 
@@ -133,7 +130,6 @@ def to_response(
     kwargs: dict[str, Any] = {
         "is_smoke": out.is_positive,
         "probability": _decision_probability(out.details, calibrated),
-        "trigger_frame_index": out.trigger_frame_index,
         "model": ModelInfo(name=name, version=version),
     }
     if verbose:

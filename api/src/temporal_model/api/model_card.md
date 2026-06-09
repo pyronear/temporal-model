@@ -60,21 +60,30 @@ frame_paths = sorted(Path("my_sequence").glob("*.jpg"))
 model = BboxTubeTemporalModel.from_package(Path(model_zip), device=None)
 out = model.predict_sequence(frame_paths)
 
-print("is_smoke:           ", out.is_positive)
-print("trigger_frame_index:", out.trigger_frame_index)  # 0-based; None if no smoke
+# 1. Binary verdict — the alarm decision.
+print("is_smoke:         ", out.is_positive)
 
-# Per-tube breakdown (logits, calibrated probabilities, bboxes, decision).
+# 2. Calibrated smoke probability in [0, 1]: the strongest kept tube's calibrated
+#    probability (0.0 when no tube was kept). Use is_positive for a yes/no alarm;
+#    use the probability to rank/triage sequences or apply your own threshold.
 kept = out.details.get("tubes", {}).get("kept", [])
-print("kept tubes:         ", len(kept))
+probs = [t["probability"] for t in kept if t["probability"] is not None]
+smoke_probability = max(probs) if probs else 0.0
+print("smoke probability:", smoke_probability)
+print("kept tubes:       ", len(kept))
 ```
 
 `predict_sequence(frame_paths)` returns a `TemporalModelOutput`:
 
-- `is_positive: bool` — the smoke verdict.
-- `trigger_frame_index: int | None` — 0-based frame where smoke first crosses the
-  decision threshold (time-to-detection, in frames; `None` when no smoke).
-- `details: dict` — per-tube logits, calibrated probabilities, bboxes, and the
-  decision (`aggregation`, `threshold`, trigger tube).
+- `is_positive: bool` — the smoke verdict. `True` iff at least one tube's
+  calibrated probability clears the packaged decision threshold.
+- `details: dict` — per-tube logits, calibrated probabilities, bounding boxes, and
+  the decision (`aggregation`, `threshold`). The top-level **smoke probability** is
+  the maximum kept-tube `probability` (shown above).
+
+`is_positive` and the probability are consistent: a positive sequence always has a
+kept tube whose probability is ≥ the threshold, so `smoke_probability` is ≥ the
+threshold whenever `is_smoke` is `True`.
 
 ## Served API (Docker)
 
@@ -88,6 +97,11 @@ docker run --gpus all -p 8000:8000 \
   pyronear/temporal-model-api:{{VERSION}}
 # POST /predict  {"frames": ["<s3-key>", ...]}      GET /health
 ```
+
+`POST /predict` returns `{ "is_smoke": bool, "probability": float | null, "model":
+{...} }`, where `probability` is the calibrated max kept-tube probability (`null`
+only for an uncalibrated model). Add `?verbose=true` for a `details` block with the
+per-tube breakdown and decision config.
 
 ## Provenance
 

@@ -108,7 +108,6 @@ repo. This spec covers only the API serving layer and its contract.
 {
   "is_smoke": true,
   "probability": 0.98,
-  "trigger_frame_index": 3,
   "model": { "name": "bbox-tube-vit-dinov2", "version": "1.2.0" }
 }
 ```
@@ -116,17 +115,22 @@ repo. This spec covers only the API serving layer and its contract.
 | Field | Source | Notes |
 |---|---|---|
 | `is_smoke` | `TemporalModelOutput.is_positive` | the verdict |
-| `probability` | decision tube's calibrated probability | see rule below; `null` only when uncalibrated |
-| `trigger_frame_index` | `TemporalModelOutput.trigger_frame_index` | 0-based; `null` if no smoke. TTD in frames; consumer multiplies by frame cadence (30 s in prod) if needed — do **not** derive TTD from filename timestamps |
+| `probability` | max kept-tube calibrated probability | see rule below; `null` only when uncalibrated |
 | `model.name` | `manifest.variant` | architecture family |
 | `model.version` | `manifest.model_version` | trained-model id; `null` for legacy packages without the field |
 
+The API does **not** surface time-to-detection: `trigger_frame_index` and the
+per-tube `first_crossing_frame` / `trigger_tube_id` are computed only on demand by
+the core library (`predict(..., compute_trigger=True)`), used by offline eval, and
+are intentionally omitted from the serving DTO. An explicit `?compute_trigger=true`
+flag is tracked in #26 for when an HTTP consumer needs it.
+
 **`probability` rule:** `probability` is `null` **iff the package is
-uncalibrated** (no `logistic_calibrator`). For a calibrated model it is always a
-number in `[0, 1]`:
-- when `is_smoke` is `true` → the calibrated probability of the **trigger tube**;
-- when `is_smoke` is `false` → the **highest** kept-tube probability (the
-  strongest sub-threshold evidence), or `0.0` when no tubes were kept.
+uncalibrated** (no `logistic_calibrator`). For a calibrated model it is the
+**highest** kept-tube probability (the strongest evidence), or `0.0` when no tubes
+were kept — regardless of the `is_smoke` decision. On a positive sequence this is
+the probability of whichever tube cleared the threshold; on a negative it is the
+strongest sub-threshold evidence.
 
 The "no tube found" outcome (`probability` `0.0`, `is_smoke` `false`) is *not*
 separately flagged in the default response — it is distinguishable from a
@@ -142,14 +146,12 @@ needing the distinction request `details`.
 {
   "is_smoke": true,
   "probability": 0.98,
-  "trigger_frame_index": 3,
   "model": { "name": "bbox-tube-vit-dinov2", "version": "1.2.0" },
 
   "details": {
     "decision": {
       "aggregation": "max_logit",
-      "threshold": 0.5,
-      "trigger_tube_id": 7
+      "threshold": 0.5
     },
     "preprocessing": {
       "num_frames_input": 30,
@@ -164,7 +166,6 @@ needing the distinction request `details`.
         "end_frame": 12,
         "logit": 3.41,
         "probability": 0.98,
-        "first_crossing_frame": 3,
         "entries": [
           { "frame_idx": 2, "bbox": [0.693, 0.504, 0.0083, 0.0148], "is_gap": false, "confidence": 0.81 },
           { "frame_idx": 3, "bbox": null,                           "is_gap": true,  "confidence": null }
@@ -175,8 +176,10 @@ needing the distinction request `details`.
 }
 ```
 
-`details` maps directly from `BboxTubeDetails`:
-- `details.decision` ← `BboxTubeDetails.decision`
+`details` maps from `BboxTubeDetails`, dropping the eval-only trigger fields
+(`decision.trigger_tube_id` and per-tube `first_crossing_frame`), which are
+always absent on the serving path (`compute_trigger=False`):
+- `details.decision` ← `BboxTubeDetails.decision` (`aggregation`, `threshold`)
 - `details.preprocessing` ← `BboxTubeDetails.preprocessing`, with
   `num_tube_candidates` ← `BboxTubeDetails.tubes.num_candidates`
 - `details.tubes` ← `BboxTubeDetails.tubes.kept` (per-tube `probability` is
