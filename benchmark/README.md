@@ -8,10 +8,10 @@ CPU-only) so their numbers are directly comparable.
 Import as `temporal_model.benchmark`. Depends on `temporal-model-core`. See the
 design spec: `docs/specs/2026-06-09-benchmark-package-design.md`.
 
-> **Scope.** Phase 1 (this package today) benchmarks the **core in-process
-> path** — calling `BboxTubeTemporalModel.predict()` directly. The API
-> end-to-end path (`run_api.py`, `TEMPORAL_API_PROFILE`) is Phase 2 and not yet
-> implemented.
+> **Scope.** Two benchmarks: the **core in-process path** (calling
+> `BboxTubeTemporalModel.predict()` directly — `temporal-benchmark core`) and the
+> **API end-to-end path** (HTTP → S3 → cached detection → serialization —
+> `temporal-benchmark api`, see *API end-to-end benchmark* below).
 
 ## What it measures
 
@@ -140,6 +140,31 @@ Each run writes `data/08_reporting/<host>-<timestamp>/`:
 The machine metadata stamped into `summary.json`/`report.md` (host, CPU, GPU,
 RAM, torch/cuda/python versions, thread count, device) is what makes runs from
 different VMs comparable — read `report.md` first.
+
+## API end-to-end benchmark
+
+Measures the real serving path (HTTP → S3 fetch → cached detection → classifier
+→ serialization) on the VM, with server-side per-stage timing via
+`TEMPORAL_API_PROFILE`. The model's `trigger_search` stage is eval-only, so it
+is not on the served path. Two passes:
+
+- **cold** — each full sequence once: worst-case "first alert" latency (every
+  frame detected).
+- **warm** — growing prefixes per sequence: steady-state, with the detection
+  cache amortizing the `detector` stage like an ongoing event.
+
+```bash
+# on the VM: bring up API + MinIO (profiling on) and upload frames
+scripts/provision_api_vm.sh ubuntu@<host>
+uv run python scripts/upload_frames_to_minio.py --store data/03_primary/sequences
+
+# run the benchmark against the local API
+uv run temporal-benchmark api --url http://localhost:8000 --store data/03_primary/sequences
+```
+
+Writes `data/08_reporting/<host>-api-<timestamp>/` (raw.parquet, summary.json,
+report.md) with cold/warm e2e latency, per-stage breakdown (incl. `s3_fetch`),
+and cache hit rate.
 
 ## Running on a VM
 
