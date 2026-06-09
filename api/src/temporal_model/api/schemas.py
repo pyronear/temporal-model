@@ -82,9 +82,7 @@ class PredictResponse(BaseModel):
     details: Details | None = None
 
 
-def _decision_probability(
-    details: dict[str, Any], calibrated: bool
-) -> float | None:
+def _decision_probability(details: dict[str, Any], calibrated: bool) -> float | None:
     """Top-level probability per the API contract.
 
     None if uncalibrated. Otherwise the max kept-tube probability (0.0 when no

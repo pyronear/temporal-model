@@ -331,9 +331,7 @@ def make_decision_fn(
             raise ValueError("aggregation='logistic' requires a fitted calibrator")
 
         def decides_positive(logit: float, tube: Tube, n_tubes: int) -> bool:
-            features = extract_features(
-                tube_feature_dict(tube, logit), n_tubes=n_tubes
-            )
+            features = extract_features(tube_feature_dict(tube, logit), n_tubes=n_tubes)
             return bool(calibrator.predict_proba(features) >= logistic_threshold)
 
         return decides_positive
