@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # out-of-range values fail at startup. Ignored for uncalibrated packages.
     calibrator_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
 
+    # Per-frame detection LRU capacity (frame_id → detections). 0 disables.
+    detection_cache_size: int = 4096
+
     s3_bucket: str = ""
     s3_region: str | None = None
     s3_endpoint_url: str | None = None

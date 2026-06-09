@@ -8,12 +8,15 @@ imported lazily so this module loads while ``core`` is still being migrated.
 
 import asyncio
 import logging
+import time
 import zipfile
 from pathlib import Path
 from typing import Any
 
 import yaml
 from starlette.concurrency import run_in_threadpool
+
+from .detection_cache import DetectionCache
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +55,7 @@ class ModelRunner:
         calibrated: bool,
         threshold_overridden: bool = False,
         packaged_threshold: float | None = None,
+        detection_cache_size: int = 0,
     ) -> None:
         self._model = model
         self.name = name
@@ -59,6 +63,7 @@ class ModelRunner:
         self.calibrated = calibrated
         self.threshold_overridden = threshold_overridden
         self.packaged_threshold = packaged_threshold
+        self._cache = DetectionCache(detection_cache_size)
         self._lock = asyncio.Lock()
 
     @classmethod
@@ -67,6 +72,7 @@ class ModelRunner:
         package_path: Path,
         device: str | None,
         calibrator_threshold: float | None = None,
+        detection_cache_size: int = 0,
     ) -> "ModelRunner":
         """Load a model package. Call once at startup — this blocks while the
         model checkpoint is deserialized; do not call from a request handler.
@@ -106,9 +112,38 @@ class ModelRunner:
             **meta,
             threshold_overridden=threshold_overridden,
             packaged_threshold=packaged_threshold,
+            detection_cache_size=detection_cache_size,
         )
 
     async def predict(self, frame_paths: list[Path]) -> Any:
-        """Run ``predict_sequence`` in a worker thread, one call at a time."""
+        """Resolve detections (cache + detect misses) then run the model.
+
+        The whole orchestration runs in a worker thread under the lock, so the
+        cache is accessed by one prediction at a time.
+        """
         async with self._lock:
-            return await run_in_threadpool(self._model.predict_sequence, frame_paths)
+            return await run_in_threadpool(self._predict_sync, frame_paths)
+
+    def _predict_sync(self, frame_paths: list[Path]) -> Any:
+        started = time.perf_counter()
+        frames = self._model.load_sequence(frame_paths)
+        resolved: dict[str, Any] = {}
+        misses = []
+        for f in frames:
+            if f.frame_id in self._cache:
+                resolved[f.frame_id] = self._cache.get(f.frame_id)
+            else:
+                misses.append(f)
+        for fd in self._model.detect(misses):
+            self._cache.put(fd.frame_id, fd)
+            resolved[fd.frame_id] = fd
+        out = self._model.predict(frames, frame_detections=resolved)
+        logger.info(
+            "predict: %d/%d cache hits, seq_len=%d, cache_size=%d, %.0fms",
+            len(frames) - len(misses),
+            len(frames),
+            len(frames),
+            len(self._cache),
+            (time.perf_counter() - started) * 1000.0,
+        )
+        return out

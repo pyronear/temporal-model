@@ -62,6 +62,7 @@ async def lifespan(app: FastAPI):
             Path(settings.model_path),
             settings.device,
             settings.calibrator_threshold,
+            detection_cache_size=settings.detection_cache_size,
         )
     except Exception as exc:  # noqa: BLE001 — degrade to not-ready, report via /health
         logger.warning("model load failed: %s", exc)
