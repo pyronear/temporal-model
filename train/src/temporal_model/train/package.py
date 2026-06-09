@@ -112,6 +112,17 @@ def build_config(
     }
 
 
+def allow_uncalibrated_for(aggregation: str) -> bool:
+    """Whether a variant may be packaged uncalibrated.
+
+    Only the logistic decision rule requires a calibrator; every other
+    aggregation (``max_logit``) is intentionally uncalibrated and opts out of
+    the core calibration gate. A logistic variant whose calibrator failed to
+    fit therefore still fails the build loudly.
+    """
+    return aggregation != "logistic"
+
+
 def verify_detector_weights(yolo_weights_path: Path, detector: Detector) -> None:
     """Assert the bundled detector weights match the declared ``detector.sha256``.
 
@@ -298,7 +309,7 @@ def main() -> None:
         output_path=args.output,
         calibrator=calibrator,
         train_git_sha=_git_sha(),
-        allow_uncalibrated=(aggregation != "logistic"),
+        allow_uncalibrated=allow_uncalibrated_for(aggregation),
     )
     print(
         f"[package] wrote {args.output} | variant={args.variant} "

@@ -33,7 +33,7 @@ from .logistic_calibrator import (
     extract_features,
     tube_feature_dict,
 )
-from .package import ModelPackage, load_model_package
+from .package import DEFAULT_AGGREGATION, ModelPackage, load_model_package
 from .protocol import Frame, TemporalModel, TemporalModelOutput
 from .stage_timer import StageTimer, stage_ctx
 from .tubes import build_tubes
@@ -51,7 +51,6 @@ _PAD_STRATEGIES = {
     "uniform": pad_frames_uniform,
 }
 
-DEFAULT_AGGREGATION = "max_logit"
 DEFAULT_LOGISTIC_THRESHOLD = 0.5
 
 

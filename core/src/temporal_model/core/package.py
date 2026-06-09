@@ -24,6 +24,7 @@ from .logistic_calibrator import LogisticCalibrator
 from .temporal_classifier import TemporalSmokeClassifier
 
 __all__ = [
+    "DEFAULT_AGGREGATION",
     "ModelPackage",
     "UncalibratedModelError",
     "build_model_package",
@@ -40,10 +41,16 @@ CLASSIFIER_CKPT_FILENAME = "classifier.ckpt"
 CONFIG_FILENAME = "config.yaml"
 LOGISTIC_CALIBRATOR_FILENAME = "logistic_calibrator.json"
 DEFAULT_EXTRACT_DIR = Path(".cache/temporal_model_core")
+DEFAULT_AGGREGATION = "max_logit"
 
 
 class UncalibratedModelError(ValueError):
     """Raised when a model package is not calibrated and the caller did not opt out."""
+
+
+def _aggregation_of(config: dict[str, Any]) -> str:
+    """Decision aggregation rule from a package config (defaults to max_logit)."""
+    return config.get("decision", {}).get("aggregation", DEFAULT_AGGREGATION)
 
 
 def is_calibrated(calibrator: LogisticCalibrator | None, aggregation: str) -> bool:
@@ -143,7 +150,7 @@ def build_model_package(
         )
 
     if not allow_uncalibrated:
-        aggregation = config.get("decision", {}).get("aggregation", "max_logit")
+        aggregation = _aggregation_of(config)
         require_calibrated(calibrator, aggregation, context="build_model_package")
 
     manifest = {
@@ -311,7 +318,7 @@ def load_model_package(
             calibrator.verify_sanity_checks()
 
     if not allow_uncalibrated:
-        aggregation = config.get("decision", {}).get("aggregation", "max_logit")
+        aggregation = _aggregation_of(config)
         require_calibrated(calibrator, aggregation, context="load_model_package")
 
     yolo_model = load_yolo(extract_dir / yolo_name)
