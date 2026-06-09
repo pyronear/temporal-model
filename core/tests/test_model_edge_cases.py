@@ -10,6 +10,7 @@ from PIL import Image
 
 from temporal_model.core.model import BboxTubeTemporalModel
 from temporal_model.core.protocol import Frame
+from temporal_model.core.stage_timer import StageTimer
 from temporal_model.core.temporal_classifier import TemporalSmokeClassifier
 
 TEST_CONFIG: dict = {
@@ -466,3 +467,31 @@ class TestFirstCrossingTrigger:
         )
         assert out.trigger_frame_index <= trigger_tube["end_frame"]
         assert trigger_tube["first_crossing_frame"] == out.trigger_frame_index
+
+
+class TestStageTimerIntegration:
+    def test_predict_populates_all_stage_timings(
+        self, tiny_classifier: TemporalSmokeClassifier, red_frames: list[Frame]
+    ) -> None:
+        # One stable box per frame -> a tube survives -> every stage runs.
+        boxes = [[(0.5, 0.5, 0.2, 0.2, 0.9)] for _ in red_frames]
+        yolo = _fake_yolo_factory(boxes)
+        model = BboxTubeTemporalModel(
+            yolo_model=yolo, classifier=tiny_classifier, config=TEST_CONFIG
+        )
+        timer = StageTimer()
+        model.predict(frames=red_frames, timer=timer)
+        timings = timer.as_dict()
+        assert {"pad", "yolo", "tubes", "crop", "vit", "trigger"} <= set(timings)
+        assert all(v >= 0.0 for v in timings.values())
+
+    def test_predict_without_timer_is_unaffected(
+        self, tiny_classifier: TemporalSmokeClassifier, red_frames: list[Frame]
+    ) -> None:
+        boxes = [[(0.5, 0.5, 0.2, 0.2, 0.9)] for _ in red_frames]
+        yolo = _fake_yolo_factory(boxes)
+        model = BboxTubeTemporalModel(
+            yolo_model=yolo, classifier=tiny_classifier, config=TEST_CONFIG
+        )
+        out = model.predict(frames=red_frames)  # no timer kwarg
+        assert isinstance(out.is_positive, bool)
