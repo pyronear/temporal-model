@@ -52,15 +52,18 @@ def test_request_rejects_scheme():
         PredictRequest(frames=["s3://bucket/a.jpg"])
 
 
-def test_smoke_default_uses_trigger_tube_probability():
+def test_smoke_uses_max_kept_probability():
+    # Trigger tube (id 7) has the LOWER prob; reported value is the max (0.91).
     out = SimpleNamespace(
-        is_positive=True, trigger_frame_index=3, details=_details([_tube(7, 0.98)])
+        is_positive=True,
+        trigger_frame_index=3,
+        details=_details([_tube(7, 0.62), _tube(2, 0.91)]),
     )
     resp = to_response(out, name="m", version="1.2.0", calibrated=True, verbose=False)
     dumped = resp.model_dump(exclude_unset=True)
     assert dumped == {
         "is_smoke": True,
-        "probability": 0.98,
+        "probability": 0.91,
         "trigger_frame_index": 3,
         "model": {"name": "m", "version": "1.2.0"},
     }
@@ -91,14 +94,6 @@ def test_uncalibrated_probability_is_null():
         is_positive=False, trigger_frame_index=None, details=_details([_tube(1, None)])
     )
     resp = to_response(out, name="m", version=None, calibrated=False, verbose=False)
-    assert resp.probability is None
-
-
-def test_smoke_trigger_tube_missing_returns_none():
-    details = _details([_tube(7, 0.98)])
-    details["decision"]["trigger_tube_id"] = 999  # not among kept tubes
-    out = SimpleNamespace(is_positive=True, trigger_frame_index=3, details=details)
-    resp = to_response(out, name="m", version="1.2.0", calibrated=True, verbose=False)
     assert resp.probability is None
 
 

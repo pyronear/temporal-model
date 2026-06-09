@@ -83,23 +83,16 @@ class PredictResponse(BaseModel):
 
 
 def _decision_probability(
-    details: dict[str, Any], is_smoke: bool, calibrated: bool
+    details: dict[str, Any], calibrated: bool
 ) -> float | None:
     """Top-level probability per the API contract.
 
-    None if uncalibrated. Otherwise: the trigger tube's probability when smoke
-    (None if the trigger tube id is unexpectedly absent), else the max kept-tube
-    probability (0.0 when no tubes were kept).
+    None if uncalibrated. Otherwise the max kept-tube probability (0.0 when no
+    tubes were kept), regardless of the smoke decision.
     """
     if not calibrated:
         return None
     kept = details["tubes"]["kept"]
-    if is_smoke:
-        trigger_id = details["decision"]["trigger_tube_id"]
-        for tube in kept:
-            if tube["tube_id"] == trigger_id:
-                return tube.get("probability")
-        return None
     probs = [t["probability"] for t in kept if t.get("probability") is not None]
     return max(probs) if probs else 0.0
 
@@ -141,7 +134,7 @@ def to_response(
     """Reshape a core model output into the public response DTO."""
     kwargs: dict[str, Any] = {
         "is_smoke": out.is_positive,
-        "probability": _decision_probability(out.details, out.is_positive, calibrated),
+        "probability": _decision_probability(out.details, calibrated),
         "trigger_frame_index": out.trigger_frame_index,
         "model": ModelInfo(name=name, version=version),
     }
