@@ -49,10 +49,13 @@ def run_core(
     reps: int = 5,
     warmup: int = 3,
     limit: int | None = None,
+    allow_uncalibrated: bool = False,
 ) -> pd.DataFrame:
     """Benchmark predict() over every sequence; one row per (sequence, rep)."""
     device = resolve_device(device)
-    model = BboxTubeTemporalModel.from_package(model_path, device=device)
+    model = BboxTubeTemporalModel.from_package(
+        model_path, device=device, allow_uncalibrated=allow_uncalibrated
+    )
 
     sequences = list(iter_sequences(store_dir))
     if limit is not None:
