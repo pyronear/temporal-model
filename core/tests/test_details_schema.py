@@ -7,8 +7,8 @@ from temporal_model.core.details_schema import (
     BboxTubeDetails,
     Decision,
     KeptTube,
+    KeptTubeEntry,
     Preprocessing,
-    TubeEntry,
     Tubes,
 )
 
@@ -31,13 +31,13 @@ def _sample_details() -> BboxTubeDetails:
                     probability=None,
                     first_crossing_frame=3,
                     entries=[
-                        TubeEntry(
+                        KeptTubeEntry(
                             frame_idx=0,
                             bbox=(0.5, 0.5, 0.1, 0.1),
                             is_gap=False,
                             confidence=0.9,
                         ),
-                        TubeEntry(
+                        KeptTubeEntry(
                             frame_idx=1,
                             bbox=None,
                             is_gap=True,
@@ -69,7 +69,7 @@ def test_decision_rejects_unknown_aggregation() -> None:
 
 def test_tube_entry_rejects_wrong_length_bbox() -> None:
     with pytest.raises(ValidationError):
-        TubeEntry(
+        KeptTubeEntry(
             frame_idx=0,
             bbox=(0.1, 0.2, 0.3),  # type: ignore[arg-type]
             is_gap=False,

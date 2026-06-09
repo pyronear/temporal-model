@@ -17,7 +17,7 @@ class _Frozen(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
-class TubeEntry(_Frozen):
+class KeptTubeEntry(_Frozen):
     frame_idx: int
     bbox: tuple[float, float, float, float] | None
     is_gap: bool
@@ -31,7 +31,7 @@ class KeptTube(_Frozen):
     logit: float
     probability: float | None
     first_crossing_frame: int | None
-    entries: list[TubeEntry]
+    entries: list[KeptTubeEntry]
 
 
 class Preprocessing(_Frozen):

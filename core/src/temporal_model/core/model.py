@@ -13,8 +13,8 @@ from .details_schema import (
     BboxTubeDetails,
     Decision,
     KeptTube,
+    KeptTubeEntry,
     Preprocessing,
-    TubeEntry,
     Tubes,
 )
 from .inference import (
@@ -307,7 +307,7 @@ class BboxTubeTemporalModel(TemporalModel):
         kept_models: list[KeptTube] = []
         for tube_idx, tube in enumerate(kept):
             entries_models = [
-                TubeEntry(
+                KeptTubeEntry(
                     frame_idx=e.frame_idx,
                     bbox=(
                         (e.detection.cx, e.detection.cy, e.detection.w, e.detection.h)
