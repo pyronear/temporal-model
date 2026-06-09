@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from temporal_model.core.data import load_detections, load_tube_record
+from temporal_model.core.labels import load_detections, load_tube_record
 
 
 def _write_label(tmp_path: Path, frame_id: str, text: str) -> Path:

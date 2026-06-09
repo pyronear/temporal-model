@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from .data import find_sequence_dir
+from .sequences import find_sequence_dir
 from .stabilize import tube_window
 
 LABEL_TO_INT = {"fp": 0, "smoke": 1}

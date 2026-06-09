@@ -16,12 +16,12 @@ from pathlib import Path
 import numpy as np
 from tqdm import tqdm
 
-from temporal_model.core.data import (
+from temporal_model.core.model import BboxTubeTemporalModel
+from temporal_model.core.sequences import (
     get_sorted_frames,
     is_wf_sequence,
     list_sequences,
 )
-from temporal_model.core.model import BboxTubeTemporalModel
 from temporal_model.eval.eval_plots import (
     plot_confusion_matrix,
     plot_pr_curve,

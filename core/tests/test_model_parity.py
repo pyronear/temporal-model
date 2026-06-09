@@ -22,7 +22,7 @@ import torch
 from PIL import Image
 from torchvision.transforms.functional import to_tensor
 
-from temporal_model.core.data import load_frame_detections
+from temporal_model.core.labels import load_frame_detections
 from temporal_model.core.model import BboxTubeTemporalModel
 from temporal_model.core.model_input import (
     crop_and_resize,
