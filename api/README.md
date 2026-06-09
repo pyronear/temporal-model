@@ -17,13 +17,16 @@ Import as `temporal_model.api`. Depends on `temporal-model-core`.
 ## Run
 
 ```bash
+make fetch-model            # download model.zip from HuggingFace (no creds), run from repo root
 make serve                  # local dev, http://localhost:8000
 docker compose up --build   # API + MinIO (S3) locally
 ```
 
-Place a `model.zip` under `api/models/` before `docker compose up` — the
-container mounts `./models:/models` and loads `/models/model.zip`. Without it
-the service starts but `/health` reports `model_loaded: false`.
+Run `make fetch-model` (from the repo root) before serving — it downloads the
+released `model.zip` from the public HuggingFace repo into `api/models/`. The
+container mounts `./models:/models` and loads `/models/model.zip`; `make serve`
+refuses to start if the file is missing. (`docker compose up --build` directly
+will fail at the `COPY` step without it.)
 
 Configuration via env vars (prefix `TEMPORAL_API_`): `MODEL_PATH`, `DEVICE`,
 `CALIBRATOR_THRESHOLD`, `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT_URL` (empty = real

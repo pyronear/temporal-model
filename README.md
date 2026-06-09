@@ -26,6 +26,7 @@ Four independent packages, each with its own `pyproject.toml` and `tests/`.
 ## Quick start
 
 ```bash
+make                # list all available targets (same as `make help`)
 make install        # uv sync across all four packages
 make test           # pytest across all four packages
 make lint           # ruff check across all four packages
@@ -36,12 +37,16 @@ Per package, `cd <pkg> && make install|lint|format|test`.
 ### Run the API locally (Docker)
 
 ```bash
-make serve      # API + MinIO via docker compose, http://localhost:8000 (GET /health)
+make fetch-model   # download the released model.zip from HuggingFace (no creds)
+make serve         # API + MinIO via docker compose, http://localhost:8000 (GET /health)
 ```
 
-Equivalent to `cd api && docker compose up --build`. The compose stack ships
-local-dev MinIO defaults (bucket `frames`, `minioadmin` creds); drop a
-`model.zip` under `api/models/` for `/health` to report `model_loaded: true`.
+`serve` is equivalent to `cd api && docker compose up --build` and refuses to
+start until `api/models/model.zip` exists, so run `make fetch-model` first (it
+pulls v0.1.0 from the public HuggingFace repo; override with
+`make fetch-model MODEL_VERSION=x.y.z`). The compose stack ships local-dev MinIO
+defaults (bucket `frames`, `minioadmin` creds); with the model present
+`/health` reports `model_loaded: true`.
 
 ## Origin
 
