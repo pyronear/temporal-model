@@ -63,6 +63,7 @@ class Details(BaseModel):
     decision: Decision
     preprocessing: Preprocessing
     tubes: list[Tube]
+    profiling: dict[str, Any] | None = None
 
 
 class ModelInfo(BaseModel):
@@ -97,6 +98,7 @@ def _to_details(
     *,
     threshold_overridden: bool,
     packaged_threshold: float | None,
+    profiling: dict[str, Any] | None = None,
 ) -> Details:
     tubes_block = details["tubes"]
     pre = details["preprocessing"]
@@ -113,6 +115,7 @@ def _to_details(
             num_tube_candidates=tubes_block["num_candidates"],
         ),
         tubes=[Tube(**t) for t in tubes_block["kept"]],
+        profiling=profiling,
     )
 
 
@@ -125,6 +128,7 @@ def to_response(
     verbose: bool,
     threshold_overridden: bool = False,
     packaged_threshold: float | None = None,
+    profiling: dict[str, Any] | None = None,
 ) -> PredictResponse:
     """Reshape a core model output into the public response DTO."""
     kwargs: dict[str, Any] = {
@@ -137,5 +141,6 @@ def to_response(
             out.details,
             threshold_overridden=threshold_overridden,
             packaged_threshold=packaged_threshold,
+            profiling=profiling,
         )
     return PredictResponse(**kwargs)
