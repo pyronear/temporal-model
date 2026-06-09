@@ -1,12 +1,12 @@
-md5: cef198628001bc0dad54d8e08086d41a
+md5: c3a42c08a5449475f83266bb4a2d870a
 frozen: true
 deps:
-- md5: 7a79332d511a50460b63ac4c4ba71e73
-  size: 162765197
+- md5: e976a17cb5b9c8ae758352fc787e3fc5
+  size: 162765214
   hash: md5
   path: ../../../../train/data/06_models/vit_dinov2_finetune/model.zip
 outs:
-- md5: 7a79332d511a50460b63ac4c4ba71e73
-  size: 162765197
+- md5: e976a17cb5b9c8ae758352fc787e3fc5
+  size: 162765214
   hash: md5
   path: model.zip
