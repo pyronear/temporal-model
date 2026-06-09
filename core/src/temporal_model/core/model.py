@@ -36,6 +36,12 @@ from .protocol import Frame, TemporalModel, TemporalModelOutput
 from .stage_timer import StageTimer, stage_ctx
 from .tubes import build_tubes
 
+__all__ = [
+    "BboxTubeTemporalModel",
+    "DEFAULT_AGGREGATION",
+    "DEFAULT_LOGISTIC_THRESHOLD",
+]
+
 _PAD_STRATEGIES = {
     "symmetric": pad_frames_symmetrically,
     "uniform": pad_frames_uniform,

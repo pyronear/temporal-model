@@ -10,6 +10,16 @@ from collections.abc import Callable
 
 from .types import Detection, FrameDetections, Tube, TubeEntry
 
+__all__ = [
+    "compute_iou",
+    "match_detections",
+    "build_tubes",
+    "interpolate_gaps",
+    "select_longest_tube",
+    "tube_from_record",
+    "merge_colocated_tubes",
+]
+
 
 def compute_iou(det_a: Detection, det_b: Detection) -> float:
     """Compute Intersection-over-Union between two detections.

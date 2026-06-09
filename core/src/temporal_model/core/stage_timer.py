@@ -15,6 +15,8 @@ from contextlib import contextmanager, nullcontext
 
 import torch
 
+__all__ = ["STAGES", "StageTimer", "stage_ctx"]
+
 # The stages of BboxTubeTemporalModel.predict(), in order. Single source of
 # truth: predict() names its stage_ctx blocks with these, and the benchmark
 # reads them back per-stage.

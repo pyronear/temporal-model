@@ -23,6 +23,13 @@ from .detector import load_detector
 from .logistic_calibrator import LogisticCalibrator
 from .temporal_classifier import TemporalSmokeClassifier
 
+__all__ = [
+    "ModelPackage",
+    "build_model_package",
+    "load_model_package",
+    "load_yolo",
+]
+
 FORMAT_VERSION = 1
 MANIFEST_FILENAME = "manifest.yaml"
 YOLO_WEIGHTS_FILENAME = "yolo_weights.pt"

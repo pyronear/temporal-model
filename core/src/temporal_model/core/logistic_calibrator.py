@@ -16,6 +16,13 @@ import numpy as np
 
 from .types import Tube
 
+__all__ = [
+    "LogisticCalibrator",
+    "tube_feature_dict",
+    "extract_features",
+    "FEATURE_NAMES",
+]
+
 
 @dataclass(frozen=True)
 class LogisticCalibrator:

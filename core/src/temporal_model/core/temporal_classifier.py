@@ -4,6 +4,8 @@ import timm
 import torch
 from torch import Tensor, nn
 
+__all__ = ["TimmBackbone", "TransformerHead", "TemporalSmokeClassifier"]
+
 
 class TimmBackbone(nn.Module):
     """Wraps a pretrained timm model as a per-frame feature extractor.

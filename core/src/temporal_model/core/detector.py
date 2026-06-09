@@ -13,6 +13,8 @@ from importlib.resources import files
 import yaml
 from pydantic import BaseModel, ConfigDict
 
+__all__ = ["Detector", "load_detector", "DETECTOR_WEIGHTS_FILENAME"]
+
 DETECTOR_YAML_FILENAME = "detector.yaml"
 # The weights file published in the HF detector repo (pyronear convention).
 DETECTOR_WEIGHTS_FILENAME = "best.pt"

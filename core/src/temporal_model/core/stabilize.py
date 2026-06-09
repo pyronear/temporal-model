@@ -8,6 +8,8 @@ it. No context margin here: the crop step adds context via ``context_factor``.
 
 from __future__ import annotations
 
+__all__ = ["union_window", "tube_window"]
+
 
 def union_window(
     boxes: list[tuple[float, float, float, float]],

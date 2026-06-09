@@ -29,6 +29,17 @@ from .tubes import (
 )
 from .types import Detection, FrameDetections, Tube
 
+__all__ = [
+    "pad_frames_symmetrically",
+    "pad_frames_uniform",
+    "run_yolo_on_frames",
+    "filter_and_interpolate_tubes",
+    "crop_tube_patches",
+    "score_tubes",
+    "find_first_crossing_trigger",
+    "build_tubes_for_inference",
+]
+
 
 def pad_frames_symmetrically(
     frames: list[Frame],

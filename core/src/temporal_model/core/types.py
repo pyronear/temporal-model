@@ -3,6 +3,8 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 
+__all__ = ["Detection", "FrameDetections", "TubeEntry", "Tube"]
+
 
 @dataclass
 class Detection:
