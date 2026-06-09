@@ -22,6 +22,19 @@ Two complementary views:
    serialization), with the same per-stage breakdown surfaced from the server
    when profiling is enabled.
 
+### Phasing
+
+Provisioning the API e2e path on a VM needs Docker + MinIO + uploading frames to
+S3, which is heavy on a small CPU box. So the work is split:
+
+- **Phase 1 (this spec's implementation target):** the **core in-process
+  breakdown**, run natively on a VM, plus the shared `core` stage timer it
+  depends on. This answers the main question — CPU latency and bottlenecks.
+- **Phase 2 (designed here, implemented later):** the **API e2e path** and the
+  `TEMPORAL_API_PROFILE` server instrumentation. Sections covering it
+  (§6, §7) are marked **Phase 2** and are out of scope for the first
+  implementation plan.
+
 ## Context
 
 ### The inference pipeline (what we are timing)
@@ -199,7 +212,7 @@ def run_core(store_dir, model_path, *, device, reps, warmup, limit) -> pd.DataFr
 The `ResourceSampler` wraps the whole timed section; its timeline + peaks are
 saved alongside the raw table.
 
-### 6. API-path runner (`benchmark/run_api.py`)
+### 6. API-path runner (`benchmark/run_api.py`) — **Phase 2**
 
 ```python
 def run_api(store_keys, base_url, *, reps, warmup, ...) -> pd.DataFrame:
@@ -216,7 +229,7 @@ def run_api(store_keys, base_url, *, reps, warmup, ...) -> pd.DataFrame:
   expected keys (provisioning that is an operational step, not part of this
   package). Non-200s are recorded per sequence, not fatal.
 
-### 7. API instrumentation (env-var gated)
+### 7. API instrumentation (env-var gated) — **Phase 2**
 
 In `api`: new setting `TEMPORAL_API_PROFILE` (default off). When on,
 `ModelRunner.predict` constructs a `StageTimer` and passes it into
@@ -252,12 +265,14 @@ From the raw table:
 
 ```
 temporal-benchmark core --store <dir> --model <model.zip> [--device auto]
-                        [--reps 5] [--warmup 3] [--limit N] [--out <dir>]
-temporal-benchmark api  --url http://host:8000 --store <dir>
+                        [--reps 5] [--warmup 3] [--limit N] [--threads N] [--out <dir>]
+temporal-benchmark api  --url http://host:8000 --store <dir>   # Phase 2
                         [--reps 5] [--warmup 3] [--limit N] [--out <dir>]
 ```
 
-`--device auto` → cuda if available else cpu (matches explorer `run_models`).
+`--device auto` → cuda if available else cpu (matches explorer `run_models`); on
+the target VM this is cpu. `--threads` sets `torch.set_num_threads()` (default:
+torch's own default); the effective value is recorded in the machine metadata.
 
 ### Output layout (self-describing per run)
 
@@ -273,13 +288,56 @@ benchmark/results/<host>-<timestamp>/
 `<timestamp>` is supplied by the CLI at invocation; results dirs are not DVC
 tracked (they are per-VM outputs, committed selectively or kept locally).
 
-### Dataset provisioning (DVC)
+### Dataset provisioning (DVC + rsync transport)
 
-Copy the `pyro-annotator` source into `benchmark/data/sequences/pyro-annotator/`,
-`dvc add` it, and push to this package's remote
-(`s3://pyro-vision-rd/dvc/temporal-model/benchmark/`). One `dvc pull` provisions
-any VM. The store is the input to the **core** path; the **api** path
-additionally needs the same frames in that VM's S3/MinIO (operational).
+DVC is the **in-repo source of truth**: copy the `pyro-annotator` source into
+`benchmark/data/sequences/pyro-annotator/`, `dvc add` it, and push to this
+package's remote (`s3://pyro-vision-rd/dvc/temporal-model/benchmark/`). A
+developer machine gets the data with `dvc pull`.
+
+**Transport to a VM is rsync, not dvc** — VMs are not assumed to have dvc or S3
+credentials. The ~562 MB set is rsync-pushed from a machine that already has it
+(see "Running on a VM"). DVC tracks/versions it; rsync moves it.
+
+### Running on a VM
+
+The first target is `ssh ubuntu@141.94.173.1`: **Ubuntu 26.04, x86_64, 4 vCPU
+AMD EPYC-Milan, 7.6 GiB RAM, no GPU, 94 GB free**. It has `git`, `rsync`, and
+`python3.14`, but **no `uv`, `docker`, or `dvc`**. Two consequences:
+
+- **CPU-only** — `--device auto` resolves to `cpu`; the benchmark records
+  `torch.get_num_threads()` (4 here) in the machine metadata, and the CLI can
+  set it via `--threads` (default: leave torch's default).
+- **System python 3.14 is too new for torch/timm wheels** — we must not use it.
+  `uv` provisions a pinned **Python 3.12** and the CPU torch wheels.
+
+Provisioning is **native uv**, kept repeatable by three helper scripts shipped
+in the package (`benchmark/scripts/`, thin wrappers over the commands below):
+
+```bash
+# provision_vm.sh <host> — one-time bootstrap on the VM
+ssh <host> 'curl -LsSf https://astral.sh/uv/install.sh | sh'
+ssh <host> 'git clone <repo> temporal-model && cd temporal-model \
+            && uv python install 3.12 \
+            && make -C benchmark install \
+            && make fetch-model'            # model.zip from HuggingFace, no creds
+
+# push_data.sh <host> — move the dataset from a machine that has it (no S3 creds on VM)
+rsync -az benchmark/data/sequences/pyro-annotator/ \
+      <host>:~/temporal-model/benchmark/data/sequences/pyro-annotator/
+
+# run (on the VM)
+ssh <host> 'cd temporal-model && uv run temporal-benchmark core \
+            --store benchmark/data/sequences --model api/models/model.zip \
+            --out benchmark/results'
+
+# pull_results.sh <host> — bring the self-describing results dir back
+rsync -az <host>:~/temporal-model/benchmark/results/ ./benchmark/results/
+```
+
+The same scripts work for any future VM; only the host changes. (Phase 2's API
+path additionally needs Docker + MinIO + frame upload on the VM — out of scope
+here.)
 
 ## Error handling / edge cases
 
@@ -322,9 +380,11 @@ passing unchanged, demonstrating the opt-in timer is non-invasive.
 **New package `benchmark/`:**
 - `pyproject.toml`, `Makefile`, `.dvc/`, `README.md`
 - `src/temporal_model/benchmark/`: `dataset.py`, `machine.py`, `resources.py`,
-  `run_core.py`, `run_api.py`, `report.py`, `cli.py`, `__init__.py`
-- `tests/`: `test_stage_timer.py` (or under core), `test_dataset.py`,
-  `test_report.py`, `test_machine.py`
+  `run_core.py`, `report.py`, `cli.py`, `__init__.py` (Phase 1);
+  `run_api.py` (Phase 2)
+- `scripts/`: `provision_vm.sh`, `push_data.sh`, `pull_results.sh`
+- `tests/`: `test_dataset.py`, `test_report.py`, `test_machine.py`
+  (+ `core/tests/test_stage_timer.py`)
 - `data/sequences/pyro-annotator/` (DVC-tracked)
 
 **Edited:**
