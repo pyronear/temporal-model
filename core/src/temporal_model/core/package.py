@@ -140,11 +140,11 @@ def build_model_package(
     return output_path.resolve()
 
 
-def _load_yolo(weights_path: Path) -> Any:
-    """Thin wrapper around ultralytics.YOLO.
+def load_yolo(weights_path: Path) -> Any:
+    """Load an ultralytics YOLO model from a weights file.
 
     The ``ultralytics`` import is deliberately inside the function body so
-    tests can patch ``_load_yolo`` without triggering the heavy import chain.
+    tests can patch ``load_yolo`` without triggering the heavy import chain.
     This is the one and only sanctioned import-inside-function in this
     project (carries a PLC0415 noqa).
     """
@@ -261,7 +261,7 @@ def load_model_package(
             )
             calibrator.verify_sanity_checks()
 
-    yolo_model = _load_yolo(extract_dir / yolo_name)
+    yolo_model = load_yolo(extract_dir / yolo_name)
     classifier = _load_classifier(extract_dir / ckpt_name, config["classifier"])
     return ModelPackage(
         classifier=classifier,

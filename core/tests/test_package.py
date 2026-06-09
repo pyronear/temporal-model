@@ -224,7 +224,7 @@ def real_tiny_archive(
 
 
 class TestLoadRoundtrip:
-    @patch("temporal_model.core.package._load_yolo")
+    @patch("temporal_model.core.package.load_yolo")
     def test_config_passthrough(
         self,
         mock_yolo: MagicMock,
@@ -236,7 +236,7 @@ class TestLoadRoundtrip:
         pkg = load_model_package(real_tiny_archive, extract_dir=tmp_path / "ext")
         assert pkg.config == real_tiny_config
 
-    @patch("temporal_model.core.package._load_yolo")
+    @patch("temporal_model.core.package.load_yolo")
     def test_yolo_returned(
         self, mock_yolo: MagicMock, real_tiny_archive: Path, tmp_path: Path
     ) -> None:
@@ -245,7 +245,7 @@ class TestLoadRoundtrip:
         pkg = load_model_package(real_tiny_archive, extract_dir=tmp_path / "ext")
         assert pkg.yolo_model is sentinel
 
-    @patch("temporal_model.core.package._load_yolo")
+    @patch("temporal_model.core.package.load_yolo")
     def test_classifier_forward_runs(
         self,
         mock_yolo: MagicMock,
@@ -263,7 +263,7 @@ class TestLoadRoundtrip:
 
 
 class TestLoadRejectsBadArchive:
-    @patch("temporal_model.core.package._load_yolo")
+    @patch("temporal_model.core.package.load_yolo")
     def test_missing_manifest(self, mock_yolo: MagicMock, tmp_path: Path) -> None:
         bad = tmp_path / "bad.zip"
         with zipfile.ZipFile(bad, "w") as zf:
@@ -271,7 +271,7 @@ class TestLoadRejectsBadArchive:
         with pytest.raises(KeyError):
             load_model_package(bad, extract_dir=tmp_path / "ext")
 
-    @patch("temporal_model.core.package._load_yolo")
+    @patch("temporal_model.core.package.load_yolo")
     def test_unsupported_format_version(
         self, mock_yolo: MagicMock, tmp_path: Path
     ) -> None:
@@ -308,7 +308,7 @@ def _make_calibrator() -> LogisticCalibrator:
 
 
 class TestCalibratorBundling:
-    @patch("temporal_model.core.package._load_yolo")
+    @patch("temporal_model.core.package.load_yolo")
     def test_package_without_calibrator_has_no_entry(
         self,
         mock_yolo: MagicMock,
@@ -324,7 +324,7 @@ class TestCalibratorBundling:
         pkg = load_model_package(real_tiny_archive, extract_dir=tmp_path / "ext")
         assert pkg.calibrator is None
 
-    @patch("temporal_model.core.package._load_yolo")
+    @patch("temporal_model.core.package.load_yolo")
     def test_package_with_calibrator_round_trips(
         self,
         mock_yolo: MagicMock,
@@ -359,7 +359,7 @@ class TestCalibratorBundling:
         assert pkg.calibrator.intercept == cal.intercept
         pkg.calibrator.verify_sanity_checks()  # no raise
 
-    @patch("temporal_model.core.package._load_yolo")
+    @patch("temporal_model.core.package.load_yolo")
     def test_load_rejects_tampered_calibrator(
         self,
         mock_yolo: MagicMock,
