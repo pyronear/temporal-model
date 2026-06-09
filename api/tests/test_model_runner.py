@@ -202,7 +202,10 @@ class _StubModel:
 
 def _runner_with(model, cache_size=4096):
     return ModelRunner(
-        model, name="m", version="1", calibrated=False,
+        model,
+        name="m",
+        version="1",
+        calibrated=False,
         detection_cache_size=cache_size,
     )
 
@@ -216,17 +219,17 @@ def test_predict_records_detector_timing_and_cache_counts():
     asyncio.run(runner.predict(["a", "b", "c"], timer=timer, profile=profile))
 
     timings = timer.as_dict()
-    assert "detector" in timings           # detect() was timed
-    assert model.predict_timer is timer    # same timer threaded into predict()
+    assert "detector" in timings  # detect() was timed
+    assert model.predict_timer is timer  # same timer threaded into predict()
     assert profile["n_frames"] == 3
-    assert profile["cache_misses"] == 3    # cold: all miss
+    assert profile["cache_misses"] == 3  # cold: all miss
     assert profile["cache_hits"] == 0
 
 
 def test_second_predict_hits_cache():
     model = _StubModel()
     runner = _runner_with(model)
-    asyncio.run(runner.predict(["a", "b"]))         # warms the cache
+    asyncio.run(runner.predict(["a", "b"]))  # warms the cache
     profile: dict = {}
     asyncio.run(runner.predict(["a", "b"], profile=profile))
     assert profile["cache_hits"] == 2
