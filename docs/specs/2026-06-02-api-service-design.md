@@ -100,8 +100,10 @@ repo. This spec covers only the API serving layer and its contract.
   against `bucket` (or the server-configured default when omitted).
 - `bucket` (optional): S3 bucket to fetch the frames from. Falls back to
   `TEMPORAL_API_S3_BUCKET`; a request with neither is rejected with
-  `400 invalid_request`. Added for alert-api stacks whose per-org bucket names
-  are not known at deploy time.
+  `400 invalid_request`. Validated against DNS-style S3 naming (lowercase
+  alphanumerics, dots, hyphens, 3-63 chars); malformed values and nonexistent
+  buckets both return `400 invalid_request`. Added for alert-api stacks whose
+  per-org bucket names are not known at deploy time.
 - Array order **is** temporal order; the API never re-sorts.
 - Each key's **basename** is the frame filename the model parses for timestamps
   (`<prefix>_<YYYY-MM-DDTHH-MM-SS>`).
@@ -212,7 +214,7 @@ Error responses use a machine-readable body:
 
 | HTTP | `code` | When |
 |---|---|---|
-| `400` | `invalid_request` | malformed body, empty `frames`, a key/bucket containing a scheme, an empty `bucket`, or no bucket available |
+| `400` | `invalid_request` | malformed body, empty `frames`, a key containing a scheme, a malformed/empty `bucket`, no bucket available, or a bucket that does not exist |
 | `404` | `frame_not_found` | an S3 key does not exist in the bucket |
 | `502` | `s3_unavailable` | S3 endpoint unreachable / fetch failure |
 | `503` | `model_not_loaded` | request arrives before the model finishes loading |

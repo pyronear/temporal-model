@@ -5,9 +5,16 @@ block. ``details`` is only set when verbose, so the route serializes with
 ``exclude_unset=True`` to omit it otherwise (while keeping explicit ``null``s).
 """
 
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+# DNS-style S3 bucket naming: 3-63 chars, lowercase alphanumerics, dots and
+# hyphens, starting/ending alphanumeric. Rejects whitespace, uppercase, ARNs
+# (colons), slashes and other malformed names early as a 400 instead of letting
+# them fail deep in boto3.
+_BUCKET_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
 
 
 class PredictRequest(BaseModel):
@@ -34,8 +41,8 @@ class PredictRequest(BaseModel):
             return v
         if not v:
             raise ValueError("bucket must not be empty")
-        if "://" in v:
-            raise ValueError(f"bucket must be a bare name, not a URL: {v!r}")
+        if not _BUCKET_RE.match(v) or ".." in v:
+            raise ValueError(f"bucket is not a valid S3 bucket name: {v!r}")
         return v
 
 

@@ -65,9 +65,18 @@ def test_request_rejects_empty_bucket():
         PredictRequest(frames=["a.jpg"], bucket="")
 
 
-def test_request_rejects_bucket_url():
+def test_request_accepts_alert_api_bucket():
+    bucket = "2eb7ac42fbbf-alert-api-2"
+    assert PredictRequest(frames=["a.jpg"], bucket=bucket).bucket == bucket
+
+
+@pytest.mark.parametrize(
+    "bad",
+    ["s3://my-bucket", "My-Bucket", "has space", "a/b", "ab", "x" * 64, "a..b"],
+)
+def test_request_rejects_malformed_bucket(bad):
     with pytest.raises(ValidationError):
-        PredictRequest(frames=["a.jpg"], bucket="s3://my-bucket")
+        PredictRequest(frames=["a.jpg"], bucket=bad)
 
 
 def test_smoke_uses_max_kept_probability():

@@ -12,10 +12,10 @@ from typing import Any
 import boto3
 import botocore.exceptions as botoexc
 
-from .errors import FrameNotFound, S3Unavailable
+from .errors import FrameNotFound, InvalidRequest, S3Unavailable
 from .settings import Settings
 
-_NOT_FOUND_CODES = {"404", "NoSuchKey", "NoSuchBucket"}
+_NOT_FOUND_CODES = {"404", "NoSuchKey"}
 
 
 def make_s3_client(settings: Settings) -> Any:
@@ -43,6 +43,10 @@ def fetch_frames(s3_client, bucket: str, keys: list[str], dest_dir: Path) -> lis
             s3_client.download_file(bucket, key, str(dst))
         except botoexc.ClientError as exc:
             error_code = exc.response.get("Error", {}).get("Code", "")
+            if error_code == "NoSuchBucket":
+                # A request-supplied (or misconfigured) bucket that does not
+                # exist — a client error, not a missing frame.
+                raise InvalidRequest(f"S3 bucket not found: {bucket}") from exc
             if error_code in _NOT_FOUND_CODES:
                 raise FrameNotFound(f"frame not found: {key}") from exc
             raise S3Unavailable(f"S3 error fetching {key}: {error_code}") from exc

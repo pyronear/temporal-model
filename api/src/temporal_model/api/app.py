@@ -104,16 +104,16 @@ def health(request: Request) -> HealthResponse:
 async def predict(
     body: PredictRequest, request: Request, verbose: bool = False
 ) -> PredictResponse:
-    runner = getattr(request.app.state, "runner", None)
-    if runner is None:
-        raise ModelNotLoaded("model is not loaded")
-    s3_client = request.app.state.s3_client
-
     bucket = body.bucket or settings.s3_bucket
     if not bucket:
         raise InvalidRequest(
             "no S3 bucket: set request 'bucket' or TEMPORAL_API_S3_BUCKET"
         )
+
+    runner = getattr(request.app.state, "runner", None)
+    if runner is None:
+        raise ModelNotLoaded("model is not loaded")
+    s3_client = request.app.state.s3_client
 
     with tempfile.TemporaryDirectory() as tmp:
         try:

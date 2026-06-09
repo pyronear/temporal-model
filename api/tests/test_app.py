@@ -218,6 +218,16 @@ def test_predict_empty_bucket_400(client):
     assert r.json()["code"] == "invalid_request"
 
 
+def test_predict_no_bucket_400_takes_precedence_over_model(client, monkeypatch):
+    # Missing-bucket validation runs before the model-loaded check, so a request
+    # with no bucket is a 400 even when the model is unavailable.
+    monkeypatch.setattr(settings, "s3_bucket", "")
+    client.app.state.runner = None
+    r = client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 400
+    assert r.json()["code"] == "invalid_request"
+
+
 def test_startup_succeeds_without_bucket(monkeypatch):
     # The app no longer hard-requires a settings bucket at startup.
     monkeypatch.setattr(settings, "s3_bucket", "")
