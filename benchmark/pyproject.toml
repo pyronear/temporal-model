@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "temporal-model-benchmark"
+version = "0.1.0"
+description = "Latency/throughput/resource benchmark for the temporal smoke classifier"
+requires-python = ">=3.11"
+dependencies = [
+    "temporal-model-core",
+    "pandas>=2.2",
+    "pyarrow>=15",
+    "matplotlib>=3.8",
+    "psutil>=5.9",
+    "nvidia-ml-py>=12",
+]
+
+[project.scripts]
+temporal-benchmark = "temporal_model.benchmark.cli:main"
+
+[tool.uv.sources]
+temporal-model-core = { path = "../core", editable = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/temporal_model"]
+
+[dependency-groups]
+dev = [
+    "dvc[s3]>=3.56",
+    "pytest>=8.0",
+    "ruff>=0.9",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B", "SIM", "PLC0415"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["temporal_model"]
+
+[tool.ruff.format]
+quote-style = "double"

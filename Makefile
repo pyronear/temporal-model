@@ -1,4 +1,4 @@
-PACKAGES := core train eval api
+PACKAGES := core train eval api benchmark
 
 # Released model.zip version fetched from HuggingFace by `fetch-model`.
 MODEL_VERSION ?= 0.2.0
