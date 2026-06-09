@@ -13,8 +13,8 @@ from .details_schema import (
     BboxTubeDetails,
     Decision,
     KeptTube,
+    KeptTubeEntry,
     Preprocessing,
-    TubeEntry,
     Tubes,
 )
 from .inference import (
@@ -26,19 +26,33 @@ from .inference import (
     run_yolo_on_frames,
     score_tubes,
 )
-from .logistic_calibrator import LogisticCalibrator, extract_features
+from .logistic_calibrator import (
+    LogisticCalibrator,
+    extract_features,
+    tube_feature_dict,
+)
 from .package import ModelPackage, load_model_package
 from .protocol import Frame, TemporalModel, TemporalModelOutput
 from .stage_timer import StageTimer, stage_ctx
 from .tubes import build_tubes
+
+__all__ = [
+    "BboxTubeTemporalModel",
+    "select_device",
+    "DEFAULT_AGGREGATION",
+    "DEFAULT_LOGISTIC_THRESHOLD",
+]
 
 _PAD_STRATEGIES = {
     "symmetric": pad_frames_symmetrically,
     "uniform": pad_frames_uniform,
 }
 
+DEFAULT_AGGREGATION = "max_logit"
+DEFAULT_LOGISTIC_THRESHOLD = 0.5
 
-def _select_device(device: str | torch.device | None) -> torch.device:
+
+def select_device(device: str | torch.device | None) -> torch.device:
     """Resolve the requested device, auto-picking the best available when None.
 
     Preference order: CUDA > MPS (Apple Silicon) > CPU.
@@ -69,7 +83,7 @@ class BboxTubeTemporalModel(TemporalModel):
         calibrator: LogisticCalibrator | None = None,
     ) -> None:
         self._yolo = yolo_model
-        self._device = _select_device(device)
+        self._device = select_device(device)
         self._classifier = classifier.to(self._device).eval()
         self._cfg = config
         self._calibrator = calibrator
@@ -81,12 +95,14 @@ class BboxTubeTemporalModel(TemporalModel):
     @property
     def aggregation(self) -> str:
         """Decision aggregation rule: ``"max_logit"`` or ``"logistic"``."""
-        return self._cfg["decision"].get("aggregation", "max_logit")
+        return self._cfg["decision"].get("aggregation", DEFAULT_AGGREGATION)
 
     @property
     def logistic_threshold(self) -> float:
         """Probability threshold for the logistic decision rule."""
-        return float(self._cfg["decision"].get("logistic_threshold", 0.5))
+        return float(
+            self._cfg["decision"].get("logistic_threshold", DEFAULT_LOGISTIC_THRESHOLD)
+        )
 
     @logistic_threshold.setter
     def logistic_threshold(self, value: float) -> None:
@@ -134,7 +150,7 @@ class BboxTubeTemporalModel(TemporalModel):
         clf_cfg = self._cfg["classifier"]
         dec = self._cfg["decision"]
 
-        aggregation = dec.get("aggregation", "max_logit")
+        aggregation = dec.get("aggregation", DEFAULT_AGGREGATION)
         effective_threshold = (
             float(dec["logistic_threshold"])
             if aggregation == "logistic"
@@ -277,7 +293,9 @@ class BboxTubeTemporalModel(TemporalModel):
                     aggregation=aggregation,
                     threshold=float(dec["threshold"]),
                     calibrator=self._calibrator,
-                    logistic_threshold=float(dec.get("logistic_threshold", 0.5)),
+                    logistic_threshold=float(
+                        dec.get("logistic_threshold", DEFAULT_LOGISTIC_THRESHOLD)
+                    ),
                     min_prefix_length=tubes_cfg["infer_min_tube_length"],
                 )
             )
@@ -287,27 +305,14 @@ class BboxTubeTemporalModel(TemporalModel):
         def _probability_for(tube_idx: int, raw_logit: float) -> float | None:
             if self._calibrator is None:
                 return None
-            tube = kept[tube_idx]
-            tube_dict = {
-                "logit": raw_logit,
-                "start_frame": tube.start_frame,
-                "end_frame": tube.end_frame,
-                "entries": [
-                    {
-                        "confidence": (
-                            e.detection.confidence if e.detection is not None else None
-                        )
-                    }
-                    for e in tube.entries
-                ],
-            }
+            tube_dict = tube_feature_dict(kept[tube_idx], raw_logit)
             features = extract_features(tube_dict, n_tubes=len(kept))
             return float(self._calibrator.predict_proba(features))
 
         kept_models: list[KeptTube] = []
         for tube_idx, tube in enumerate(kept):
             entries_models = [
-                TubeEntry(
+                KeptTubeEntry(
                     frame_idx=e.frame_idx,
                     bbox=(
                         (e.detection.cx, e.detection.cy, e.detection.w, e.detection.h)

@@ -18,11 +18,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from temporal_model.core.data import (
-    is_wf_sequence,
-    list_sequences,
-    load_frame_detections,
-)
+from temporal_model.core.labels import load_frame_detections
+from temporal_model.core.sequences import is_wf_sequence, list_sequences
 from temporal_model.core.tubes import (
     build_tubes,
     interpolate_gaps,

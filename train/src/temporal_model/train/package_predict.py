@@ -11,7 +11,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from temporal_model.core.data import (
+from temporal_model.core.sequences import (
     get_sorted_frames,
     is_wf_sequence,
     list_sequences,

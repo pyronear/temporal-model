@@ -14,12 +14,12 @@ stages:
         - src/temporal_model/eval/evaluate.py
         - src/temporal_model/eval/protocol_eval.py
         - src/temporal_model/eval/eval_plots.py
-        - ../core/src/temporal_model/core/data.py
+        - ../core/src/temporal_model/core/sequences.py
         - ../core/src/temporal_model/core/model.py
         - ../core/src/temporal_model/core/inference.py
         - ../core/src/temporal_model/core/stabilize.py
         - ../core/src/temporal_model/core/tubes.py
-        - ../core/src/temporal_model/core/model_input.py
+        - ../core/src/temporal_model/core/crop.py
         - ../core/src/temporal_model/core/protocol.py
         - ../core/src/temporal_model/core/types.py
         - ../core/src/temporal_model/core/details_schema.py

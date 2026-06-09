@@ -8,6 +8,8 @@ it. No context margin here: the crop step adds context via ``context_factor``.
 
 from __future__ import annotations
 
+__all__ = ["union_window", "tube_window"]
+
 
 def union_window(
     boxes: list[tuple[float, float, float, float]],
@@ -38,7 +40,7 @@ def tube_window(
     (non-``None``) boxes. Raises ``ValueError`` if no box is available.
 
     Centralizes the stabilize crop-window *policy* so the training crop
-    (``model_input.process_tube``) and the inference crop
+    (``train.crop_patches.process_tube``) and the inference crop
     (``inference.crop_tube_patches``) cannot drift apart — train/inference window
     parity is the property the whole feature relies on.
     """

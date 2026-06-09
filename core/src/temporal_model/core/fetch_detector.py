@@ -18,6 +18,8 @@ from huggingface_hub import hf_hub_download
 
 from .detector import DETECTOR_WEIGHTS_FILENAME, Detector, load_detector
 
+__all__ = ["fetch_detector", "main"]
+
 
 def _sha256(path: Path) -> str:
     h = hashlib.sha256()

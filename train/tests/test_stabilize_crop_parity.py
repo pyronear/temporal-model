@@ -25,9 +25,9 @@ from PIL import Image
 from torchvision.transforms.functional import to_tensor
 
 from temporal_model.core.inference import crop_tube_patches
-from temporal_model.core.model_input import process_tube
 from temporal_model.core.protocol import Frame
 from temporal_model.core.types import Detection, Tube, TubeEntry
+from temporal_model.train.crop_patches import process_tube
 
 _MEAN = [0.485, 0.456, 0.406]
 _STD = [0.229, 0.224, 0.225]

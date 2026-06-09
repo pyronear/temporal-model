@@ -9,7 +9,9 @@ import pytest
 from temporal_model.core.logistic_calibrator import (
     LogisticCalibrator,
     extract_features,
+    tube_feature_dict,
 )
+from temporal_model.core.types import Detection, Tube, TubeEntry
 
 
 def test_json_roundtrip_preserves_weights(tmp_path: Path) -> None:
@@ -151,3 +153,26 @@ def test_verify_sanity_checks_raises_on_tampered_weights() -> None:
     )
     with pytest.raises(ValueError, match="sanity check"):
         tampered.verify_sanity_checks()
+
+
+def test_tube_feature_dict_matches_inline_shape():
+    det = Detection(class_id=0, cx=0.5, cy=0.5, w=0.1, h=0.1, confidence=0.8)
+    tube = Tube(
+        tube_id=3,
+        entries=[
+            TubeEntry(frame_idx=0, detection=det),
+            TubeEntry(frame_idx=1, detection=None, is_gap=True),
+        ],
+        start_frame=0,
+        end_frame=1,
+    )
+    d = tube_feature_dict(tube, logit=1.25)
+    assert d == {
+        "logit": 1.25,
+        "start_frame": 0,
+        "end_frame": 1,
+        "entries": [{"confidence": 0.8}, {"confidence": None}],
+    }
+    # And it feeds extract_features without error.
+    feats = extract_features(d, n_tubes=2)
+    assert feats.shape == (4,)

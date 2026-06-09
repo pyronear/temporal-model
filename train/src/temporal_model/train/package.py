@@ -28,7 +28,7 @@ from temporal_model.core.logistic_calibrator import (
     extract_features,
 )
 from temporal_model.core.model import BboxTubeTemporalModel
-from temporal_model.core.package import _load_yolo, build_model_package
+from temporal_model.core.package import build_model_package, load_yolo
 from temporal_model.core.temporal_classifier import TemporalSmokeClassifier
 from temporal_model.train.calibration import calibrate_threshold
 from temporal_model.train.logistic_calibrator_fit import fit as fit_logistic_calibrator
@@ -181,7 +181,7 @@ def _fit_calibrator_and_threshold(
     os.environ.setdefault("YOLO_VERBOSE", "False")  # quiet per-frame YOLO logs
     print("[package] loading detector + building in-memory pipeline...", flush=True)
     fit_model = BboxTubeTemporalModel(
-        yolo_model=_load_yolo(yolo_weights_path),
+        yolo_model=load_yolo(yolo_weights_path),
         classifier=classifier,
         config=pipeline_config,
     )

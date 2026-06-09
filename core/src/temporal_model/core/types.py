@@ -2,7 +2,8 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
+
+__all__ = ["Detection", "FrameDetections", "TubeEntry", "Tube"]
 
 
 @dataclass
@@ -56,16 +57,3 @@ class Tube:
     entries: list[TubeEntry] = field(default_factory=list)
     start_frame: int = 0
     end_frame: int = 0
-
-
-@dataclass
-class SequenceFeatures:
-    """Precomputed features for a single sequence, saved as .pt/.json."""
-
-    sequence_id: str
-    num_frames: int
-    num_detections: int
-    tubes: list[Tube]
-    is_positive: bool | None = None
-    features_path: Path | None = None
-    metadata_path: Path | None = None

@@ -36,7 +36,9 @@ stages:
       deps:
         - src/temporal_model/train/build_tubes.py
         - ../core/src/temporal_model/core/tubes.py
-        - ../core/src/temporal_model/core/data.py
+        - ../core/src/temporal_model/core/sequences.py
+        - ../core/src/temporal_model/core/labels.py
+        - ../core/src/temporal_model/core/protocol.py
         - ../core/src/temporal_model/core/types.py
         - data/01_raw/datasets/${item}
       params:
@@ -60,7 +62,9 @@ stages:
         --stabilize ${model_input.stabilize}
       deps:
         - src/temporal_model/train/build_model_input.py
-        - ../core/src/temporal_model/core/model_input.py
+        - src/temporal_model/train/crop_patches.py
+        - ../core/src/temporal_model/core/crop.py
+        - ../core/src/temporal_model/core/sequences.py
         - ../core/src/temporal_model/core/stabilize.py
         - data/03_primary/tubes/${item}
         - data/01_raw/datasets/${item}
@@ -114,7 +118,7 @@ stages:
       - ../core/src/temporal_model/core/stabilize.py
       - ../core/src/temporal_model/core/logistic_calibrator.py
       - ../core/src/temporal_model/core/tubes.py
-      - ../core/src/temporal_model/core/data.py
+      - ../core/src/temporal_model/core/sequences.py
       - ../core/src/temporal_model/core/detector.yaml
       - data/06_models/vit_dinov2_finetune/best_checkpoint.pt
       - data/06_models/detectors/yolo11s_nimble-narwhal_v6.0.0/yolo_weights.pt
