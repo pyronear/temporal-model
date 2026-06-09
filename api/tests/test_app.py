@@ -199,16 +199,21 @@ def test_lifespan_passes_calibrator_threshold(monkeypatch):
     # untested).
     captured = {}
 
-    def fake_load(package_path, device, calibrator_threshold=None):
+    def fake_load(
+        package_path, device, calibrator_threshold=None, detection_cache_size=0
+    ):
         captured["calibrator_threshold"] = calibrator_threshold
+        captured["detection_cache_size"] = detection_cache_size
         return FakeRunner(output=_smoke_output())
 
     monkeypatch.setattr(settings, "s3_bucket", BUCKET)
     monkeypatch.setattr(settings, "calibrator_threshold", 0.33)
+    monkeypatch.setattr(settings, "detection_cache_size", 256)
     monkeypatch.setattr(ModelRunner, "load", fake_load)
     with TestClient(app):
         pass
     assert captured["calibrator_threshold"] == 0.33
+    assert captured["detection_cache_size"] == 256
 
 
 def test_configure_logging_idempotent_and_preserves_propagation():
