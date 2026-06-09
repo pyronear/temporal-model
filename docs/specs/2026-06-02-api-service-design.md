@@ -38,7 +38,9 @@ Established facts from the `vision-rd` source that constrain this design:
   ```
 - **Output type** (`pyrocore.TemporalModelOutput`):
   - `is_positive: bool`
-  - `trigger_frame_index: int | None` (0-based; time-to-detection in *frames*)
+  - `trigger_frame_index: int | None` (0-based; time-to-detection in *frames*;
+    eval-only — always `None` on the serving path and omitted from the API DTO,
+    see the response contract below)
   - `details: dict` (validated by `bbox_tube_temporal.details_schema.BboxTubeDetails`)
 - **`details` schema** (`BboxTubeDetails`):
   - `preprocessing`: `num_frames_input`, `num_truncated`, `padded_frame_indices`
