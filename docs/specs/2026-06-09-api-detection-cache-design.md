@@ -145,14 +145,6 @@ This confirms the cache is working (hit rate climbs as a sequence grows) and
 surfaces how per-call cost scales — enough to validate the feature without any
 additional metrics infrastructure.
 
-### Optional extension (note, not v1)
-
-With detections cached, the no-smoke path has no kept tubes and never opens the
-image bytes (`crop` is skipped). We *could* skip the S3 download for already-seen
-frames and fetch lazily only for frames a kept tube touches — cutting network
-latency too. Deferred: it adds control flow for a case the cache already makes
-cheap.
-
 ## Data flow
 
 ```
