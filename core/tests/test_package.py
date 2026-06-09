@@ -19,8 +19,11 @@ from temporal_model.core.package import (
     LOGISTIC_CALIBRATOR_FILENAME,
     MANIFEST_FILENAME,
     YOLO_WEIGHTS_FILENAME,
+    UncalibratedModelError,
     build_model_package,
+    is_calibrated,
     load_model_package,
+    require_calibrated,
 )
 from temporal_model.core.temporal_classifier import TemporalSmokeClassifier
 
@@ -457,3 +460,29 @@ class TestProvenance:
         with zipfile.ZipFile(out, "r") as zf:
             manifest = yaml.safe_load(zf.read(MANIFEST_FILENAME))
         assert manifest["provenance"]["train_git_sha"] == "abc1234"
+
+
+class TestIsCalibrated:
+    def test_calibrator_and_logistic_is_calibrated(self) -> None:
+        assert is_calibrated(_make_calibrator(), "logistic") is True
+
+    def test_calibrator_but_max_logit_is_uncalibrated(self) -> None:
+        assert is_calibrated(_make_calibrator(), "max_logit") is False
+
+    def test_no_calibrator_logistic_is_uncalibrated(self) -> None:
+        assert is_calibrated(None, "logistic") is False
+
+    def test_no_calibrator_max_logit_is_uncalibrated(self) -> None:
+        assert is_calibrated(None, "max_logit") is False
+
+
+class TestRequireCalibrated:
+    def test_passes_when_calibrated(self) -> None:
+        require_calibrated(_make_calibrator(), "logistic", context="x")  # no raise
+
+    def test_raises_when_uncalibrated(self) -> None:
+        with pytest.raises(UncalibratedModelError, match="not calibrated"):
+            require_calibrated(None, "max_logit", context="ctx")
+
+    def test_error_is_a_valueerror(self) -> None:
+        assert issubclass(UncalibratedModelError, ValueError)

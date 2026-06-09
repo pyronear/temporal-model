@@ -25,9 +25,12 @@ from .temporal_classifier import TemporalSmokeClassifier
 
 __all__ = [
     "ModelPackage",
+    "UncalibratedModelError",
     "build_model_package",
+    "is_calibrated",
     "load_model_package",
     "load_yolo",
+    "require_calibrated",
 ]
 
 FORMAT_VERSION = 1
@@ -37,6 +40,30 @@ CLASSIFIER_CKPT_FILENAME = "classifier.ckpt"
 CONFIG_FILENAME = "config.yaml"
 LOGISTIC_CALIBRATOR_FILENAME = "logistic_calibrator.json"
 DEFAULT_EXTRACT_DIR = Path(".cache/temporal_model_core")
+
+
+class UncalibratedModelError(ValueError):
+    """Raised when a model package is not calibrated and the caller did not opt out."""
+
+
+def is_calibrated(calibrator: LogisticCalibrator | None, aggregation: str) -> bool:
+    """A package is calibrated iff a calibrator is bundled AND the decision is logistic."""
+    return calibrator is not None and aggregation == "logistic"
+
+
+def require_calibrated(
+    calibrator: LogisticCalibrator | None,
+    aggregation: str,
+    *,
+    context: str,
+) -> None:
+    """Raise :class:`UncalibratedModelError` unless the package is calibrated."""
+    if not is_calibrated(calibrator, aggregation):
+        raise UncalibratedModelError(
+            f"{context}: model is not calibrated "
+            f"(calibrator={'present' if calibrator is not None else 'missing'}, "
+            f"aggregation={aggregation!r}); pass allow_uncalibrated=True to override"
+        )
 
 
 @dataclass
