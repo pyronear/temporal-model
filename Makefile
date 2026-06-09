@@ -4,12 +4,14 @@ PACKAGES := core train eval api
 MODEL_VERSION ?= 0.1.0
 MODEL_ZIP := api/models/model.zip
 
+.DEFAULT_GOAL := help
 .PHONY: help install lint format test serve fetch-model
 
 help: ## Show this help
-	@echo "Fans out targets across: $(PACKAGES)"
-	@echo "Targets: install lint format test"
-	@echo "API only: fetch-model (download model.zip from HF), serve (API + MinIO via docker compose)"
+	@echo "Available targets:"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
+	    | sort \
+	    | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
 install: ## uv sync every package
 	@for pkg in $(PACKAGES); do echo "==> $$pkg"; $(MAKE) -C $$pkg install; done
