@@ -4,23 +4,24 @@ import logging
 from pathlib import Path
 
 import pandas as pd
-import torch
 
-from temporal_model.core.model import BboxTubeTemporalModel
-from temporal_model.core.stage_timer import StageTimer
+from temporal_model.core.model import BboxTubeTemporalModel, _select_device
+from temporal_model.core.stage_timer import STAGES, StageTimer
 
 from .dataset import BenchSequence, iter_sequences
 
 logger = logging.getLogger(__name__)
 
-STAGES = ("pad", "yolo", "tubes", "crop", "vit", "trigger")
-
 
 def resolve_device(requested: str) -> str:
-    """Map ``auto`` to cuda-if-available else cpu; pass anything else through."""
-    if requested == "auto":
-        return "cuda" if torch.cuda.is_available() else "cpu"
-    return requested
+    """Resolve the device the same way the model does (cuda > mps > cpu).
+
+    Delegates to the model's own ``_select_device`` so the benchmark always
+    runs — and times — on the device production would pick. ``"auto"`` lets it
+    auto-detect; any explicit value is passed through.
+    """
+    dev = None if requested == "auto" else requested
+    return str(_select_device(dev))
 
 
 def _one_rep(model: BboxTubeTemporalModel, seq: BenchSequence, device: str) -> dict:

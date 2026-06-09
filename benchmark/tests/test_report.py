@@ -1,5 +1,7 @@
 """Tests for benchmark aggregation."""
 
+import json
+
 import pandas as pd
 
 from temporal_model.benchmark.report import summarize
@@ -50,3 +52,20 @@ def test_summarize_counts_failures_and_excludes_them():
     assert s["n_sequences"] == 2
     assert s["n_failed"] == 1
     assert s["total_ms"]["p50"] == 100.0  # failed row excluded from latency
+
+
+def test_summarize_all_failed_is_safe():
+    # Every sequence failed → bare dicts with no timing columns at all.
+    df = pd.DataFrame(
+        [
+            {"key": "a", "rep": 0, "failed": True},
+            {"key": "b", "rep": 0, "failed": True},
+        ]
+    )
+    s = summarize(df)
+    assert s["n_sequences"] == 2
+    assert s["n_failed"] == 2
+    assert s["total_ms"]["p50"] == 0.0
+    assert s["throughput"]["sequences_per_sec"] == 0.0
+    # Must stay valid JSON — no NaN tokens leaking in.
+    assert json.loads(json.dumps(s)) == s

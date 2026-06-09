@@ -32,9 +32,9 @@ def test_as_dict_returns_a_copy():
     assert timer.as_dict()["crop"] != -1.0
 
 
-def test_cpu_timer_does_not_flag_cuda():
+def test_cpu_timer_has_no_sync():
     timer = StageTimer(device="cpu")
-    assert timer._cuda is False
+    assert timer._sync is None
 
 
 def test_stage_ctx_is_noop_without_timer():

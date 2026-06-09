@@ -9,7 +9,20 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import pandas as pd  # noqa: E402
 
-STAGES = ["pad", "yolo", "tubes", "crop", "vit", "trigger"]
+from temporal_model.core.stage_timer import STAGES  # noqa: E402
+
+
+def _ok_rows(df: pd.DataFrame) -> pd.DataFrame:
+    """Successful rows that carry timing columns.
+
+    Failed rows are recorded as bare ``{key, rep, failed}`` dicts, so an
+    all-failed run yields a DataFrame with no ``total_ms`` column at all. Return
+    an empty frame in that case rather than letting callers ``KeyError``.
+    """
+    ok = df[~df["failed"]] if "failed" in df else df
+    if "total_ms" not in ok.columns:
+        return ok.iloc[0:0]
+    return ok
 
 
 def _pct(series: pd.Series, q: float) -> float:
@@ -17,29 +30,42 @@ def _pct(series: pd.Series, q: float) -> float:
 
 
 def summarize(df: pd.DataFrame) -> dict:
-    """Compute latency percentiles, throughput, and mean stage shares."""
-    ok = df[~df["failed"]] if "failed" in df else df
-    total = ok["total_ms"]
-    mean_total_ms = float(total.mean()) if len(total) else 0.0
-    mean_frames = float(ok["frame_count"].mean()) if len(ok) else 0.0
+    """Compute latency percentiles, throughput, and mean stage shares.
+
+    Degrades gracefully when every sequence failed: latency/throughput/stage
+    figures are zero and ``n_failed`` reflects the failures, so a run that
+    blew up still produces a valid (loadable) report instead of a traceback.
+    """
+    ok = _ok_rows(df)
+    has_data = not ok.empty
+
+    total = ok["total_ms"] if has_data else pd.Series(dtype=float)
+    mean_total_ms = float(total.mean()) if has_data else 0.0
+    mean_frames = float(ok["frame_count"].mean()) if has_data else 0.0
     seq_per_sec = 1000.0 / mean_total_ms if mean_total_ms else 0.0
 
     stage_means = (
         {s: float(ok[f"{s}_ms"].mean()) for s in STAGES}
-        if len(ok)
+        if has_data
         else dict.fromkeys(STAGES, 0.0)
     )
     stage_total = sum(stage_means.values()) or 1.0
 
-    return {
-        "n_sequences": int(df["key"].nunique()),
-        "n_failed": int(df["failed"].sum()) if "failed" in df else 0,
-        "total_ms": {
+    latency = (
+        {
             "p50": _pct(total, 0.50),
             "p90": _pct(total, 0.90),
             "p99": _pct(total, 0.99),
             "mean": round(mean_total_ms, 3),
-        },
+        }
+        if has_data
+        else {"p50": 0.0, "p90": 0.0, "p99": 0.0, "mean": 0.0}
+    )
+
+    return {
+        "n_sequences": int(df["key"].nunique()) if "key" in df else 0,
+        "n_failed": int(df["failed"].sum()) if "failed" in df else 0,
+        "total_ms": latency,
         "stage_ms_mean": {s: round(v, 3) for s, v in stage_means.items()},
         "stage_share_pct": {
             s: round(100.0 * v / stage_total, 1) for s, v in stage_means.items()
@@ -52,8 +78,11 @@ def summarize(df: pd.DataFrame) -> dict:
 
 
 def _plot_latency_hist(df: pd.DataFrame, out: Path) -> None:
+    ok = _ok_rows(df)
+    if ok.empty:
+        return
     fig, ax = plt.subplots()
-    df.loc[~df["failed"], "total_ms"].plot.hist(bins=30, ax=ax)
+    ok["total_ms"].plot.hist(bins=30, ax=ax)
     ax.set_xlabel("total latency (ms)")
     ax.set_title("Per-sequence latency distribution")
     fig.savefig(out, bbox_inches="tight")
@@ -71,7 +100,9 @@ def _plot_stage_breakdown(summary: dict, out: Path) -> None:
 
 
 def _plot_latency_vs_frames(df: pd.DataFrame, out: Path) -> None:
-    ok = df[~df["failed"]]
+    ok = _ok_rows(df)
+    if ok.empty:
+        return
     fig, ax = plt.subplots()
     ax.scatter(ok["frame_count"], ok["total_ms"], s=8, alpha=0.5)
     ax.set_xlabel("frame count")

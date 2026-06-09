@@ -15,8 +15,8 @@ from .run_core import resolve_device, run_core
 
 
 def _run_core_cmd(args: argparse.Namespace) -> None:
-    threads = args.threads or os.cpu_count()
-    if threads is not None:
+    threads = args.threads if args.threads is not None else os.cpu_count()
+    if threads:
         torch.set_num_threads(threads)
     device = resolve_device(args.device)
 
