@@ -4,6 +4,7 @@ Wires the YOLO companion + tube building + patch cropping + the trained
 temporal classifier into the :class:`TemporalModel` contract.
 """
 
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Self
 
@@ -36,6 +37,7 @@ from .package import ModelPackage, load_model_package
 from .protocol import Frame, TemporalModel, TemporalModelOutput
 from .stage_timer import StageTimer, stage_ctx
 from .tubes import build_tubes
+from .types import FrameDetections
 
 __all__ = [
     "BboxTubeTemporalModel",
@@ -142,10 +144,48 @@ class BboxTubeTemporalModel(TemporalModel):
         """
         return cls.from_package(archive_path, device=device)
 
+    def detect(self, frames: list[Frame]) -> list[FrameDetections]:
+        """Run the companion YOLO detector over ``frames`` (one batched call).
+
+        Pure: same input → same output. Exposed so a serving layer can cache
+        per-frame detections and avoid re-detecting frames it has already seen.
+        """
+        infer = self._cfg["infer"]
+        return run_yolo_on_frames(
+            self._yolo,
+            frames,
+            confidence_threshold=infer["confidence_threshold"],
+            iou_nms=infer["iou_nms"],
+            image_size=infer["image_size"],
+            device=self._device,
+        )
+
+    def _resolve_frame_detections(
+        self,
+        truncated: list[Frame],
+        frame_detections: dict[str, FrameDetections],
+    ) -> list[FrameDetections]:
+        """Use supplied detections where present, detect the rest, in order.
+
+        Each entry's positional ``frame_idx`` is re-stamped to its index in
+        ``truncated`` — a cached entry carries the ``frame_idx`` from the call
+        that produced it, which is meaningless here.
+        """
+        misses = [f for f in truncated if f.frame_id not in frame_detections]
+        fresh = {fd.frame_id: fd for fd in self.detect(misses)}
+        resolved: list[FrameDetections] = []
+        for idx, f in enumerate(truncated):
+            fd = frame_detections.get(f.frame_id)
+            if fd is None:
+                fd = fresh[f.frame_id]
+            resolved.append(replace(fd, frame_idx=idx))
+        return resolved
+
     def predict(
         self,
         frames: list[Frame],
         *,
+        frame_detections: dict[str, FrameDetections] | None = None,
         timer: StageTimer | None = None,
         compute_trigger: bool = False,
     ) -> TemporalModelOutput:
@@ -221,14 +261,12 @@ class BboxTubeTemporalModel(TemporalModel):
                 truncated, padded_indices = pad_fn(truncated, min_length=pad_min)
 
         with stage_ctx(timer, "detector"):
-            frame_dets = run_yolo_on_frames(
-                self._yolo,
-                truncated,
-                confidence_threshold=infer["confidence_threshold"],
-                iou_nms=infer["iou_nms"],
-                image_size=infer["image_size"],
-                device=self._device,
-            )
+            if frame_detections is None:
+                frame_dets = self.detect(truncated)
+            else:
+                frame_dets = self._resolve_frame_detections(
+                    truncated, frame_detections
+                )
 
         with stage_ctx(timer, "tubes"):
             # Pre-merge (raw) candidates count, for the details JSON.
