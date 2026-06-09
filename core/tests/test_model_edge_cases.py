@@ -330,7 +330,7 @@ class TestDeviceSelection:
             config=cfg,
             device="cpu",
         )
-        out = model.predict(frames=red_frames)
+        out = model.predict(frames=red_frames, compute_trigger=True)
 
         kept = out.details["tubes"]["kept"]
         assert isinstance(kept, list)
@@ -456,7 +456,7 @@ class TestFirstCrossingTrigger:
             config=cfg,
             device="cpu",
         )
-        out = model.predict(frames=red_frames)
+        out = model.predict(frames=red_frames, compute_trigger=True)
 
         assert out.is_positive is True
         assert out.trigger_frame_index is not None
@@ -467,6 +467,36 @@ class TestFirstCrossingTrigger:
         )
         assert out.trigger_frame_index <= trigger_tube["end_frame"]
         assert trigger_tube["first_crossing_frame"] == out.trigger_frame_index
+
+    def test_compute_trigger_gate(
+        self, tiny_classifier: TemporalSmokeClassifier, red_frames: list[Frame]
+    ) -> None:
+        """Default predict() skips the trigger search (trigger fields None);
+        compute_trigger=True restores the full trigger output, with the same
+        is_positive in both modes."""
+        per_frame = [[(0.5, 0.5, 0.1, 0.1, 0.9)] for _ in red_frames]
+        yolo = _fake_yolo_factory(per_frame)
+        cfg = {
+            **TEST_CONFIG,
+            "decision": {**TEST_CONFIG["decision"], "threshold": -1e6},
+        }
+        model = BboxTubeTemporalModel(
+            yolo_model=yolo,
+            classifier=tiny_classifier,
+            config=cfg,
+            device="cpu",
+        )
+
+        default = model.predict(frames=red_frames)
+        assert default.is_positive is True
+        assert default.trigger_frame_index is None
+        assert default.details["decision"]["trigger_tube_id"] is None
+        assert default.details["tubes"]["kept"][0]["first_crossing_frame"] is None
+
+        full = model.predict(frames=red_frames, compute_trigger=True)
+        assert full.is_positive is default.is_positive
+        assert full.trigger_frame_index is not None
+        assert full.details["decision"]["trigger_tube_id"] is not None
 
 
 class TestStageTimerIntegration:

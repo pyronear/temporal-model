@@ -21,6 +21,7 @@ from .inference import (
     build_tubes_for_inference,
     crop_tube_patches,
     find_first_crossing_trigger,
+    make_decision_fn,
     pad_frames_symmetrically,
     pad_frames_uniform,
     run_yolo_on_frames,
@@ -142,7 +143,11 @@ class BboxTubeTemporalModel(TemporalModel):
         return cls.from_package(archive_path, device=device)
 
     def predict(
-        self, frames: list[Frame], *, timer: StageTimer | None = None
+        self,
+        frames: list[Frame],
+        *,
+        timer: StageTimer | None = None,
+        compute_trigger: bool = False,
     ) -> TemporalModelOutput:
         infer = self._cfg["infer"]
         tubes_cfg = self._cfg["tubes"]
@@ -283,22 +288,40 @@ class BboxTubeTemporalModel(TemporalModel):
             )
 
         with stage_ctx(timer, "trigger_search"):
-            is_positive, trigger, trigger_tube_id, per_tube_first_crossing = (
-                find_first_crossing_trigger(
-                    classifier=self._classifier,
-                    tubes=kept,
-                    patches_per_tube=patches_per_tube,
-                    masks_per_tube=masks_per_tube,
-                    full_logits=logits,
-                    aggregation=aggregation,
+            if compute_trigger:
+                is_positive, trigger, trigger_tube_id, per_tube_first_crossing = (
+                    find_first_crossing_trigger(
+                        classifier=self._classifier,
+                        tubes=kept,
+                        patches_per_tube=patches_per_tube,
+                        masks_per_tube=masks_per_tube,
+                        full_logits=logits,
+                        aggregation=aggregation,
+                        threshold=float(dec["threshold"]),
+                        calibrator=self._calibrator,
+                        logistic_threshold=float(
+                            dec.get("logistic_threshold", DEFAULT_LOGISTIC_THRESHOLD)
+                        ),
+                        min_prefix_length=tubes_cfg["infer_min_tube_length"],
+                    )
+                )
+            else:
+                decides_positive = make_decision_fn(
+                    aggregation,
                     threshold=float(dec["threshold"]),
                     calibrator=self._calibrator,
                     logistic_threshold=float(
                         dec.get("logistic_threshold", DEFAULT_LOGISTIC_THRESHOLD)
                     ),
-                    min_prefix_length=tubes_cfg["infer_min_tube_length"],
                 )
-            )
+                n_kept = len(kept)
+                is_positive = any(
+                    decides_positive(float(logits[i].item()), tube, n_kept)
+                    for i, tube in enumerate(kept)
+                )
+                trigger = None
+                trigger_tube_id = None
+                per_tube_first_crossing = {}
 
         logits_list: list[float] = logits.tolist()
 
