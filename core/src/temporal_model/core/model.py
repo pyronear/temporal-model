@@ -260,11 +260,15 @@ class BboxTubeTemporalModel(TemporalModel):
                     ) from e
                 truncated, padded_indices = pad_fn(truncated, min_length=pad_min)
 
-        with stage_ctx(timer, "detector"):
-            if frame_detections is None:
+        if frame_detections is None:
+            # Time the "detector" stage only when we actually detect. When
+            # detections are supplied (a serving layer that detects + caches
+            # upstream), that real cost is timed there; resolving the supplied
+            # dict here is negligible and must not be conflated into "detector".
+            with stage_ctx(timer, "detector"):
                 frame_dets = self.detect(truncated)
-            else:
-                frame_dets = self._resolve_frame_detections(truncated, frame_detections)
+        else:
+            frame_dets = self._resolve_frame_detections(truncated, frame_detections)
 
         with stage_ctx(timer, "tubes"):
             # Pre-merge (raw) candidates count, for the details JSON.

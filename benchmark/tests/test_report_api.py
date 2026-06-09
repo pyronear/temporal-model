@@ -58,3 +58,8 @@ def test_summarize_api_counts_errors():
     s = summarize_api(df)
     assert s["passes"]["cold"]["n_errors"] == 1
     assert s["passes"]["cold"]["n_requests"] == 2
+
+
+def test_summarize_api_empty_frame_is_safe():
+    s = summarize_api(pd.DataFrame())
+    assert s == {"passes": {}, "n_requests": 0}

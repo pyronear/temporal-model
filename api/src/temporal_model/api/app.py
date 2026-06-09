@@ -118,9 +118,9 @@ async def predict(
 
     with tempfile.TemporaryDirectory() as tmp:
         try:
-            # StageTimer with no device → no GPU syncs (the served target is CPU);
-            # exact wall-clock timing for s3_fetch + the CPU model stages.
-            timer = StageTimer() if settings.profile else None
+            # Timer carries the model device so GPU/MPS stages are synced for
+            # honest timing; on the CPU serving target this is a no-op.
+            timer = StageTimer(settings.device) if settings.profile else None
             profile: dict | None = {} if settings.profile else None
 
             with stage_ctx(timer, "s3_fetch"):

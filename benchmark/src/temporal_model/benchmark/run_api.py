@@ -99,13 +99,17 @@ def run_api(
     warm_min_frames: int = 3,
 ) -> pd.DataFrame:
     """Benchmark the API over HTTP; one row per request, per pass."""
-    sequences = list(iter_sequences(store_dir))
+    all_sequences = list(iter_sequences(store_dir))
     if limit is not None:
-        sequences = sequences[:limit]
-    if not sequences:
+        all_sequences = all_sequences[: limit + warmup]
+    if not all_sequences:
         raise SystemExit(f"no sequences found under {store_dir}")
 
-    for seq in sequences[:warmup]:
+    # Warmup sequences populate the server detection cache, so they must NOT be
+    # measured — otherwise the cold pass would re-hit a warm cache for them.
+    warmup_seqs = all_sequences[:warmup]
+    sequences = all_sequences[warmup:]
+    for seq in warmup_seqs:
         rows_for_sequence(
             store_dir,
             seq.key,

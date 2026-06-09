@@ -201,12 +201,19 @@ def _api_stage_cols(df: pd.DataFrame) -> list[str]:
     ]
 
 
+def _mean_ms(series: pd.Series) -> float:
+    """Mean as a finite float — NaN (empty / all-missing) collapses to 0.0 so it
+    never leaks into summary.json as an invalid bare ``NaN`` token."""
+    val = float(series.mean()) if len(series) else 0.0
+    return round(val, 3) if val == val else 0.0  # val != val ⇔ NaN
+
+
 def _summarize_pass(pdf: pd.DataFrame) -> dict:
     ok = pdf[pdf["http_status"] == 200]
     e2e = ok["e2e_ms"] if not ok.empty else pd.Series(dtype=float)
     stage_cols = _api_stage_cols(pdf)
     stage_means = {
-        c[:-3]: round(float(ok[c].mean()), 3) if (not ok.empty and c in ok) else 0.0
+        c[:-3]: _mean_ms(ok[c]) if (not ok.empty and c in ok) else 0.0
         for c in stage_cols
     }
     hits = float(ok["cache_hits"].sum()) if "cache_hits" in ok else 0.0
@@ -230,6 +237,8 @@ def _summarize_pass(pdf: pd.DataFrame) -> dict:
 
 def summarize_api(df: pd.DataFrame) -> dict:
     """Aggregate API benchmark rows, split by cache pass (cold/warm)."""
+    if "pass" not in df.columns:
+        return {"passes": {}, "n_requests": 0}
     passes = {p: _summarize_pass(df[df["pass"] == p]) for p in df["pass"].unique()}
     return {"passes": passes, "n_requests": int(len(df))}
 
