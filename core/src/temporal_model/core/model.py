@@ -38,6 +38,7 @@ from .tubes import build_tubes
 
 __all__ = [
     "BboxTubeTemporalModel",
+    "select_device",
     "DEFAULT_AGGREGATION",
     "DEFAULT_LOGISTIC_THRESHOLD",
 ]
@@ -51,7 +52,7 @@ DEFAULT_AGGREGATION = "max_logit"
 DEFAULT_LOGISTIC_THRESHOLD = 0.5
 
 
-def _select_device(device: str | torch.device | None) -> torch.device:
+def select_device(device: str | torch.device | None) -> torch.device:
     """Resolve the requested device, auto-picking the best available when None.
 
     Preference order: CUDA > MPS (Apple Silicon) > CPU.
@@ -82,7 +83,7 @@ class BboxTubeTemporalModel(TemporalModel):
         calibrator: LogisticCalibrator | None = None,
     ) -> None:
         self._yolo = yolo_model
-        self._device = _select_device(device)
+        self._device = select_device(device)
         self._classifier = classifier.to(self._device).eval()
         self._cfg = config
         self._calibrator = calibrator

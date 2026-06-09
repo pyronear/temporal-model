@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from temporal_model.core.model import BboxTubeTemporalModel, _select_device
+from temporal_model.core.model import BboxTubeTemporalModel, select_device
 from temporal_model.core.stage_timer import STAGES, StageTimer
 
 from .dataset import BenchSequence, iter_sequences
@@ -16,12 +16,12 @@ logger = logging.getLogger(__name__)
 def resolve_device(requested: str) -> str:
     """Resolve the device the same way the model does (cuda > mps > cpu).
 
-    Delegates to the model's own ``_select_device`` so the benchmark always
+    Delegates to the model's own ``select_device`` so the benchmark always
     runs — and times — on the device production would pick. ``"auto"`` lets it
     auto-detect; any explicit value is passed through.
     """
     dev = None if requested == "auto" else requested
-    return str(_select_device(dev))
+    return str(select_device(dev))
 
 
 def _one_rep(model: BboxTubeTemporalModel, seq: BenchSequence, device: str) -> dict:
