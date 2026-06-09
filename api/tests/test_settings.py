@@ -41,3 +41,12 @@ def test_calibrator_threshold_out_of_range_fails(monkeypatch, value):
     monkeypatch.setenv("TEMPORAL_API_CALIBRATOR_THRESHOLD", value)
     with pytest.raises(ValidationError):
         Settings(_env_file=None)
+
+
+def test_detection_cache_size_default():
+    assert Settings(_env_file=None).detection_cache_size == 4096
+
+
+def test_detection_cache_size_env_override(monkeypatch):
+    monkeypatch.setenv("TEMPORAL_API_DETECTION_CACHE_SIZE", "10")
+    assert Settings(_env_file=None).detection_cache_size == 10
