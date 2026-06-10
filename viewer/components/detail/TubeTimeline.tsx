@@ -108,6 +108,12 @@ export function TubeTimeline({
           </text>
         </g>
       ))}
+      {/* trigger frame number, in red, under the trigger line */}
+      {tx != null && trigger != null && (
+        <text x={tx} y={bodyBottom + 15} textAnchor="middle" fontSize={9} fontWeight={700} fill="#e11d48">
+          {trigger}
+        </text>
+      )}
       <text
         x={gutter + plot / 2}
         y={bodyBottom + axisH + titleH - 1}

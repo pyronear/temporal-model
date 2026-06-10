@@ -1,5 +1,14 @@
 "use client";
 
+// Human-readable blurb per known source; unknown sources just show their name.
+const SOURCE_INFO: Record<string, string> = {
+  "pyro-annotator": "human-labeled platform sequences (smoke / fp / unknown)",
+  val: "held-out validation split",
+  train: "training split",
+};
+
+const blurb = (s: string) => SOURCE_INFO[s] ?? "";
+
 export function SourceSelect({
   sources,
   value,
@@ -18,11 +27,12 @@ export function SourceSelect({
         onChange={(e) => onChange(e.target.value)}
       >
         {sources.map((s) => (
-          <option key={s} value={s}>
-            {s}
+          <option key={s} value={s} title={blurb(s)}>
+            {blurb(s) ? `${s} — ${blurb(s)}` : s}
           </option>
         ))}
       </select>
+      {blurb(value) && <p className="text-[11px] leading-snug text-slate-400">{blurb(value)}</p>}
     </div>
   );
 }

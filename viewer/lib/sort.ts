@@ -1,6 +1,6 @@
 import type { ResultRow } from "@/lib/types";
 
-export type SortCol = "camera" | "label" | "decision" | "outcome" | "probability";
+export type SortCol = "camera" | "label" | "decision" | "outcome" | "probability" | "tubes";
 export interface Sort {
   col: SortCol;
   dir: "asc" | "desc";
@@ -37,6 +37,9 @@ export function sortRows(rows: ResultRow[], sort: Sort | null): ResultRow[] {
       if (av == null) return 1;
       if (bv == null) return -1;
       return sign * (av - bv);
+    }
+    if (sort.col === "tubes") {
+      return sign * ((a.num_tubes_kept ?? 0) - (b.num_tubes_kept ?? 0));
     }
     return sign * str(a, sort.col).localeCompare(str(b, sort.col));
   });

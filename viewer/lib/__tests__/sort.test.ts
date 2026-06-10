@@ -4,7 +4,7 @@ import type { ResultRow } from "@/lib/types";
 
 const r = (key: string, probability: number | null, camera: string | null = "c"): ResultRow => ({
   key, source: "s", label: "smoke", decision: "keep", outcome: "kept-smoke",
-  score: 1, probability, trigger_frame_index: 0,
+  score: 1, probability, num_tubes_kept: 1, trigger_frame_index: 0,
   organization_name: null, camera_name: camera, started_at: null,
 });
 

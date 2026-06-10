@@ -16,6 +16,7 @@ export interface ResultRow {
   outcome: Outcome;
   score: number | null;
   probability: number | null;
+  num_tubes_kept: number;
   trigger_frame_index: number | null;
   organization_name: string | null;
   camera_name: string | null;

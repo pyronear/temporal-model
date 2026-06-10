@@ -31,6 +31,7 @@ const COLUMNS: Column[] = [
       </>
     ),
   },
+  { header: "tubes", sortCol: "tubes", render: (r) => r.num_tubes_kept },
   { header: "prob", sortCol: "probability", render: (r) => num(r.probability) },
 ];
 

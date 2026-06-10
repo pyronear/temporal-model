@@ -58,13 +58,30 @@ export function DetailPanel({
     trigger: triggerState(t.tube_id, triggerTubeId, wouldIds),
   }));
 
-  const boxesByFrame = (i: number): OverlayBox[] =>
-    (bbmap.get(i) ?? []).map((b) => ({
+  const boxesByFrame = (i: number): OverlayBox[] => {
+    const active = bbmap.get(i) ?? [];
+    const activeIds = new Set(active.map((b) => b.tubeId));
+    const out: OverlayBox[] = active.map((b) => ({
       bbox: b.bbox,
       color: tubeColor(b.tubeId),
       trigger: triggerState(b.tubeId, triggerTubeId, wouldIds),
       confidence: b.confidence,
     }));
+    // For tubes with no detection at this frame, show their stabilized crop
+    // window as a dashed box (where the crop is / will be).
+    for (const t of kept) {
+      if (!activeIds.has(t.tube_id) && t.stabilized_window) {
+        out.push({
+          bbox: t.stabilized_window,
+          color: tubeColor(t.tube_id),
+          trigger: triggerState(t.tube_id, triggerTubeId, wouldIds),
+          confidence: null,
+          dashed: true,
+        });
+      }
+    }
+    return out;
+  };
 
   const activeBoxByTube = (frame: number) => {
     const m = new Map<number, [number, number, number, number]>();
@@ -86,11 +103,8 @@ export function DetailPanel({
 
   return (
     <section className="flex h-full flex-col gap-3 overflow-auto p-4">
-      <header className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">
-          {row.decision === "keep" ? "💨 KEEP (smoke)" : "🚫 DISCARD (no smoke)"}
-        </h2>
-        <code className="text-xs text-slate-500">{row.key}</code>
+      <header className="flex items-center justify-between border-b border-slate-100 pb-2">
+        <code className="text-sm font-medium text-slate-700">{row.key}</code>
       </header>
       <div className="grid grid-cols-4 gap-2 text-sm">
         <Stat label="verdict" value={row.decision} />

@@ -4,7 +4,7 @@ import type { ResultRow } from "@/lib/types";
 
 const r = (p: Partial<ResultRow>): ResultRow => ({
   key: "k", source: "s", label: "smoke", decision: "keep", outcome: "kept-smoke",
-  score: 1, probability: 0.9, trigger_frame_index: 0,
+  score: 1, probability: 0.9, num_tubes_kept: 1, trigger_frame_index: 0,
   organization_name: null, camera_name: "cam-1", started_at: null, ...p,
 });
 

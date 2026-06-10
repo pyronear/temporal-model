@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
 import { correctnessLabel, outcomeTokens, rowTokens } from "@/lib/correctness";
 import type { Outcome } from "@/lib/types";
 

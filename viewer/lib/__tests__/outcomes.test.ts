@@ -11,6 +11,7 @@ function row(p: Partial<ResultRow>): ResultRow {
     outcome: "kept-smoke",
     score: 1,
     probability: 0.9,
+    num_tubes_kept: 1,
     trigger_frame_index: 0,
     organization_name: null,
     camera_name: null,
