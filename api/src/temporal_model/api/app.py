@@ -6,7 +6,7 @@ import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
@@ -14,6 +14,7 @@ from starlette.concurrency import run_in_threadpool
 
 from temporal_model.core.stage_timer import StageTimer, stage_ctx
 
+from .auth import require_token
 from .errors import ApiError, InferenceError, InvalidRequest, ModelNotLoaded
 from .model_runner import ModelRunner
 from .s3 import fetch_frames, make_s3_client
@@ -105,7 +106,12 @@ def health(request: Request) -> HealthResponse:
     )
 
 
-@app.post("/predict", response_model=PredictResponse, response_model_exclude_unset=True)
+@app.post(
+    "/predict",
+    response_model=PredictResponse,
+    response_model_exclude_unset=True,
+    dependencies=[Depends(require_token)],
+)
 async def predict(
     body: PredictRequest, request: Request, verbose: bool = False
 ) -> PredictResponse:

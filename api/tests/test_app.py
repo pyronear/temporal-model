@@ -102,6 +102,48 @@ def test_health_loaded(client):
     }
 
 
+def test_predict_requires_token_when_set(client, monkeypatch):
+    monkeypatch.setattr(settings, "token", "s3cr3t")
+    r = client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 401
+    assert r.json()["code"] == "unauthorized"
+    assert r.headers["WWW-Authenticate"] == "Bearer"
+
+
+def test_predict_wrong_token_401(client, monkeypatch):
+    monkeypatch.setattr(settings, "token", "s3cr3t")
+    r = client.post(
+        "/predict",
+        json={"frames": KEYS},
+        headers={"Authorization": "Bearer nope"},
+    )
+    assert r.status_code == 401
+    assert r.json()["code"] == "unauthorized"
+
+
+def test_predict_correct_token_200(client, monkeypatch):
+    monkeypatch.setattr(settings, "token", "s3cr3t")
+    r = client.post(
+        "/predict",
+        json={"frames": KEYS},
+        headers={"Authorization": "Bearer s3cr3t"},
+    )
+    assert r.status_code == 200
+    assert r.json()["is_smoke"] is True
+
+
+def test_predict_open_when_token_unset(client):
+    # token defaults to None on the shared settings object → auth off.
+    r = client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 200
+
+
+def test_health_open_even_with_token_set(client, monkeypatch):
+    monkeypatch.setattr(settings, "token", "s3cr3t")
+    r = client.get("/health")
+    assert r.status_code == 200
+
+
 def test_predict_default(client):
     r = client.post("/predict", json={"frames": KEYS})
     assert r.status_code == 200
