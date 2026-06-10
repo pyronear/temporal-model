@@ -98,3 +98,24 @@ def test_no_tubes_kept_shape_validates() -> None:
     )
     assert details.tubes.num_candidates == 3
     assert details.decision.trigger_tube_id is None
+
+
+def test_tubes_num_outside_roi_defaults_to_zero():
+    assert Tubes(num_candidates=2, kept=[]).num_outside_roi == 0
+
+
+def test_details_parses_legacy_dump_without_num_outside_roi():
+    # Dumps serialized before the ROI feature must still validate.
+    details = BboxTubeDetails(
+        preprocessing=Preprocessing(
+            num_frames_input=1, num_truncated=0, padded_frame_indices=[]
+        ),
+        tubes=Tubes(num_candidates=0, kept=[]),
+        decision=Decision(
+            aggregation="max_logit", threshold=0.0, trigger_tube_id=None
+        ),
+    )
+    dump = details.model_dump()
+    del dump["tubes"]["num_outside_roi"]
+    parsed = BboxTubeDetails.model_validate(dump)
+    assert parsed.tubes.num_outside_roi == 0
