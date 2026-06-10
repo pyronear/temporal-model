@@ -20,7 +20,7 @@ from .logistic_calibrator import (
     tube_feature_dict,
 )
 from .protocol import Frame
-from .stabilize import tube_window
+from .stabilize import tube_stabilized_window
 from .tubes import (
     build_tubes,
     merge_colocated_tubes,
@@ -241,21 +241,7 @@ def crop_tube_patches(
     mean_t = torch.tensor(normalization_mean).view(3, 1, 1)
     std_t = torch.tensor(normalization_std).view(3, 1, 1)
 
-    window = None
-    if stabilize:
-        boxes = [
-            (
-                (e.detection.cx, e.detection.cy, e.detection.w, e.detection.h)
-                if e.detection is not None
-                else None,
-                e.is_gap,
-            )
-            for e in tube.entries
-        ]
-        # A tube with no usable detection has no window; leave it None. Every
-        # such entry hits the ``det is None`` skip below, so it is never read.
-        if any(box is not None for box, _ in boxes):
-            window = tube_window(boxes)
+    window = tube_stabilized_window(tube.entries) if stabilize else None
 
     for slot, entry in enumerate(tube.entries[:n]):
         det = entry.detection

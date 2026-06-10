@@ -41,6 +41,7 @@ class KeptTube(_Frozen):
     probability: float | None
     first_crossing_frame: int | None
     entries: list[KeptTubeEntry]
+    stabilized_window: tuple[float, float, float, float] | None = None
 
 
 class Preprocessing(_Frozen):

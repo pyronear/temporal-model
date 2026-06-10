@@ -35,6 +35,7 @@ from .logistic_calibrator import (
 )
 from .package import DEFAULT_AGGREGATION, ModelPackage, load_model_package
 from .protocol import Frame, TemporalModel, TemporalModelOutput
+from .stabilize import tube_stabilized_window
 from .stage_timer import StageTimer, stage_ctx
 from .tubes import build_tubes
 from .types import FrameDetections
@@ -406,6 +407,11 @@ class BboxTubeTemporalModel(TemporalModel):
                     probability=_probability_for(tube_idx, logits_list[tube_idx]),
                     first_crossing_frame=first_crossing,
                     entries=entries_models,
+                    stabilized_window=(
+                        tube_stabilized_window(tube.entries)
+                        if mi.get("stabilize", True)
+                        else None
+                    ),
                 )
             )
 

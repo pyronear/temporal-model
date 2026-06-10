@@ -45,3 +45,34 @@ def test_window_ignores_gap_only_entries_without_detection():
 def test_window_none_when_no_usable_detection():
     entries = [_Entry(None, is_gap=True), _Entry(None, is_gap=True)]
     assert tube_stabilized_window(entries) is None
+
+
+def test_kept_tube_schema_accepts_window():
+    from temporal_model.core.details_schema import KeptTube
+
+    t = KeptTube(
+        tube_id=0,
+        start_frame=0,
+        end_frame=2,
+        logit=1.0,
+        probability=None,
+        first_crossing_frame=None,
+        entries=[],
+        stabilized_window=(0.3, 0.3, 0.3, 0.3),
+    )
+    assert t.stabilized_window == (0.3, 0.3, 0.3, 0.3)
+
+
+def test_kept_tube_window_defaults_none():
+    from temporal_model.core.details_schema import KeptTube
+
+    t = KeptTube(
+        tube_id=0,
+        start_frame=0,
+        end_frame=2,
+        logit=1.0,
+        probability=None,
+        first_crossing_frame=None,
+        entries=[],
+    )
+    assert t.stabilized_window is None
