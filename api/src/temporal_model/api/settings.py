@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     # surface them in logs and the verbose response (`details.profiling`).
     profile: bool = False
 
+    # Shared bearer token guarding POST /predict (env TEMPORAL_API_TOKEN).
+    # Unset/empty disables auth (open /predict) — a startup log line reports
+    # which mode is active.
+    token: str | None = None
+
     s3_bucket: str = ""
     s3_region: str | None = None
     s3_endpoint_url: str | None = None
