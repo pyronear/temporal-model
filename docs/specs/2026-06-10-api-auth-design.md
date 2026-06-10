@@ -39,7 +39,7 @@ shape so error responses stay consistent.
 Add one field to `Settings` (`api/settings.py`):
 
 ```python
-api_token: str | None = None  # TEMPORAL_API_TOKEN; unset/empty disables auth
+token: str | None = None  # TEMPORAL_API_TOKEN; unset/empty disables auth
 ```
 
 When unset or empty, auth is **disabled** (open `/predict`). This keeps local
@@ -77,7 +77,7 @@ security = HTTPBearer(auto_error=False)
 def require_token(
     creds: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> None:
-    expected = settings.api_token
+    expected = settings.token
     if not expected:          # auth disabled
         return
     if creds is None or not secrets.compare_digest(creds.credentials, expected):
@@ -136,7 +136,7 @@ New `api/tests/test_auth.py` (plus, if natural, a case or two in `test_app.py`):
 4. token unset → `/predict` reachable (auth off)
 5. `/health` returns 200 with no credential, regardless of token setting
 
-Tests override the setting (monkeypatch `settings.api_token`) rather than
+Tests override the setting (monkeypatch `settings.token`) rather than
 relying on process env, matching the existing `test_settings.py` style.
 
 ## Docs
