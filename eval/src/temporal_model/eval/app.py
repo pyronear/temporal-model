@@ -296,7 +296,11 @@ def main() -> None:  # pragma: no cover - Streamlit UI
         return
 
     st.sidebar.header("Select")
-    sources = sorted(df["source"].dropna().unique())
+    # pyro-annotator first (default), then any other source alphabetically.
+    sources = sorted(
+        df["source"].dropna().unique(),
+        key=lambda s: (s != "pyro-annotator", s),
+    )
     source = st.sidebar.selectbox("source", sources, key="source")
     view = df[df["source"] == source].reset_index(drop=True)
     has_org = view["organization_name"].notna().any()
