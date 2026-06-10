@@ -6,7 +6,7 @@ import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
@@ -14,6 +14,7 @@ from starlette.concurrency import run_in_threadpool
 
 from temporal_model.core.stage_timer import StageTimer, stage_ctx
 
+from .auth import require_token
 from .errors import ApiError, InferenceError, InvalidRequest, ModelNotLoaded
 from .model_runner import ModelRunner
 from .s3 import fetch_frames, make_s3_client
@@ -55,6 +56,10 @@ class HealthResponse(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _configure_logging()
+    if settings.token:
+        logger.info("auth enabled")
+    else:
+        logger.warning("auth disabled: TEMPORAL_API_TOKEN not set")
     app.state.s3_client = make_s3_client(settings)
     try:
         app.state.runner = ModelRunner.load(
@@ -75,7 +80,9 @@ app = FastAPI(title="Temporal Model API", version="0.1.0", lifespan=lifespan)
 @app.exception_handler(ApiError)
 async def _api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
     return JSONResponse(
-        status_code=exc.status_code, content={"detail": exc.detail, "code": exc.code}
+        status_code=exc.status_code,
+        content={"detail": exc.detail, "code": exc.code},
+        headers=exc.headers,
     )
 
 
@@ -103,7 +110,12 @@ def health(request: Request) -> HealthResponse:
     )
 
 
-@app.post("/predict", response_model=PredictResponse, response_model_exclude_unset=True)
+@app.post(
+    "/predict",
+    response_model=PredictResponse,
+    response_model_exclude_unset=True,
+    dependencies=[Depends(require_token)],
+)
 async def predict(
     body: PredictRequest, request: Request, verbose: bool = False
 ) -> PredictResponse:

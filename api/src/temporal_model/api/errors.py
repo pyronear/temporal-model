@@ -10,6 +10,7 @@ class ApiError(Exception):
 
     status_code: int = 500
     code: str = "error"
+    headers: dict[str, str] | None = None
 
     def __init__(self, detail: str) -> None:
         self.detail = detail
@@ -39,3 +40,9 @@ class ModelNotLoaded(ApiError):
 class InferenceError(ApiError):
     status_code = 500
     code = "inference_error"
+
+
+class Unauthorized(ApiError):
+    status_code = 401
+    code = "unauthorized"
+    headers = {"WWW-Authenticate": "Bearer"}

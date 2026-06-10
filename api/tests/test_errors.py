@@ -4,6 +4,7 @@ from temporal_model.api.errors import (
     InferenceError,
     ModelNotLoaded,
     S3Unavailable,
+    Unauthorized,
 )
 
 
@@ -30,3 +31,14 @@ def test_detail_is_carried():
     err = FrameNotFound("missing key cam12/a.jpg")
     assert err.detail == "missing key cam12/a.jpg"
     assert isinstance(err, ApiError)
+
+
+def test_unauthorized_shape():
+    exc = Unauthorized("missing or invalid token")
+    assert exc.status_code == 401
+    assert exc.code == "unauthorized"
+    assert exc.headers == {"WWW-Authenticate": "Bearer"}
+
+
+def test_apierror_headers_default_none():
+    assert ApiError("x").headers is None

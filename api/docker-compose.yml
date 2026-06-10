@@ -9,6 +9,8 @@ services:
       - TEMPORAL_API_MODEL_PATH=/models/model.zip
       # override the packaged calibrator threshold (probability in [0, 1]); optional
       # - TEMPORAL_API_CALIBRATOR_THRESHOLD=0.8
+      # shared bearer token guarding POST /predict; unset = auth disabled
+      # - TEMPORAL_API_TOKEN=change-me
       - TEMPORAL_API_S3_BUCKET=frames
       - TEMPORAL_API_S3_ENDPOINT_URL=http://minio:9000
       - TEMPORAL_API_S3_REGION=us-east-1

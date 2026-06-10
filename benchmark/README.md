@@ -162,6 +162,13 @@ uv run python scripts/upload_frames_to_minio.py --store data/03_primary/sequence
 uv run temporal-benchmark api --url http://localhost:8000 --store data/03_primary/sequences
 ```
 
+If the API has auth enabled, export the same token before running — the client
+sends it as a bearer header on every request (an unset var means no header):
+
+```bash
+export TEMPORAL_API_TOKEN=<token>
+```
+
 Writes `data/08_reporting/<host>-api-<timestamp>/` (raw.parquet, summary.json,
 report.md) with cold/warm e2e latency, per-stage breakdown (incl. `s3_fetch`),
 and cache hit rate.

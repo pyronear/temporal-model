@@ -50,3 +50,12 @@ def test_detection_cache_size_default():
 def test_detection_cache_size_env_override(monkeypatch):
     monkeypatch.setenv("TEMPORAL_API_DETECTION_CACHE_SIZE", "10")
     assert Settings(_env_file=None).detection_cache_size == 10
+
+
+def test_api_token_default_none():
+    assert Settings(_env_file=None).token is None
+
+
+def test_api_token_env_override(monkeypatch):
+    monkeypatch.setenv("TEMPORAL_API_TOKEN", "s3cr3t")
+    assert Settings(_env_file=None).token == "s3cr3t"
