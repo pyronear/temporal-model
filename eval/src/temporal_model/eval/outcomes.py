@@ -87,3 +87,21 @@ def performance_summary(df: pd.DataFrame) -> dict:
         "specificity": discarded_fp / n_fp if n_fp else None,
         "precision": kept_smoke / n_kept if n_kept else None,
     }
+
+
+def apply_threshold(df: pd.DataFrame, threshold: float) -> pd.DataFrame:
+    """Re-decide keep/discard at ``threshold`` from the ``probability`` column.
+
+    Returns a copy: ``decision`` = keep iff ``probability`` is non-null and
+    ``>= threshold`` (a sequence with no kept tubes has null probability ->
+    discard), and ``outcome`` recomputed via :func:`compute_outcome`. All other
+    columns (``score``, ``probability``, ``label``, metadata) are unchanged.
+    """
+    out = df.copy()
+    keep = out["probability"].notna() & (out["probability"] >= threshold)
+    out["decision"] = keep.map({True: "keep", False: "discard"})
+    out["outcome"] = [
+        compute_outcome(d, lbl)
+        for d, lbl in zip(out["decision"], out["label"], strict=True)
+    ]
+    return out

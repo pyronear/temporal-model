@@ -1,6 +1,7 @@
 import pandas as pd
 
 from temporal_model.eval.outcomes import (
+    apply_threshold,
     compute_outcome,
     decision_from_output,
     filter_results,
@@ -49,3 +50,37 @@ def test_performance_summary_counts_and_rates():
     assert s["recall"] == 0.5
     assert s["specificity"] == 0.5
     assert s["precision"] == 0.5
+
+
+def test_apply_threshold_redecides_and_recomputes_outcome():
+    df = pd.DataFrame(
+        {
+            "label": ["smoke", "smoke", "fp", "fp", "smoke"],
+            "probability": [0.9, 0.2, 0.8, 0.1, None],
+            "decision": ["keep", "keep", "keep", "discard", "keep"],
+            "outcome": [
+                "kept-smoke",
+                "kept-smoke",
+                "kept-fp",
+                "discarded-fp",
+                "kept-smoke",
+            ],
+            "score": [5.0, 1.0, 4.0, 0.5, 2.0],
+        }
+    )
+    out = apply_threshold(df, 0.5)
+    assert list(out["decision"]) == ["keep", "discard", "keep", "discard", "discard"]
+    assert list(out["outcome"]) == [
+        "kept-smoke",
+        "discarded-smoke",
+        "kept-fp",
+        "discarded-fp",
+        "discarded-smoke",  # probability None -> discard
+    ]
+    # raising the threshold flips the 0.8 fp from kept-fp to discarded-fp
+    out2 = apply_threshold(df, 0.85)
+    assert out2.loc[2, "decision"] == "discard"
+    assert out2.loc[2, "outcome"] == "discarded-fp"
+    # untouched columns preserved; input not mutated
+    assert list(out["score"]) == [5.0, 1.0, 4.0, 0.5, 2.0]
+    assert list(df["decision"]) == ["keep", "keep", "keep", "discard", "keep"]
