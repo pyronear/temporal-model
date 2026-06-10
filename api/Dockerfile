@@ -10,15 +10,18 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
-# Bring in the core path-dependency and the api package itself.
+# Bring in the core path-dependency and the api package itself. Copy only what
+# `uv sync` and the runtime need — NOT api/models, whose model.zip is baked
+# separately below (a broad `COPY api/` would duplicate that ~163 MB in the image).
 COPY core/ ./core/
-COPY api/ ./api/
+COPY api/pyproject.toml api/uv.lock ./api/
+COPY api/src ./api/src/
 
 WORKDIR /app/api
 RUN uv sync --no-dev
 
 # Bake the released model.zip (placed in the build context by `release fetch`)
-# to MODEL_PATH.
+# to MODEL_PATH (settings default: /models/model.zip).
 COPY api/models/model.zip /models/model.zip
 
 EXPOSE 8000
