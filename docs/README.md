@@ -277,8 +277,13 @@ maps four features of each tube to a calibrated probability:
 |---|---|---|
 | `logit` | the classifier's raw score | higher → more smoke-like |
 | `log_len` | log(1 + tube length in frames) | longer tubes are trusted more |
-| `mean_conf` | mean YOLO confidence over the tube | consistent detections are trusted more |
+| `mean_conf` | mean YOLO confidence over the tube's entries | consistent detections are trusted more |
 | `n_tubes` | number of kept tubes in the sequence | busy scenes are trusted less |
+
+Note that `mean_conf` runs over *all* entries, and interpolated gap entries
+carry `confidence = 0.0` — so a tube that YOLO kept losing is automatically
+discounted: every frame the detector missed drags the calibrated probability
+down, even though interpolation kept the tube intact for the classifier.
 
 A tube is positive when its probability reaches `logistic_threshold`, which
 is picked on the validation set at packaging time to hit the configured
