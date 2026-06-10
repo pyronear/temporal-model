@@ -50,6 +50,10 @@ under `data/08_reporting/<source>/vit_dinov2_finetune/`:
   with per-frame entries, decision) including `stabilized_window` per kept tube.
 - `sequences/<key>.json` — `SequenceView`: key, source, label, metadata, and the
   ordered frame paths (relative to the eval package dir).
+- `model_config.json` — the scored model's merged metadata (detector source +
+  variant + train_git_sha from the package manifest; decision/infer/model_input/
+  tubes/classifier config; logistic calibrator). Drives the viewer's sidebar
+  model-config panel.
 
 This is the stable interface; a future React/Next.js viewer consumes the same files.
 

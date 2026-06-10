@@ -40,6 +40,8 @@ stages:
             cache: false
         - data/08_reporting/${item}/vit_dinov2_finetune/results.parquet:
             cache: false
+        - data/08_reporting/${item}/vit_dinov2_finetune/model_config.json:
+            cache: false
         - data/08_reporting/${item}/vit_dinov2_finetune/details:
             cache: false
         - data/08_reporting/${item}/vit_dinov2_finetune/sequences:
@@ -85,6 +87,8 @@ stages:
       - data/08_reporting/pyro-annotator/vit_dinov2_finetune/results.json:
           cache: false
       - data/08_reporting/pyro-annotator/vit_dinov2_finetune/results.parquet:
+          cache: false
+      - data/08_reporting/pyro-annotator/vit_dinov2_finetune/model_config.json:
           cache: false
       - data/08_reporting/pyro-annotator/vit_dinov2_finetune/details:
           cache: false
