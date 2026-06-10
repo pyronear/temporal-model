@@ -291,8 +291,30 @@ def render_performance(df: pd.DataFrame) -> None:  # pragma: no cover - Streamli
             col.caption(frac)
 
 
+# Hover help (info-on-hover) for each headline model-config param. Kept quote-free
+# so it embeds safely in an HTML title attribute.
+MODEL_CONFIG_HELP = {
+    "detector": "Stage-1 object detector that proposes smoke boxes per frame; "
+    "value is its source (e.g. a HuggingFace repo).",
+    "variant": "Packaged model variant name.",
+    "train sha": "Git commit of the training run that produced this model.",
+    "aggregation": "Rule combining per-tube scores into the sequence keep/discard "
+    "decision (max_logit or logistic).",
+    "threshold": "Decision threshold on the aggregated max-logit score.",
+    "logistic threshold": "Probability threshold applied when aggregation is logistic.",
+    "stabilize": "If true, each tube is cropped from one fixed window (stabilized) "
+    "instead of tracking the per-frame bbox.",
+    "context factor": "How much the bbox is expanded before cropping the classifier "
+    "patch (more context).",
+    "max frames": "Max frames per tube fed to the temporal classifier; longer tubes "
+    "are truncated.",
+    "pad": "Short tubes are padded up to a minimum number of frames using this "
+    "strategy.",
+}
+
+
 def render_model_config(source: str) -> None:  # pragma: no cover - Streamlit UI
-    """Sidebar panel: headline model fields + a full-config expander."""
+    """Sidebar panel: headline model fields (info-on-hover) + full-config expander."""
     cfg = load_model_config(source)
     st.sidebar.divider()
     st.sidebar.caption("Model config")
@@ -305,20 +327,28 @@ def render_model_config(source: str) -> None:  # pragma: no cover - Streamlit UI
     infer = cfg.get("infer") or {}
     classifier = cfg.get("classifier") or {}
     sha = (cfg.get("train_git_sha") or "")[:8] or "—"
-    lines = [
-        f"**detector** `{detector}`",
-        f"**variant** {cfg.get('variant', '—')}",
-        f"**train sha** `{sha}`",
-        f"**aggregation** {decision.get('aggregation', '—')}",
-        f"**threshold** {decision.get('threshold', '—')}",
-        f"**logistic threshold** {decision.get('logistic_threshold', '—')}",
-        f"**stabilize** {model_input.get('stabilize', '—')}",
-        f"**context factor** {model_input.get('context_factor', '—')}",
-        f"**max frames** {classifier.get('max_frames', '—')}",
-        f"**pad** {infer.get('pad_strategy', '—')} / min "
-        f"{infer.get('pad_to_min_frames', '—')}",
+    fields = [
+        ("detector", f"<code>{detector}</code>"),
+        ("variant", cfg.get("variant", "—")),
+        ("train sha", f"<code>{sha}</code>"),
+        ("aggregation", decision.get("aggregation", "—")),
+        ("threshold", decision.get("threshold", "—")),
+        ("logistic threshold", decision.get("logistic_threshold", "—")),
+        ("stabilize", model_input.get("stabilize", "—")),
+        ("context factor", model_input.get("context_factor", "—")),
+        ("max frames", classifier.get("max_frames", "—")),
+        (
+            "pad",
+            f"{infer.get('pad_strategy', '—')} / min "
+            f"{infer.get('pad_to_min_frames', '—')}",
+        ),
     ]
-    st.sidebar.markdown("  \n".join(lines))
+    # Each label is an <abbr title=...> so hovering shows the param's explanation.
+    rows = [
+        f'<abbr title="{MODEL_CONFIG_HELP[label]}"><b>{label}</b></abbr> {value}'
+        for label, value in fields
+    ]
+    st.sidebar.markdown("<br>".join(rows), unsafe_allow_html=True)
     with st.sidebar.expander("full config"):
         st.json(cfg)
 
