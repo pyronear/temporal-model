@@ -9,7 +9,13 @@ it("labels", () => {
 });
 
 it("tokens exist for every outcome", () => {
-  const outcomes: Outcome[] = ["kept-smoke", "discarded-fp", "kept-fp", "discarded-smoke", "n/a"];
+  const outcomes: Outcome[] = [
+    "kept-smoke",
+    "discarded-fp",
+    "kept-fp",
+    "discarded-smoke",
+    "n/a",
+  ];
   for (const o of outcomes) {
     expect(outcomeTokens[o]).toBeDefined();
     expect(outcomeTokens[o].dot).toMatch(/^#/);

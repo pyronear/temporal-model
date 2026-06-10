@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { applyThreshold, computeOutcome, performanceSummary } from "@/lib/outcomes";
+import {
+  applyThreshold,
+  computeOutcome,
+  performanceSummary,
+} from "@/lib/outcomes";
 import type { ResultRow } from "@/lib/types";
 
 function row(p: Partial<ResultRow>): ResultRow {
@@ -39,7 +43,12 @@ describe("applyThreshold", () => {
       row({ label: "smoke", probability: null }),
     ];
     const out = applyThreshold(rows, 0.5);
-    expect(out.map((r) => r.decision)).toEqual(["keep", "discard", "keep", "discard"]);
+    expect(out.map((r) => r.decision)).toEqual([
+      "keep",
+      "discard",
+      "keep",
+      "discard",
+    ]);
     expect(out.map((r) => r.outcome)).toEqual([
       "kept-smoke",
       "discarded-smoke",

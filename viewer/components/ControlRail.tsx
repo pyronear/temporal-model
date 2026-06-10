@@ -18,7 +18,11 @@ export function ControlRail(props: {
 }) {
   return (
     <aside className="flex h-full w-72 shrink-0 flex-col gap-4 overflow-auto border-r border-slate-200 bg-slate-50 p-4">
-      <SourceSelect sources={props.sources} value={props.source} onChange={props.onSource} />
+      <SourceSelect
+        sources={props.sources}
+        value={props.source}
+        onChange={props.onSource}
+      />
       <PerfCards rows={props.rows} />
       {props.showSlider && (
         <ThresholdSlider

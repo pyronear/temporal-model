@@ -35,5 +35,9 @@ export function applyFilters(rows: ResultRow[], f: Filters): ResultRow[] {
 
 /** Sorted distinct non-null camera names present in the rows. */
 export function cameraOptions(rows: ResultRow[]): string[] {
-  return [...new Set(rows.map((r) => r.camera_name).filter((c): c is string => c != null))].sort();
+  return [
+    ...new Set(
+      rows.map((r) => r.camera_name).filter((c): c is string => c != null),
+    ),
+  ].sort();
 }

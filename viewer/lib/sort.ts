@@ -1,6 +1,12 @@
 import type { ResultRow } from "@/lib/types";
 
-export type SortCol = "camera" | "label" | "decision" | "outcome" | "probability" | "tubes";
+export type SortCol =
+  | "camera"
+  | "label"
+  | "decision"
+  | "outcome"
+  | "probability"
+  | "tubes";
 export interface Sort {
   col: SortCol;
   dir: "asc" | "desc";

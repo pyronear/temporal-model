@@ -8,7 +8,10 @@ export async function GET(
 ) {
   const { source } = await params;
   try {
-    const txt = await fs.readFile(`${sourceDir(source)}/model_config.json`, "utf8");
+    const txt = await fs.readFile(
+      `${sourceDir(source)}/model_config.json`,
+      "utf8",
+    );
     return NextResponse.json(JSON.parse(txt));
   } catch {
     return NextResponse.json({});

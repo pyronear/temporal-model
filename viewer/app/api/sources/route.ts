@@ -21,7 +21,11 @@ export async function GET() {
   }
   // pyro-annotator first, then alphabetical (mirrors the Streamlit default).
   sources.sort((a, b) =>
-    a === "pyro-annotator" ? -1 : b === "pyro-annotator" ? 1 : a.localeCompare(b),
+    a === "pyro-annotator"
+      ? -1
+      : b === "pyro-annotator"
+        ? 1
+        : a.localeCompare(b),
   );
   return NextResponse.json(sources);
 }

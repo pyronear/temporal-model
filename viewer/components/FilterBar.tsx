@@ -109,7 +109,10 @@ export function FilterBar({
           label="camera"
           value={filters.camera}
           onChange={(v) => onChange({ ...filters, camera: v })}
-          options={[{ value: "all", label: "all" }, ...cameras.map((c) => ({ value: c, label: c }))]}
+          options={[
+            { value: "all", label: "all" },
+            ...cameras.map((c) => ({ value: c, label: c })),
+          ]}
         />
       )}
     </div>

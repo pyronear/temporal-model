@@ -1,6 +1,9 @@
 import type { BboxTubeDetails, KeptTube } from "@/lib/types";
 
-export function processedToInputIndex(frameIdx: number, padded: number[]): number | null {
+export function processedToInputIndex(
+  frameIdx: number,
+  padded: number[],
+): number | null {
   if (padded.includes(frameIdx)) return null;
   return frameIdx - padded.filter((p) => p < frameIdx).length;
 }
@@ -22,7 +25,11 @@ export function frameBboxesByInputIndex(
       const inp = processedToInputIndex(e.frame_idx, padded);
       if (inp == null) continue;
       const list = out.get(inp) ?? [];
-      list.push({ bbox: e.bbox, confidence: e.confidence, tubeId: tube.tube_id });
+      list.push({
+        bbox: e.bbox,
+        confidence: e.confidence,
+        tubeId: tube.tube_id,
+      });
       out.set(inp, list);
     }
   }
@@ -40,12 +47,15 @@ export function tubeInputBoxes(tube: KeptTube, padded: number[]): TubeBox[] {
   for (const e of tube.entries) {
     if (e.bbox == null) continue;
     const inp = processedToInputIndex(e.frame_idx, padded);
-    if (inp != null) boxes.push({ inputIdx: inp, bbox: e.bbox, confidence: e.confidence });
+    if (inp != null)
+      boxes.push({ inputIdx: inp, bbox: e.bbox, confidence: e.confidence });
   }
   return boxes;
 }
 
-export function triggeringTubeIds(details: BboxTubeDetails | null): Set<number> {
+export function triggeringTubeIds(
+  details: BboxTubeDetails | null,
+): Set<number> {
   const dec = details?.decision;
   if (!dec || dec.threshold == null) return new Set();
   const useProb = dec.aggregation === "logistic";

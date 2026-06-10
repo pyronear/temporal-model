@@ -3,7 +3,10 @@ import { useMemo, useState } from "react";
 import type { OverlayBox } from "@/components/detail/BboxOverlay";
 import { FrameViewer } from "@/components/detail/FrameViewer";
 import { TubeCrops } from "@/components/detail/TubeCrops";
-import { TubeTimeline, type TimelineRow } from "@/components/detail/TubeTimeline";
+import {
+  TubeTimeline,
+  type TimelineRow,
+} from "@/components/detail/TubeTimeline";
 import { correctnessLabel, outcomeTokens } from "@/lib/correctness";
 import {
   frameBboxesByInputIndex,
@@ -15,8 +18,16 @@ import {
 import type { BboxTubeDetails, ResultRow, SequenceView } from "@/lib/types";
 
 const PALETTE = [
-  "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
-  "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
+  "#1f77b4",
+  "#ff7f0e",
+  "#2ca02c",
+  "#d62728",
+  "#9467bd",
+  "#8c564b",
+  "#e377c2",
+  "#7f7f7f",
+  "#bcbd22",
+  "#17becf",
 ];
 const tubeColor = (id: number) => PALETTE[id % PALETTE.length];
 
@@ -32,9 +43,17 @@ function Stat({
   color?: string;
 }) {
   return (
-    <div className="flex flex-col rounded-xl border border-slate-200 bg-white p-2.5" title={hint}>
-      <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="mt-0.5 text-sm font-semibold" style={color ? { color } : undefined}>
+    <div
+      className="flex flex-col rounded-xl border border-slate-200 bg-white p-2.5"
+      title={hint}
+    >
+      <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+        {label}
+      </div>
+      <div
+        className="mt-0.5 text-sm font-semibold"
+        style={color ? { color } : undefined}
+      >
         {value}
       </div>
       <div className="mt-1 text-[10px] leading-snug text-slate-400">{hint}</div>
@@ -104,9 +123,14 @@ export function DetailPanel({
   };
 
   const triggerByTube = new Map(
-    kept.map((t) => [t.tube_id, triggerState(t.tube_id, triggerTubeId, wouldIds)] as const),
+    kept.map(
+      (t) =>
+        [t.tube_id, triggerState(t.tube_id, triggerTubeId, wouldIds)] as const,
+    ),
   );
-  const colorByTube = new Map(kept.map((t) => [t.tube_id, tubeColor(t.tube_id)] as const));
+  const colorByTube = new Map(
+    kept.map((t) => [t.tube_id, tubeColor(t.tube_id)] as const),
+  );
 
   // The parent owns the frame index so the viewer, timeline, and crops stay in sync.
   const [i, setI] = useState(0);
@@ -145,7 +169,12 @@ export function DetailPanel({
       {n > 0 && (
         <div className="grid grid-cols-[2fr_1fr] gap-3">
           <div className="space-y-2">
-            <FrameViewer frames={frames} boxesByFrame={boxesByFrame} i={i} setI={setI} />
+            <FrameViewer
+              frames={frames}
+              boxesByFrame={boxesByFrame}
+              i={i}
+              setI={setI}
+            />
             <TubeTimeline rows={timeline} n={n} current={cur} trigger={trig} />
           </div>
           <TubeCrops

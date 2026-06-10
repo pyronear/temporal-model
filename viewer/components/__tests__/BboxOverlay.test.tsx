@@ -5,7 +5,14 @@ import { BboxOverlay } from "@/components/detail/BboxOverlay";
 it("renders a rect per box at normalized coords", () => {
   const { container } = render(
     <BboxOverlay
-      boxes={[{ bbox: [0.5, 0.5, 0.2, 0.2], color: "#059669", trigger: "decisive", confidence: 0.9 }]}
+      boxes={[
+        {
+          bbox: [0.5, 0.5, 0.2, 0.2],
+          color: "#059669",
+          trigger: "decisive",
+          confidence: 0.9,
+        },
+      ]}
     />,
   );
   const rect = container.querySelector("rect")!;

@@ -8,7 +8,8 @@ import type { KeptTube } from "@/lib/types";
 function TriggerBadge({ state }: { state: TriggerState }) {
   if (state === "decisive")
     return <span className="font-semibold text-amber-600">⚡ triggered</span>;
-  if (state === "would") return <span className="text-slate-400">would trigger</span>;
+  if (state === "would")
+    return <span className="text-slate-400">would trigger</span>;
   return null;
 }
 
@@ -26,15 +27,26 @@ function TubeCrop({
 }) {
   const [dim, setDim] = useState<{ w: number; h: number } | null>(null);
   const box = window ?? fallbackBbox;
-  if (!box) return <p className="text-xs text-slate-400">inactive at this frame</p>;
-  const style = dim ? stabilizedCropStyle(box, dim.w, dim.h, CONTEXT, SIZE) : null;
+  if (!box)
+    return <p className="text-xs text-slate-400">inactive at this frame</p>;
+  const style = dim
+    ? stabilizedCropStyle(box, dim.w, dim.h, CONTEXT, SIZE)
+    : null;
   return (
-    <div className="relative overflow-hidden bg-slate-100" style={{ width: SIZE, height: SIZE }}>
+    <div
+      className="relative overflow-hidden bg-slate-100"
+      style={{ width: SIZE, height: SIZE }}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={frameUrl(framePath)}
         alt=""
-        onLoad={(e) => setDim({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+        onLoad={(e) =>
+          setDim({
+            w: e.currentTarget.naturalWidth,
+            h: e.currentTarget.naturalHeight,
+          })
+        }
         style={
           style
             ? {

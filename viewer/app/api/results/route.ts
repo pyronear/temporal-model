@@ -13,7 +13,10 @@ export async function GET() {
   const rows: unknown[] = [];
   for (const source of names) {
     try {
-      const txt = await fs.readFile(`${sourceDir(source)}/results.json`, "utf8");
+      const txt = await fs.readFile(
+        `${sourceDir(source)}/results.json`,
+        "utf8",
+      );
       rows.push(...JSON.parse(txt));
     } catch {
       /* skip sources without results */

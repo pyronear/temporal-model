@@ -4,11 +4,26 @@ import { ControlRail } from "@/components/ControlRail";
 import { DetailPanel } from "@/components/detail/DetailPanel";
 import { FilterBar } from "@/components/FilterBar";
 import { SequenceTable } from "@/components/SequenceTable";
-import { fetchModelConfig, fetchResults, fetchSequence, fetchSources } from "@/lib/api";
-import { applyFilters, cameraOptions, defaultFilters, type Filters } from "@/lib/filters";
+import {
+  fetchModelConfig,
+  fetchResults,
+  fetchSequence,
+  fetchSources,
+} from "@/lib/api";
+import {
+  applyFilters,
+  cameraOptions,
+  defaultFilters,
+  type Filters,
+} from "@/lib/filters";
 import { applyThreshold } from "@/lib/outcomes";
 import { nextSort, sortRows, type Sort } from "@/lib/sort";
-import type { BboxTubeDetails, ModelConfig, ResultRow, SequenceView } from "@/lib/types";
+import type {
+  BboxTubeDetails,
+  ModelConfig,
+  ResultRow,
+  SequenceView,
+} from "@/lib/types";
 
 const DEFAULT_LOGISTIC_THRESHOLD = 0.5;
 
@@ -18,7 +33,10 @@ export default function Page() {
   const [allRows, setAllRows] = useState<ResultRow[]>([]);
   const [cfg, setCfg] = useState<ModelConfig>({});
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [seq, setSeq] = useState<{ details: BboxTubeDetails | null; view: SequenceView | null }>({
+  const [seq, setSeq] = useState<{
+    details: BboxTubeDetails | null;
+    view: SequenceView | null;
+  }>({
     details: null,
     view: null,
   });
@@ -54,7 +72,8 @@ export default function Page() {
     [allRows, source],
   );
   const showSlider =
-    cfg.decision?.aggregation === "logistic" && sourceRows.some((r) => r.probability != null);
+    cfg.decision?.aggregation === "logistic" &&
+    sourceRows.some((r) => r.probability != null);
   const rows = useMemo(
     () => (showSlider ? applyThreshold(sourceRows, threshold) : sourceRows),
     [sourceRows, showSlider, threshold],
@@ -78,7 +97,8 @@ export default function Page() {
   // user's pick is filtered out / absent — no state-sync effect needed.
   const selected = useMemo(() => {
     if (!tableRows.length) return null;
-    if (selectedKey && tableRows.some((r) => r.key === selectedKey)) return selectedKey;
+    if (selectedKey && tableRows.some((r) => r.key === selectedKey))
+      return selectedKey;
     return tableRows[0].key;
   }, [tableRows, selectedKey]);
 
@@ -122,7 +142,11 @@ export default function Page() {
       </div>
       <div className="w-[40%] shrink-0 border-l border-slate-200">
         {originalRow ? (
-          <DetailPanel details={seq.details} view={seq.view} row={originalRow} />
+          <DetailPanel
+            details={seq.details}
+            view={seq.view}
+            row={originalRow}
+          />
         ) : (
           <p className="p-4 text-slate-400">No sequences.</p>
         )}

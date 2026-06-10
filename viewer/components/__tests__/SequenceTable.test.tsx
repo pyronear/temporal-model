@@ -4,8 +4,18 @@ import { SequenceTable } from "@/components/SequenceTable";
 import type { ResultRow } from "@/lib/types";
 
 const r = (key: string, outcome: ResultRow["outcome"]): ResultRow => ({
-  key, source: "s", label: "smoke", decision: "keep", outcome, score: 1, probability: 0.9,
-  num_tubes_kept: 1, trigger_frame_index: 0, organization_name: null, camera_name: "cam-1", started_at: null,
+  key,
+  source: "s",
+  label: "smoke",
+  decision: "keep",
+  outcome,
+  score: 1,
+  probability: 0.9,
+  num_tubes_kept: 1,
+  trigger_frame_index: 0,
+  organization_name: null,
+  camera_name: "cam-1",
+  started_at: null,
 });
 
 it("renders rows and fires onSelect on click", () => {

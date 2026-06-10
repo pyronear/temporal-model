@@ -28,6 +28,7 @@ const UNKNOWN_KEEP: Tokens = { bg: "#eff6ff", dot: "#3b82f6", text: "#1e40af" };
 
 /** Row colours: errors/correct from outcome; GT-unknown tinted by verdict. */
 export function rowTokens(outcome: Outcome, verdict: Decision): Tokens {
-  if (outcome === "n/a") return verdict === "keep" ? UNKNOWN_KEEP : outcomeTokens["n/a"];
+  if (outcome === "n/a")
+    return verdict === "keep" ? UNKNOWN_KEEP : outcomeTokens["n/a"];
   return outcomeTokens[outcome];
 }

@@ -19,7 +19,13 @@ export function BboxOverlay({ boxes }: { boxes: OverlayBox[] }) {
     >
       {boxes.map((b, i) => {
         const [cx, cy, w, h] = b.bbox;
-        const sw = b.dashed ? 1.5 : b.trigger === "decisive" ? 3 : b.trigger === "would" ? 2 : 1.5;
+        const sw = b.dashed
+          ? 1.5
+          : b.trigger === "decisive"
+            ? 3
+            : b.trigger === "would"
+              ? 2
+              : 1.5;
         return (
           <rect
             key={i}

@@ -16,7 +16,9 @@ export function FrameModal({
 }) {
   const [scale, setScale] = useState(1);
   const [off, setOff] = useState({ x: 0, y: 0 });
-  const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+  const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(
+    null,
+  );
   const viewport = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -32,7 +34,10 @@ export function FrameModal({
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       setScale((s) => {
-        const next = Math.min(8, Math.max(1, s * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+        const next = Math.min(
+          8,
+          Math.max(1, s * (e.deltaY < 0 ? 1.15 : 1 / 1.15)),
+        );
         if (next === 1) setOff({ x: 0, y: 0 });
         return next;
       });
@@ -47,7 +52,10 @@ export function FrameModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+      onClick={onClose}
+    >
       <div className="absolute right-3 top-3 z-10 flex gap-2 text-xs text-white">
         <button
           onClick={(e) => {

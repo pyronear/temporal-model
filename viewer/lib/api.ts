@@ -1,4 +1,9 @@
-import type { BboxTubeDetails, ModelConfig, ResultRow, SequenceView } from "@/lib/types";
+import type {
+  BboxTubeDetails,
+  ModelConfig,
+  ResultRow,
+  SequenceView,
+} from "@/lib/types";
 
 async function getJSON<T>(url: string): Promise<T> {
   const r = await fetch(url);
@@ -14,4 +19,5 @@ export const fetchSequence = (source: string, key: string) =>
   getJSON<{ details: BboxTubeDetails | null; view: SequenceView | null }>(
     `/api/sequence/${encodeURIComponent(source)}/${encodeURIComponent(key)}`,
   );
-export const frameUrl = (relPath: string) => `/api/frame?path=${encodeURIComponent(relPath)}`;
+export const frameUrl = (relPath: string) =>
+  `/api/frame?path=${encodeURIComponent(relPath)}`;

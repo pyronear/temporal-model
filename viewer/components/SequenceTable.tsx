@@ -84,7 +84,9 @@ export function SequenceTable({
                 key={c.header}
                 onClick={() => c.sortCol && onSort?.(c.sortCol)}
                 className={`border-b border-slate-200 px-3 py-2 ${
-                  c.sortCol && onSort ? "cursor-pointer select-none hover:text-slate-700" : ""
+                  c.sortCol && onSort
+                    ? "cursor-pointer select-none hover:text-slate-700"
+                    : ""
                 }`}
               >
                 {c.header}

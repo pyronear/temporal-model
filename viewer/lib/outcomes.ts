@@ -1,13 +1,17 @@
 import type { Decision, Label, Outcome, ResultRow } from "@/lib/types";
 
 export function computeOutcome(decision: Decision, label: Label): Outcome {
-  if (label === "smoke") return decision === "keep" ? "kept-smoke" : "discarded-smoke";
+  if (label === "smoke")
+    return decision === "keep" ? "kept-smoke" : "discarded-smoke";
   if (label === "fp") return decision === "keep" ? "kept-fp" : "discarded-fp";
   return "n/a";
 }
 
 /** Re-decide every row at a logistic threshold (does not mutate input). */
-export function applyThreshold(rows: ResultRow[], threshold: number): ResultRow[] {
+export function applyThreshold(
+  rows: ResultRow[],
+  threshold: number,
+): ResultRow[] {
   return rows.map((r) => {
     const decision: Decision =
       r.probability != null && r.probability >= threshold ? "keep" : "discard";
