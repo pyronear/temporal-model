@@ -38,6 +38,24 @@ model — it only reads generated artifacts.
 The left pane selects the **source** (train / val / pyro-annotator); org/camera
 filters appear only for sources that carry that metadata.
 
+### React / Next.js viewer
+
+A polished React/Next.js + Tailwind port of the same viewer lives in
+[`viewer/`](../viewer) and reads the identical reporting tree (it never runs the
+model). It needs Node 22+ and a populated reporting tree (run `uv run dvc repro`
+or `dvc pull` first, same as the Streamlit app):
+
+```bash
+cd ../viewer
+cp .env.local.example .env.local   # DATA_ROOT — defaults to ../eval
+npm install
+npm run dev                        # http://localhost:3000
+```
+
+`DATA_ROOT` points at this `eval/` package dir; the app derives the reporting tree
+(`$DATA_ROOT/data/08_reporting`) and resolves frame paths relative to it. See
+[`viewer/README.md`](../viewer/README.md) for the full guide.
+
 ### Data contract (frontend-agnostic)
 
 The viewer — and any future frontend — depends only on these per-source artifacts
