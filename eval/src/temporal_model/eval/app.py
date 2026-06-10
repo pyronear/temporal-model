@@ -19,7 +19,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from temporal_model.eval.outcomes import performance_summary
+from temporal_model.eval.outcomes import apply_threshold, performance_summary
 from temporal_model.eval.render import (
     CORRECTNESS,
     correctness_label,
@@ -377,10 +377,41 @@ def main() -> None:  # pragma: no cover - Streamlit UI
     source = st.sidebar.selectbox("source", sources, key="source")
     render_model_config(source)
     view = df[df["source"] == source].reset_index(drop=True)
+    original = view  # pre-threshold rows: the drill-down shows the model's real run
     has_org = view["organization_name"].notna().any()
     has_cam = view["camera_name"].notna().any()
 
+    # Logistic-threshold explorer. Read the current slider value from session_state
+    # BEFORE the cards/table (Streamlit widgets persist their value by key), so they
+    # reflect it; the slider widget itself renders just below the cards. Only shown
+    # for calibrated sources (some non-null probability).
+    has_prob = bool(view["probability"].notna().any())
+    default_thr = float(
+        (load_model_config(source).get("decision") or {}).get("logistic_threshold", 0.5)
+    )
+    thr_key = f"thr_{source}"
+    thr = float(st.session_state.get(thr_key, default_thr)) if has_prob else default_thr
+    if has_prob:
+        view = apply_threshold(view, thr)
+
     render_performance(view)
+
+    if has_prob:
+        scol, rcol = st.columns([5, 1], vertical_alignment="bottom")
+        scol.slider(
+            "logistic threshold",
+            0.0,
+            1.0,
+            value=default_thr,
+            step=0.01,
+            key=thr_key,
+            help="Re-decides keep/discard live (cards + table). "
+            "Drill-down shows the model's actual run.",
+        )
+        if rcol.button("↺ reset", help=f"model default: {default_thr:.3f}"):
+            st.session_state.pop(thr_key, None)
+            st.rerun()
+        st.caption(f"model default logistic threshold: {default_thr:.3f}")
 
     has_day = False
     if "started_at" in view.columns:
@@ -463,7 +494,7 @@ def main() -> None:  # pragma: no cover - Streamlit UI
     selected = st.session_state.get("selected_key")
     if selected not in set(view["key"]):
         selected = view.iloc[0]["key"]
-    _drilldown(source, selected, view[view["key"] == selected].iloc[0])
+    _drilldown(source, selected, original[original["key"] == selected].iloc[0])
 
 
 if __name__ == "__main__":  # pragma: no cover
