@@ -364,20 +364,20 @@ stages:
       size: 481
     - path: ../core/src/temporal_model/core/inference.py
       hash: md5
-      md5: a55a93ec1c487b3388afd6ce750fe73a
-      size: 17200
+      md5: 7f930868f79fbdadb4ea9f49cea4036d
+      size: 18047
     - path: ../core/src/temporal_model/core/logistic_calibrator.py
       hash: md5
       md5: fc8f3b5f18e59e0c72edc1cf973d1cb2
       size: 5062
     - path: ../core/src/temporal_model/core/model.py
       hash: md5
-      md5: c110350c234d927df9029dc7cc0e4da2
-      size: 12375
+      md5: 0c38974cb5a5e6d6c08e0178838fcd81
+      size: 15324
     - path: ../core/src/temporal_model/core/package.py
       hash: md5
-      md5: 0987f6a16146a03d3222c4a900261e08
-      size: 10096
+      md5: cd0bfa9f82113a5dba28667ff4b46f63
+      size: 12270
     - path: ../core/src/temporal_model/core/sequences.py
       hash: md5
       md5: 52023f25efee8db079a744636b832969
@@ -428,8 +428,8 @@ stages:
       size: 2511
     - path: src/temporal_model/train/package.py
       hash: md5
-      md5: 49692a94b459a59a0804382baa18cae4
-      size: 11141
+      md5: 355f8769d140a73966d04ff355cd7ecb
+      size: 11636
     - path: src/temporal_model/train/package_predict.py
       hash: md5
       md5: 72341b820819bc1a3509ab2832e82596
@@ -488,5 +488,5 @@ stages:
     outs:
     - path: data/06_models/vit_dinov2_finetune/model.zip
       hash: md5
-      md5: e976a17cb5b9c8ae758352fc787e3fc5
+      md5: af97e7f065bd2d47e8733339b11a0478
       size: 162765214
