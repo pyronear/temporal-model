@@ -9,6 +9,7 @@ import json
 import sys
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from temporal_model.core import model as model_module
@@ -163,8 +164,6 @@ def test_evaluate_packaged_writes_expected_outputs(tmp_path, monkeypatch):
 
 
 def test_evaluate_packaged_writes_viewer_artifacts(tmp_path, monkeypatch):
-    import pandas as pd
-
     sequences_dir = tmp_path / "sequences"
     output_dir = tmp_path / "out"
     _make_sequence(sequences_dir, "wildfire", "wf_seq_a", n_frames=4)  # TP
@@ -288,8 +287,6 @@ def test_evaluate_packaged_skips_sequences_without_images(tmp_path, monkeypatch)
 
 
 def _write_store_seq(root, key, label, n_frames):
-    import json as _json
-
     seq = root / "org-a" / "cam-1" / key
     (seq / "images").mkdir(parents=True)
     frames = []
@@ -312,7 +309,7 @@ def _write_store_seq(root, key, label, n_frames):
         "organization_name": "org-a",
         "started_at": "2026-05-19T14:10:01",
     }
-    (seq / "meta.json").write_text(_json.dumps(meta))
+    (seq / "meta.json").write_text(json.dumps(meta))
     return seq
 
 

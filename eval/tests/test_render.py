@@ -167,3 +167,11 @@ def test_triggering_tube_ids_max_logit_uses_logit():
 def test_triggering_tube_ids_no_threshold_is_empty():
     assert triggering_tube_ids({}) == set()
     assert triggering_tube_ids({"decision": {}, "tubes": {"kept": []}}) == set()
+
+
+def test_app_module_imports():
+    # App must import cleanly (no Streamlit calls at import time).
+    import temporal_model.eval.app as app  # noqa: PLC0415
+
+    assert hasattr(app, "main")
+    assert hasattr(app, "reporting_dirs")
