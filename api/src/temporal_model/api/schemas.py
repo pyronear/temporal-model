@@ -5,13 +5,24 @@ block. ``details`` is only set when verbose, so the route serializes with
 ``exclude_unset=True`` to omit it otherwise (while keeping explicit ``null``s).
 """
 
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+# DNS-style S3 bucket naming: 3-63 chars, lowercase alphanumerics, dots and
+# hyphens, starting/ending alphanumeric. Rejects whitespace, uppercase, ARNs
+# (colons), slashes and other malformed names early as a 400 instead of letting
+# them fail deep in boto3.
+_BUCKET_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
+
 
 class PredictRequest(BaseModel):
     frames: list[str]
+    # Optional per-request S3 bucket. Falls back to settings.s3_bucket when
+    # omitted (alert-api stacks use per-org dynamic bucket names that no single
+    # setting can cover).
+    bucket: str | None = None
 
     @field_validator("frames")
     @classmethod
@@ -21,6 +32,17 @@ class PredictRequest(BaseModel):
         for key in v:
             if "://" in key:
                 raise ValueError(f"frame key must be a bare S3 key, not a URL: {key!r}")
+        return v
+
+    @field_validator("bucket")
+    @classmethod
+    def _validate_bucket(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if not v:
+            raise ValueError("bucket must not be empty")
+        if not _BUCKET_RE.match(v) or ".." in v:
+            raise ValueError(f"bucket is not a valid S3 bucket name: {v!r}")
         return v
 
 

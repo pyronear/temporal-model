@@ -3,7 +3,7 @@ import botocore.exceptions as botoexc
 import pytest
 from moto import mock_aws
 
-from temporal_model.api.errors import FrameNotFound, S3Unavailable
+from temporal_model.api.errors import FrameNotFound, InvalidRequest, S3Unavailable
 from temporal_model.api.s3 import fetch_frames
 
 BUCKET = "test-frames"
@@ -38,6 +38,14 @@ def test_missing_key_raises_frame_not_found(tmp_path):
     client.create_bucket(Bucket=BUCKET)
     with pytest.raises(FrameNotFound):
         fetch_frames(client, BUCKET, ["cam12/missing.jpg"], tmp_path)
+
+
+@mock_aws
+def test_missing_bucket_raises_invalid_request(tmp_path):
+    # A nonexistent bucket is a client error, not a missing frame.
+    client = boto3.client("s3", region_name="us-east-1")
+    with pytest.raises(InvalidRequest):
+        fetch_frames(client, "no-such-bucket", ["cam12/a.jpg"], tmp_path)
 
 
 def test_endpoint_failure_raises_s3_unavailable(tmp_path, monkeypatch):

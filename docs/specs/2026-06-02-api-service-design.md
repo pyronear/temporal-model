@@ -68,7 +68,7 @@ repo. This spec covers only the API serving layer and its contract.
 | Frame source (v1) | S3 object keys only (no raw upload in v1) |
 | Frame field | `frames: list[str]` — bare S3 keys, ordered |
 | Key format | Bare keys; scheme prefixes (`s3://`, `http://`) rejected with `400` |
-| Bucket / creds | Server-configured (one bucket per deployment); creds via boto3 chain |
+| Bucket / creds | Optional server-configured default bucket, overridable per request via `bucket`; creds via boto3 chain |
 | S3 client | boto3 with configurable `endpoint_url` → AWS / OVH / MinIO unchanged |
 | Ordering | Array order = temporal order; never re-sorted |
 | Response style | Reshaped public DTO (not the raw `TemporalModelOutput`) |
@@ -91,12 +91,19 @@ repo. This spec covers only the API serving layer and its contract.
     "cam12/2023-05-23/adf_site_999_2023-05-23T17-18-01.jpg",
     "cam12/2023-05-23/adf_site_999_2023-05-23T17-18-31.jpg",
     "cam12/2023-05-23/adf_site_999_2023-05-23T17-19-01.jpg"
-  ]
+  ],
+  "bucket": "2eb7ac42fbbf-alert-api-2"
 }
 ```
 
 - `frames`: ordered list of **bare S3 object keys** (strings, ≥1), resolved
-  against the server-configured bucket.
+  against `bucket` (or the server-configured default when omitted).
+- `bucket` (optional): S3 bucket to fetch the frames from. Falls back to
+  `TEMPORAL_API_S3_BUCKET`; a request with neither is rejected with
+  `400 invalid_request`. Validated against DNS-style S3 naming (lowercase
+  alphanumerics, dots, hyphens, 3-63 chars); malformed values and nonexistent
+  buckets both return `400 invalid_request`. Added for alert-api stacks whose
+  per-org bucket names are not known at deploy time.
 - Array order **is** temporal order; the API never re-sorts.
 - Each key's **basename** is the frame filename the model parses for timestamps
   (`<prefix>_<YYYY-MM-DDTHH-MM-SS>`).
@@ -207,7 +214,7 @@ Error responses use a machine-readable body:
 
 | HTTP | `code` | When |
 |---|---|---|
-| `400` | `invalid_request` | malformed body, empty `frames`, or a key containing a scheme |
+| `400` | `invalid_request` | malformed body, empty `frames`, a key containing a scheme, a malformed/empty `bucket`, no bucket available, or a bucket that does not exist |
 | `404` | `frame_not_found` | an S3 key does not exist in the bucket |
 | `502` | `s3_unavailable` | S3 endpoint unreachable / fetch failure |
 | `503` | `model_not_loaded` | request arrives before the model finishes loading |
@@ -226,7 +233,7 @@ Extend the existing `pydantic-settings` `Settings` (env prefix `TEMPORAL_API_`):
 | `MODEL_PATH` | `/models/model.zip` | path to the packaged model |
 | `DEVICE` | `None` (auto cuda→mps→cpu) | torch device override |
 | `CALIBRATOR_THRESHOLD` | `None` (use packaged value) | server-side override of the calibrator (logistic) decision threshold, a probability in `[0, 1]`; out-of-range fails startup; ignored (warned) for uncalibrated packages |
-| `S3_BUCKET` | — (required) | bucket holding the frames |
+| `S3_BUCKET` | `""` (optional default) | default bucket holding the frames; a request's `bucket` overrides it. A request with neither fails `400` |
 | `S3_REGION` | `None` | region (e.g. `gra` for OVH) |
 | `S3_ENDPOINT_URL` | `None` | empty = real AWS; set for OVH / MinIO |
 | `HOST` | `0.0.0.0` | bind host |
@@ -238,9 +245,10 @@ role); they are never accepted in the request.
 ### `s3.py` — frame fetching
 
 - A thin boto3 S3 client built from settings (`endpoint_url`, `region`).
-- `fetch_frames(keys: list[str]) -> list[Path]`: validates keys (reject schemes),
-  downloads each object to a per-request temp directory **preserving the key's
-  basename**, returns local paths in the **same order** as `keys`.
+- `fetch_frames(s3_client, bucket, keys, dest_dir) -> list[Path]`: downloads each
+  object from `bucket` to a per-request temp directory **preserving the key's
+  basename**, returns local paths in the **same order** as `keys`. (Key/bucket
+  scheme validation happens at the request-schema layer.)
 - Maps S3 errors: missing key → `frame_not_found` (404); connection/other →
   `s3_unavailable` (502).
 - Temp directory is cleaned up after the response (context manager).
@@ -321,7 +329,8 @@ sequence; then `curl` the API.
 
 - Raw-frame upload (multipart or base64). S3 keys only; revisit when a non-S3
   caller exists.
-- Per-request bucket / credentials, or cross-bucket reads.
+- Per-request credentials. (Per-request *bucket* is now supported via the
+  `bucket` field; credentials still come solely from the boto3 chain.)
 - Async jobs / queueing / batching across requests.
 - Client-supplied (per-request) decision threshold override (decision stays
   server-side; consumers re-threshold using returned `probability`/`logit`). Note:

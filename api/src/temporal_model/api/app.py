@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 from starlette.concurrency import run_in_threadpool
 
-from .errors import ApiError, InferenceError, ModelNotLoaded
+from .errors import ApiError, InferenceError, InvalidRequest, ModelNotLoaded
 from .model_runner import ModelRunner
 from .s3 import fetch_frames, make_s3_client
 from .schemas import PredictRequest, PredictResponse, to_response
@@ -52,10 +52,6 @@ class HealthResponse(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _configure_logging()
-    if not settings.s3_bucket:
-        raise RuntimeError(
-            "TEMPORAL_API_S3_BUCKET is required but not set; refusing to start"
-        )
     app.state.s3_client = make_s3_client(settings)
     try:
         app.state.runner = ModelRunner.load(
@@ -108,6 +104,12 @@ def health(request: Request) -> HealthResponse:
 async def predict(
     body: PredictRequest, request: Request, verbose: bool = False
 ) -> PredictResponse:
+    bucket = body.bucket or settings.s3_bucket
+    if not bucket:
+        raise InvalidRequest(
+            "no S3 bucket: set request 'bucket' or TEMPORAL_API_S3_BUCKET"
+        )
+
     runner = getattr(request.app.state, "runner", None)
     if runner is None:
         raise ModelNotLoaded("model is not loaded")
@@ -117,7 +119,7 @@ async def predict(
         try:
             # fetch_frames is blocking boto3 I/O — run it off the event loop.
             paths = await run_in_threadpool(
-                fetch_frames, s3_client, settings.s3_bucket, body.frames, Path(tmp)
+                fetch_frames, s3_client, bucket, body.frames, Path(tmp)
             )
             out = await runner.predict(paths)
             return to_response(
