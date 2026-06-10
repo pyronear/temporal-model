@@ -123,7 +123,10 @@ Raw tubes then go through three cleanup passes (`build_tubes_for_inference`):
    contained in the larger, `merge_iomin`, or their centers within roughly a
    box-size, `merge_prox_factor`) are fused into one tube
    (`merge_colocated_tubes`). On frames where fragments overlap, the
-   largest-area box wins.
+   largest-area box wins. The exact pass order is filter → merge →
+   filter again: filtering *before* the merge keeps sub-threshold noise
+   from being folded into a real plume, and the re-run after it makes
+   sure the merged tubes still meet the thresholds.
 3. **Interpolate** — frames where the tracker missed the object (gap entries)
    get a synthetic box, linearly interpolated between the nearest observed
    boxes (`interpolate_gaps`). Gap entries are flagged `is_gap=True` and carry
