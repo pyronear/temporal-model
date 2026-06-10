@@ -40,6 +40,6 @@ def test_non_ascii_token_fails_closed_not_500(monkeypatch):
     # fail-closed: a clean 401, never a 500. (compare_digest raises TypeError on
     # non-ASCII *str*; comparing bytes turns that into a normal mismatch.)
     monkeypatch.setattr(settings, "token", "wörd-123")
-    wire_credential = "wörd-123".encode("utf-8").decode("latin-1")  # what arrives
+    wire_credential = "wörd-123".encode().decode("latin-1")  # what arrives
     with pytest.raises(Unauthorized):  # not TypeError
         require_token(_creds(wire_credential))
