@@ -56,19 +56,24 @@ This is the stable interface; a future React/Next.js viewer consumes the same fi
 ## Pyro-annotator source
 
 Pyro-annotator sequences (human-labeled smoke/fp/unknown, enriched with
-org/camera/timestamps) are brought in by a one-time copy of the explorer's already
-processed store, then re-scored by eval's own `model.zip` — so the displayed
-predictions come from the exact model eval evaluates:
+org/camera/timestamps) are a first-class eval source — re-scored by eval's own
+`model.zip`, so the displayed predictions come from the exact model eval evaluates.
+The sequences are DVC-tracked (`data/01_raw/pyro-annotator.dvc`); pull them, then
+run the dedicated stage:
 
 ```bash
-uv run python scripts/copy_pyro_annotator.py    # copy frames + meta.json into data/01_raw/pyro-annotator
-uv run dvc add data/01_raw/pyro-annotator        # track in eval's DVC remote
+uv run dvc pull data/01_raw/pyro-annotator.dvc   # frames + meta.json from eval's remote
 uv run dvc repro evaluate_pyro_annotator         # score + emit viewer artifacts
 ```
 
-The copy needs the explorer checkout present with its data pulled (`dvc pull` in
-the explorer). `unknown`-labeled sequences are excluded from metrics but remain
-viewable (ground-truth-unknown colouring).
+`unknown`-labeled sequences are excluded from metrics but remain viewable
+(ground-truth-unknown colouring), and pyro-annotator is the viewer's default source.
+
+**Provenance.** The store was copied once from the temporal-model-explorer's
+processed pyro-annotator sequences (`data/03_primary/sequences/pyro-annotator/` —
+each a `meta.json` + `images/`) and `dvc add`ed here. To refresh after the
+explorer's annotations change, re-copy those sequence directories into
+`data/01_raw/pyro-annotator/` and `dvc add` again.
 
 ## Pipeline
 
@@ -93,4 +98,5 @@ sequences with no images are recorded in `dropped.json` and skipped.
 make install
 make test
 uv run dvc repro            # needs model.zip + raw sequences in place
+make app                    # launch the qualitative viewer (reads the reporting tree)
 ```
