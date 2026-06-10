@@ -1,0 +1,82 @@
+export type Outcome =
+  | "kept-smoke"
+  | "discarded-fp"
+  | "kept-fp"
+  | "discarded-smoke"
+  | "n/a";
+
+export type Decision = "keep" | "discard";
+export type Label = "smoke" | "fp" | "unknown";
+
+export interface ResultRow {
+  key: string;
+  source: string;
+  label: Label;
+  decision: Decision;
+  outcome: Outcome;
+  score: number | null;
+  probability: number | null;
+  trigger_frame_index: number | null;
+  organization_name: string | null;
+  camera_name: string | null;
+  started_at: string | null;
+}
+
+export interface KeptTubeEntry {
+  frame_idx: number;
+  bbox: [number, number, number, number] | null;
+  is_gap: boolean;
+  confidence: number | null;
+}
+
+export interface KeptTube {
+  tube_id: number;
+  start_frame: number;
+  end_frame: number;
+  logit: number;
+  probability: number | null;
+  first_crossing_frame: number | null;
+  stabilized_window: [number, number, number, number] | null;
+  entries: KeptTubeEntry[];
+}
+
+export interface BboxTubeDetails {
+  preprocessing: {
+    num_frames_input: number;
+    num_truncated: number;
+    padded_frame_indices: number[];
+  };
+  tubes: { num_candidates: number; kept: KeptTube[] };
+  decision: {
+    aggregation: "max_logit" | "logistic";
+    threshold: number;
+    logistic_threshold?: number;
+    trigger_tube_id: number | null;
+  };
+}
+
+export interface SequenceView {
+  key: string;
+  source: string;
+  label: Label;
+  organization_name: string | null;
+  camera_name: string | null;
+  started_at: string | null;
+  frames: string[];
+}
+
+export interface ModelConfig {
+  detector?: { source?: string; type?: string } | null;
+  variant?: string | null;
+  train_git_sha?: string | null;
+  decision?: {
+    aggregation?: string;
+    threshold?: number;
+    logistic_threshold?: number | null;
+  } | null;
+  infer?: { pad_strategy?: string; pad_to_min_frames?: number } | null;
+  model_input?: { stabilize?: boolean; context_factor?: number } | null;
+  classifier?: { max_frames?: number; backbone?: string } | null;
+  tubes?: Record<string, unknown> | null;
+  calibrator?: unknown;
+}
