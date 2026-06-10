@@ -25,3 +25,6 @@ api/models/
 
 # OS
 .DS_Store
+
+# brainstorming visual companion
+.superpowers/
