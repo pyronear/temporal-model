@@ -45,7 +45,7 @@ export function FrameViewer({
           {cur + 1}/{n}
         </span>
       </div>
-      <div className="relative w-full overflow-hidden rounded-lg bg-slate-100">
+      <div className="relative w-full overflow-hidden bg-slate-100">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={frameUrl(frames[cur])} alt={`frame ${cur}`} className="block w-full" />
         <BboxOverlay boxes={boxesByFrame(cur)} />

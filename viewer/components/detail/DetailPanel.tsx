@@ -75,6 +75,10 @@ export function DetailPanel({
     return m;
   };
 
+  const triggerByTube = new Map(
+    kept.map((t) => [t.tube_id, triggerState(t.tube_id, triggerTubeId, wouldIds)] as const),
+  );
+
   // The parent owns the frame index so the viewer, timeline, and crops stay in sync.
   const [i, setI] = useState(0);
   const n = frames.length;
@@ -107,7 +111,12 @@ export function DetailPanel({
             <FrameViewer frames={frames} boxesByFrame={boxesByFrame} i={i} setI={setI} />
             <TubeTimeline rows={timeline} n={n} current={cur} trigger={trig} />
           </div>
-          <TubeCrops tubes={kept} framePath={frames[cur]} activeBoxByTube={activeBoxByTube(cur)} />
+          <TubeCrops
+            tubes={kept}
+            framePath={frames[cur]}
+            activeBoxByTube={activeBoxByTube(cur)}
+            triggerByTube={triggerByTube}
+          />
         </div>
       )}
     </section>
