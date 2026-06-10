@@ -3,6 +3,10 @@ import { useEffect, useState } from "react";
 import { frameUrl } from "@/lib/api";
 import { BboxOverlay, type OverlayBox } from "@/components/detail/BboxOverlay";
 import { FrameModal } from "@/components/detail/FrameModal";
+import {
+  TIMELINE_LEFT_PCT,
+  TIMELINE_RIGHT_PCT,
+} from "@/components/detail/TubeTimeline";
 
 export function FrameViewer({
   frames,
@@ -32,15 +36,33 @@ export function FrameViewer({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => setPlaying((p) => !p)}
-          aria-label={playing ? "pause" : "play"}
-          title={playing ? "pause" : "play"}
-          className="inline-flex h-6 w-7 shrink-0 items-center justify-center rounded border border-slate-300 text-sm leading-none"
+      <div
+        className="relative w-full cursor-zoom-in overflow-hidden bg-slate-100"
+        onClick={() => setZoom(true)}
+        title="click to enlarge"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={frameUrl(frames[cur])}
+          alt={`frame ${cur}`}
+          className="block w-full"
+        />
+        <BboxOverlay boxes={boxesByFrame(cur)} />
+      </div>
+      <div className="flex items-center">
+        <div
+          className="flex shrink-0 justify-start"
+          style={{ width: `${TIMELINE_LEFT_PCT}%` }}
         >
-          {playing ? "⏸" : "▶"}
-        </button>
+          <button
+            onClick={() => setPlaying((p) => !p)}
+            aria-label={playing ? "pause" : "play"}
+            title={playing ? "pause" : "play"}
+            className="inline-flex h-6 w-7 items-center justify-center rounded border border-slate-300 text-sm leading-none"
+          >
+            {playing ? "⏸" : "▶"}
+          </button>
+        </div>
         <input
           type="range"
           min={0}
@@ -48,20 +70,14 @@ export function FrameViewer({
           value={cur}
           aria-label="frame"
           onChange={(e) => setI(() => parseInt(e.target.value, 10))}
-          className="flex-1"
+          className="min-w-0 flex-1"
         />
-        <span className="text-xs text-slate-500">
+        <span
+          className="shrink-0 text-right text-xs text-slate-500"
+          style={{ width: `${TIMELINE_RIGHT_PCT}%` }}
+        >
           {cur + 1}/{n}
         </span>
-      </div>
-      <div
-        className="relative w-full cursor-zoom-in overflow-hidden bg-slate-100"
-        onClick={() => setZoom(true)}
-        title="click to enlarge"
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={frameUrl(frames[cur])} alt={`frame ${cur}`} className="block w-full" />
-        <BboxOverlay boxes={boxesByFrame(cur)} />
       </div>
 
       {zoom && (
