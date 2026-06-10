@@ -56,6 +56,10 @@ class HealthResponse(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _configure_logging()
+    if settings.token:
+        logger.info("auth enabled")
+    else:
+        logger.warning("auth disabled: TEMPORAL_API_TOKEN not set")
     app.state.s3_client = make_s3_client(settings)
     try:
         app.state.runner = ModelRunner.load(

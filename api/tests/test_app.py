@@ -144,6 +144,30 @@ def test_health_open_even_with_token_set(client, monkeypatch):
     assert r.status_code == 200
 
 
+def test_lifespan_logs_auth_enabled(monkeypatch, caplog):
+    monkeypatch.setattr(settings, "s3_bucket", BUCKET)
+    monkeypatch.setattr(settings, "token", "s3cr3t")
+    monkeypatch.setattr(
+        ModelRunner, "load", lambda *a, **k: FakeRunner(output=_smoke_output())
+    )
+    with caplog.at_level(logging.INFO, logger="temporal_model.api.app"):
+        with TestClient(app):
+            pass
+    assert "auth enabled" in caplog.text
+
+
+def test_lifespan_warns_auth_disabled(monkeypatch, caplog):
+    monkeypatch.setattr(settings, "s3_bucket", BUCKET)
+    monkeypatch.setattr(settings, "token", None)
+    monkeypatch.setattr(
+        ModelRunner, "load", lambda *a, **k: FakeRunner(output=_smoke_output())
+    )
+    with caplog.at_level(logging.WARNING, logger="temporal_model.api.app"):
+        with TestClient(app):
+            pass
+    assert "auth disabled" in caplog.text
+
+
 def test_predict_default(client):
     r = client.post("/predict", json={"frames": KEYS})
     assert r.status_code == 200
