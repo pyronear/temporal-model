@@ -122,6 +122,27 @@ class TestPredictWithRoi:
 
         assert out == baseline
 
+    def test_roi_with_compute_trigger_searches_only_kept_tubes(
+        self, red_frames, tiny_classifier
+    ):
+        # Guards the filter-before-trigger-search ordering: the trigger must
+        # never point at a tube the ROI dropped.
+        model = _two_cluster_model(red_frames, tiny_classifier)
+        out = model.predict(
+            frames=red_frames, roi=(0.6, 0.4, 0.8, 0.6), compute_trigger=True
+        )
+
+        kept = out.details["tubes"]["kept"]
+        assert len(kept) == 1
+        assert out.details["tubes"]["num_outside_roi"] == 1
+        trigger_tube_id = out.details["decision"]["trigger_tube_id"]
+        if out.is_positive:
+            assert trigger_tube_id == kept[0]["tube_id"]
+            assert out.trigger_frame_index is not None
+        else:
+            assert trigger_tube_id is None
+            assert out.trigger_frame_index is None
+
 
 class TestRoiValidation:
     @pytest.mark.parametrize(
@@ -131,6 +152,7 @@ class TestRoiValidation:
             (0.0, 0.0, 1.0, 1.1),  # out of range high
             (0.5, 0.2, 0.4, 0.8),  # x_min >= x_max
             (0.2, 0.8, 0.4, 0.8),  # y_min >= y_max (zero height)
+            (0.2, 0.8),  # wrong arity
         ],
     )
     def test_invalid_roi_raises(self, roi, tiny_classifier):

@@ -10,6 +10,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from temporal_model.core.tubes import validate_roi
+
 # DNS-style S3 bucket naming: 3-63 chars, lowercase alphanumerics, dots and
 # hyphens, starting/ending alphanumeric. Rejects whitespace, uppercase, ARNs
 # (colons), slashes and other malformed names early as a 400 instead of letting
@@ -58,11 +60,12 @@ class PredictRequest(BaseModel):
     ) -> tuple[float, float, float, float] | None:
         if v is None:
             return v
-        x_min, y_min, x_max, y_max = v
-        if not all(0.0 <= c <= 1.0 for c in v):
-            raise ValueError("roi_xyxyn coordinates must be in [0, 1]")
-        if x_min >= x_max or y_min >= y_max:
-            raise ValueError("roi_xyxyn requires x_min < x_max and y_min < y_max")
+        # Rules live in core (single source of truth shared with
+        # model.predict); only the field name in the message is added here.
+        try:
+            validate_roi(v)
+        except ValueError as e:
+            raise ValueError(f"roi_xyxyn: {e}") from e
         return v
 
 
@@ -99,7 +102,7 @@ class Preprocessing(BaseModel):
     num_truncated: int
     padded_frame_indices: list[int]
     num_tube_candidates: int
-    num_tubes_outside_roi: int = 0
+    num_tubes_outside_roi: int
 
 
 class Details(BaseModel):
@@ -156,7 +159,9 @@ def _to_details(
             num_truncated=pre["num_truncated"],
             padded_frame_indices=pre["padded_frame_indices"],
             num_tube_candidates=tubes_block["num_candidates"],
-            num_tubes_outside_roi=tubes_block.get("num_outside_roi", 0),
+            # Strict like num_candidates: core (same-commit path dependency)
+            # always emits the key; a silent 0 here would mask a core rename.
+            num_tubes_outside_roi=tubes_block["num_outside_roi"],
         ),
         tubes=[Tube(**t) for t in tubes_block["kept"]],
         profiling=profiling,

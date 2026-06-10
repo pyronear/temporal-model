@@ -36,7 +36,7 @@ from .logistic_calibrator import (
 from .package import DEFAULT_AGGREGATION, ModelPackage, load_model_package
 from .protocol import Frame, TemporalModel, TemporalModelOutput
 from .stage_timer import StageTimer, stage_ctx
-from .tubes import build_tubes, tube_intersects_roi
+from .tubes import build_tubes, tube_intersects_roi, validate_roi
 from .types import FrameDetections
 
 __all__ = [
@@ -196,17 +196,7 @@ class BboxTubeTemporalModel(TemporalModel):
         compute_trigger: bool = False,
     ) -> TemporalModelOutput:
         if roi is not None:
-            x_min, y_min, x_max, y_max = roi
-            if (
-                not all(0.0 <= c <= 1.0 for c in roi)
-                or x_min >= x_max
-                or y_min >= y_max
-            ):
-                raise ValueError(
-                    f"invalid roi {roi!r}: expected normalized "
-                    "(x_min, y_min, x_max, y_max) with x_min < x_max "
-                    "and y_min < y_max"
-                )
+            validate_roi(roi)
 
         infer = self._cfg["infer"]
         tubes_cfg = self._cfg["tubes"]
