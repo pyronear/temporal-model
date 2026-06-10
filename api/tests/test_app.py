@@ -27,7 +27,7 @@ def _details(kept, trigger):
             "num_truncated": 0,
             "padded_frame_indices": [],
         },
-        "tubes": {"num_candidates": 2, "kept": kept},
+        "tubes": {"num_candidates": 2, "num_outside_roi": 0, "kept": kept},
     }
 
 
@@ -65,7 +65,7 @@ class FakeRunner:
     def __init__(self, output=None, error=None):
         self._output = output
         self._error = error
-        self.roi = "UNSET"  # sentinel: distinguishes "not passed" from None
+        self.roi = None
 
     async def predict(self, paths, *, roi=None, timer=None, profile=None):
         self.roi = roi

@@ -18,7 +18,7 @@ def _details(kept):
             "num_truncated": 0,
             "padded_frame_indices": [],
         },
-        "tubes": {"num_candidates": len(kept) + 1, "kept": kept},
+        "tubes": {"num_candidates": len(kept) + 1, "num_outside_roi": 0, "kept": kept},
     }
 
 
@@ -169,7 +169,7 @@ def test_to_response_includes_profiling_when_verbose():
             "num_truncated": 0,
             "padded_frame_indices": [],
         },
-        "tubes": {"num_candidates": 0, "kept": []},
+        "tubes": {"num_candidates": 0, "num_outside_roi": 0, "kept": []},
     }
     out = SimpleNamespace(is_positive=False, trigger_frame_index=None, details=details)
     profiling = {
@@ -235,10 +235,11 @@ def test_verbose_details_map_num_tubes_outside_roi():
     assert resp.details.preprocessing.num_tubes_outside_roi == 3
 
 
-def test_verbose_details_num_tubes_outside_roi_defaults_to_zero():
-    # Core dumps from before the ROI feature lack the key.
+def test_verbose_details_num_tubes_outside_roi_is_strict():
+    # Read strictly like num_candidates: core always emits the key, and a
+    # missing key must fail loudly rather than silently report 0.
     details = _details([_tube(1, 0.9)])
-    assert "num_outside_roi" not in details["tubes"]
+    del details["tubes"]["num_outside_roi"]
     out = SimpleNamespace(is_positive=True, trigger_frame_index=3, details=details)
-    resp = to_response(out, name="m", version="1", calibrated=True, verbose=True)
-    assert resp.details.preprocessing.num_tubes_outside_roi == 0
+    with pytest.raises(KeyError):
+        to_response(out, name="m", version="1", calibrated=True, verbose=True)
