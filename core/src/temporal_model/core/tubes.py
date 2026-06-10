@@ -18,6 +18,7 @@ __all__ = [
     "select_longest_tube",
     "tube_from_record",
     "merge_colocated_tubes",
+    "tube_intersects_roi",
 ]
 
 
@@ -548,3 +549,27 @@ def _box_rank(det: Detection) -> tuple[float, float, float]:
     confidence, then larger cx — a total order, so the choice is independent of
     the input tube order (no silent nondeterminism on equal-area ties)."""
     return (_area(det), det.confidence, det.cx)
+
+
+def tube_intersects_roi(
+    tube: Tube, roi: tuple[float, float, float, float]
+) -> bool:
+    """True if any real (non-gap) detection bbox overlaps the ROI rectangle.
+
+    ``roi`` is ``(x_min, y_min, x_max, y_max)`` normalized to [0, 1];
+    touching edges count as overlap. Gap entries are synthetic (interpolated)
+    and do not count.
+    """
+    x_min, y_min, x_max, y_max = roi
+    for entry in tube.entries:
+        if entry.is_gap or entry.detection is None:
+            continue
+        d = entry.detection
+        if (
+            d.cx - d.w / 2 <= x_max
+            and d.cx + d.w / 2 >= x_min
+            and d.cy - d.h / 2 <= y_max
+            and d.cy + d.h / 2 >= y_min
+        ):
+            return True
+    return False
