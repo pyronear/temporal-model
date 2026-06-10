@@ -187,6 +187,7 @@ def main() -> None:
                 "outcome": outcome,
                 "score": max(t["logit"] for t in kept) if kept else None,
                 "probability": max_probability(output.details),
+                "num_tubes_kept": len(kept),
                 "trigger_frame_index": output.trigger_frame_index,
                 "organization_name": org,
                 "camera_name": cam,

@@ -212,6 +212,7 @@ def test_evaluate_packaged_writes_viewer_artifacts(tmp_path, monkeypatch):
     assert by_key["wf_seq_a"]["decision"] == "keep"
     assert by_key["wf_seq_a"]["outcome"] == "kept-smoke"
     assert by_key["wf_seq_a"]["source"] == "train"
+    assert by_key["wf_seq_a"]["num_tubes_kept"] == 1  # FakeModel keeps one tube
     assert by_key["fp_seq_c"]["outcome"] == "kept-fp"  # FakeModel keeps 4-frame seqs
     df = pd.read_parquet(output_dir / "results.parquet")
     assert len(df) == 2
