@@ -2,8 +2,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { ControlRail } from "@/components/ControlRail";
 import { DetailPanel } from "@/components/detail/DetailPanel";
+import { FilterBar } from "@/components/FilterBar";
 import { SequenceTable } from "@/components/SequenceTable";
 import { fetchModelConfig, fetchResults, fetchSequence, fetchSources } from "@/lib/api";
+import { applyFilters, cameraOptions, defaultFilters, type Filters } from "@/lib/filters";
 import { applyThreshold } from "@/lib/outcomes";
 import type { BboxTubeDetails, ModelConfig, ResultRow, SequenceView } from "@/lib/types";
 
@@ -57,13 +59,23 @@ export default function Page() {
     [sourceRows, showSlider, threshold],
   );
 
-  // Effective selection is derived: fall back to the first row when the user's
-  // pick is absent (e.g. after switching source) — no state-sync effect needed.
+  // Filters reset when the source changes (camera options are source-specific).
+  const [filters, setFilters] = useState<Filters>(defaultFilters);
+  const [prevFilterSource, setPrevFilterSource] = useState(source);
+  if (source !== prevFilterSource) {
+    setPrevFilterSource(source);
+    setFilters(defaultFilters());
+  }
+  const cameras = useMemo(() => cameraOptions(sourceRows), [sourceRows]);
+  const tableRows = useMemo(() => applyFilters(rows, filters), [rows, filters]);
+
+  // Effective selection is derived: fall back to the first visible row when the
+  // user's pick is filtered out / absent — no state-sync effect needed.
   const selected = useMemo(() => {
-    if (!rows.length) return null;
-    if (selectedKey && rows.some((r) => r.key === selectedKey)) return selectedKey;
-    return rows[0].key;
-  }, [rows, selectedKey]);
+    if (!tableRows.length) return null;
+    if (selectedKey && tableRows.some((r) => r.key === selectedKey)) return selectedKey;
+    return tableRows[0].key;
+  }, [tableRows, selectedKey]);
 
   useEffect(() => {
     if (source && selected) fetchSequence(source, selected).then(setSeq);
@@ -85,8 +97,17 @@ export default function Page() {
         onThreshold={setThreshold}
         onReset={() => setThreshold(defaultThr)}
       />
-      <div className="min-w-0 flex-1 p-4">
-        <SequenceTable rows={rows} selectedKey={selected} onSelect={setSelectedKey} />
+      <div className="flex min-w-0 flex-1 flex-col p-4">
+        <FilterBar
+          filters={filters}
+          cameras={cameras}
+          onChange={setFilters}
+          shownCount={tableRows.length}
+          totalCount={rows.length}
+        />
+        <div className="min-h-0 flex-1">
+          <SequenceTable rows={tableRows} selectedKey={selected} onSelect={setSelectedKey} />
+        </div>
       </div>
       <div className="w-[40%] shrink-0 border-l border-slate-200">
         {originalRow ? (

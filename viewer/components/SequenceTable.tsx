@@ -42,7 +42,7 @@ export function SequenceTable({
       <table className="w-full border-collapse text-sm">
         <thead className="sticky top-0 bg-white text-left text-xs uppercase tracking-wide text-slate-500">
           <tr>
-            {["camera", "ground truth", "verdict", "correctness", "score", "prob"].map((h) => (
+            {["camera", "ground truth", "verdict", "correctness", "prob"].map((h) => (
               <th key={h} className="border-b border-slate-200 px-3 py-2">
                 {h}
               </th>
@@ -70,7 +70,6 @@ export function SequenceTable({
                   />
                   {correctnessLabel(r.outcome)}
                 </td>
-                <td className="px-3 py-1.5 text-slate-600">{num(r.score)}</td>
                 <td className="px-3 py-1.5 text-slate-600">{num(r.probability)}</td>
               </tr>
             );
