@@ -2,8 +2,10 @@
 
 **Date:** 2026-06-10
 **Status:** Approved (brainstorm)
-**Scope:** `api` (settings, a new `auth` module, `app.py` wiring, `errors.py`).
-No model behavior change. No change to request/response payloads.
+**Scope:** `api` (settings, a new `auth` module, `app.py` wiring, `errors.py`)
+plus the `benchmark` HTTP client (`run_api.py`), which must present the token
+when calling `/predict`. No model behavior change. No change to
+request/response payloads.
 
 ## Goal
 
@@ -109,6 +111,20 @@ In the `lifespan` startup, log one line via the existing module logger:
 
 So an operator can see at a glance whether the deployment is protected.
 
+### Benchmark client (consumer)
+
+The `benchmark` package's `api` subcommand drives `/predict` over HTTP via
+`run_api.py::_http_post` (the in-process `core` subcommand is unaffected — it
+never touches the API). With auth enabled, those requests must carry the token
+or every one returns 401.
+
+`_http_post` reads `TEMPORAL_API_TOKEN` from the environment (the **same** var
+the server uses) and, when set, sends `Authorization: Bearer <token>`. When
+unset, no header is added and behavior is identical to today — so this is a
+no-op against an auth-disabled server. No new CLI flag: the operator exports the
+same env var they already set on the server. The token is read per request via
+`os.environ.get`, keeping the existing `post=` injection seam intact for tests.
+
 ## Testing
 
 New `api/tests/test_auth.py` (plus, if natural, a case or two in `test_app.py`):
@@ -125,10 +141,12 @@ relying on process env, matching the existing `test_settings.py` style.
 
 ## Docs
 
-- Add `TEMPORAL_API_TOKEN` to the README env-var table with a one-line
+- Add `TEMPORAL_API_TOKEN` to the `api/README.md` env-var table with a one-line
   description.
 - Add a commented `TEMPORAL_API_TOKEN=` example to `.envrc` and to the
   `environment:` block in `docker-compose.yml`.
+- Note in `benchmark/README.md` (under the `api` subcommand) that
+  `TEMPORAL_API_TOKEN` must be exported to benchmark an auth-protected server.
 
 ## Out of scope
 
