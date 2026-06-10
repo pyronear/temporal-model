@@ -16,6 +16,11 @@ class ApiError(Exception):
         super().__init__(detail)
 
 
+class InvalidRequest(ApiError):
+    status_code = 400
+    code = "invalid_request"
+
+
 class FrameNotFound(ApiError):
     status_code = 404
     code = "frame_not_found"

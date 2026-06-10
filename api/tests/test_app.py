@@ -193,10 +193,55 @@ def test_predict_mapping_error_returns_coded_500(client):
     assert r.json()["code"] == "inference_error"
 
 
-def test_startup_fails_without_bucket(monkeypatch):
+def test_predict_uses_request_bucket(monkeypatch):
+    # A request-supplied bucket overrides the settings default and is the bucket
+    # frames are actually fetched from.
+    other = "2eb7ac42fbbf-alert-api-2"
+    monkeypatch.setattr(settings, "s3_bucket", "settings-default")
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="us-east-1")
+        s3.create_bucket(Bucket=other)
+        for key in KEYS:
+            s3.put_object(Bucket=other, Key=key, Body=b"\xff\xd8\xff\xe0jpeg")
+        with TestClient(app) as c:
+            c.app.state.s3_client = s3
+            c.app.state.runner = FakeRunner(output=_smoke_output())
+            r = c.post("/predict", json={"frames": KEYS, "bucket": other})
+    assert r.status_code == 200
+    assert r.json()["is_smoke"] is True
+
+
+def test_predict_no_bucket_400(client, monkeypatch):
     monkeypatch.setattr(settings, "s3_bucket", "")
-    with pytest.raises(RuntimeError), TestClient(app):
-        pass
+    r = client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 400
+    assert r.json()["code"] == "invalid_request"
+
+
+def test_predict_empty_bucket_400(client):
+    r = client.post("/predict", json={"frames": KEYS, "bucket": ""})
+    assert r.status_code == 400
+    assert r.json()["code"] == "invalid_request"
+
+
+def test_predict_no_bucket_400_takes_precedence_over_model(client, monkeypatch):
+    # Missing-bucket validation runs before the model-loaded check, so a request
+    # with no bucket is a 400 even when the model is unavailable.
+    monkeypatch.setattr(settings, "s3_bucket", "")
+    client.app.state.runner = None
+    r = client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 400
+    assert r.json()["code"] == "invalid_request"
+
+
+def test_startup_succeeds_without_bucket(monkeypatch):
+    # The app no longer hard-requires a settings bucket at startup.
+    monkeypatch.setattr(settings, "s3_bucket", "")
+    monkeypatch.setattr(
+        ModelRunner, "load", lambda *a, **k: FakeRunner(output=_smoke_output())
+    )
+    with TestClient(app) as c:
+        assert c.get("/health").json()["model_loaded"] is True
 
 
 def test_lifespan_passes_calibrator_threshold(monkeypatch):
