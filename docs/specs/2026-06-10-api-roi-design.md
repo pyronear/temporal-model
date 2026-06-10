@@ -24,12 +24,19 @@ other tube.
    genuinely "only looks at" the ROI: no GPU spent on irrelevant tubes, and
    the calibrator's `n_tubes` feature counts only in-ROI tubes — as if the
    rest of the frame were empty.
-3. **Named-field object** in the request: most self-documenting and
-   mistake-proof for clients.
+3. **Positional array with convention-suffixed key**: `roi_xyxyn` encodes
+   both the corner convention and normalization in the field name — the same
+   ultralytics vocabulary the API already uses (response bboxes are documented
+   as "YOLO xywhn convention") and consistent with the response style of
+   positional bbox tuples. Likely matches the platform's native localization
+   arrays, so the client passes a slice of what it already holds.
+   (An earlier draft used a named-field object; revised after noting the
+   API's existing positional-tuple style and the two-conventions ambiguity a
+   bare `roi` key would create.)
 4. **Details addition: one count only.** `num_outside_roi` in the tubes
    block. No ROI echo (client knows what it sent; API echoes no other
    inputs), no dropped-tube geometry (dropped tubes are unscored by decision
-   2; re-running without `roi` reproduces the full picture — detections are
+   2; re-running without `roi_xyxyn` reproduces the full picture — detections are
    cached).
 
 ## API contract
@@ -42,38 +49,49 @@ New optional field on `PredictRequest`:
 {
   "frames": ["..."],
   "bucket": "...",
-  "roi": {"x_min": 0.30, "y_min": 0.35, "x_max": 0.50, "y_max": 0.55}
+  "roi_xyxyn": [0.30, 0.35, 0.50, 0.55]
 }
 ```
+
+`roi_xyxyn` is `[x_min, y_min, x_max, y_max]`, normalized — corners in the
+ultralytics `xyxyn` convention, named to disambiguate from the `xywhn`
+convention used by response bboxes.
 
 Validation (Pydantic, fails as `400 invalid_request` via the existing
 `RequestValidationError` handler):
 
-- All four fields required when `roi` is present; extra fields rejected.
-- Each coordinate in `[0, 1]` inclusive (`Field(ge=0.0, le=1.0)`).
-  `{0, 0, 1, 1}` is a valid whole-frame ROI.
-- `x_min < x_max` and `y_min < y_max` (model validator) — zero-area and
-  inverted rectangles rejected.
-- `roi` omitted or `null` → exactly today's behavior, byte-identical
+- Exactly 4 floats (enforced by the tuple type).
+- Each coordinate in `[0, 1]` inclusive. `[0, 0, 1, 1]` is a valid
+  whole-frame ROI.
+- `x_min < x_max` and `y_min < y_max` — zero-area and inverted rectangles
+  rejected. This also catches most accidental `xywhn` input fail-closed
+  (`[cx, cy, w, h]` typically has `w < cx`).
+- `roi_xyxyn` omitted or `null` → exactly today's behavior, byte-identical
   responses.
 
 ```python
-class Roi(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class PredictRequest(BaseModel):
+    frames: list[str]
+    bucket: str | None = None
+    roi_xyxyn: tuple[float, float, float, float] | None = None
 
-    x_min: float = Field(ge=0.0, le=1.0)
-    y_min: float = Field(ge=0.0, le=1.0)
-    x_max: float = Field(ge=0.0, le=1.0)
-    y_max: float = Field(ge=0.0, le=1.0)
-
-    @model_validator(mode="after")
-    def _validate_extent(self) -> "Roi":
-        if self.x_min >= self.x_max:
-            raise ValueError("roi requires x_min < x_max")
-        if self.y_min >= self.y_max:
-            raise ValueError("roi requires y_min < y_max")
-        return self
+    @field_validator("roi_xyxyn")
+    @classmethod
+    def _validate_roi(cls, v):
+        if v is None:
+            return v
+        x_min, y_min, x_max, y_max = v
+        if not all(0.0 <= c <= 1.0 for c in v):
+            raise ValueError("roi_xyxyn coordinates must be in [0, 1]")
+        if x_min >= x_max or y_min >= y_max:
+            raise ValueError(
+                "roi_xyxyn requires x_min < x_max and y_min < y_max"
+            )
+        return v
 ```
+
+(Follows the existing `PredictRequest` `field_validator` style used for
+`frames` and `bucket`.)
 
 ### Response
 
@@ -99,7 +117,8 @@ entries are synthetic and do not count.
 - `BboxTubeTemporalModel.predict()` gains
   `roi: tuple[float, float, float, float] | None = None`, interpreted as
   `(x_min, y_min, x_max, y_max)` normalized. Core takes a plain tuple — it
-  stays Pydantic-light at its boundary; the API converts the named object.
+  stays Pydantic-light at its boundary; the API's `roi_xyxyn` tuple passes
+  straight through.
 - Core defensively validates the tuple (coords in `[0, 1]`, `x_min < x_max`,
   `y_min < y_max`) and raises `ValueError` — `predict()` is a public API
   callable without the HTTP layer.
@@ -114,10 +133,12 @@ entries are synthetic and do not count.
 
 ## API plumbing
 
-- `PredictRequest.roi: Roi | None = None`.
-- `app.predict()` → `ModelRunner.predict(roi=...)` → `_predict_sync` →
-  `self._model.predict(frames, frame_detections=resolved, roi=roi,
-  timer=timer)` — a pass-through tuple param at each hop.
+- `PredictRequest.roi_xyxyn: tuple[float, float, float, float] | None = None`.
+- `app.predict()` → `ModelRunner.predict(roi=body.roi_xyxyn)` →
+  `_predict_sync` → `self._model.predict(frames, frame_detections=resolved,
+  roi=roi, timer=timer)` — a pass-through tuple param at each hop. (`roi` is
+  the parameter name internally; the wire-format suffix matters at the HTTP
+  boundary, not in Python signatures where the tuple order is documented.)
 - **Detection cache unaffected:** keyed by `frame_id`, stores raw full-frame
   detections; ROI filtering happens downstream at the tube level, so the same
   cached detections serve requests with different ROIs correctly.
@@ -144,9 +165,10 @@ entries are synthetic and do not count.
 **API** (`api/tests/`):
 
 - Validation matrix: coordinate out of `[0, 1]`, `x_min >= x_max`,
-  `y_min >= y_max`, missing field, extra field → 400 with message.
+  `y_min >= y_max`, wrong length (3 or 5 elements), non-numeric element
+  → 400 with message.
 - Happy path: stubbed runner receives the `(x_min, y_min, x_max, y_max)`
-  tuple; omitted `roi` → runner receives `None`.
+  tuple; omitted `roi_xyxyn` → runner receives `None`.
 - `verbose=true` response includes `num_tubes_outside_roi`.
 
 **Manual sanity** (not committed — scratch data is not in the repo):
