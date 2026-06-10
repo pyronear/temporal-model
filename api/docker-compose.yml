@@ -12,6 +12,8 @@ services:
       - TEMPORAL_API_S3_BUCKET=frames
       - TEMPORAL_API_S3_ENDPOINT_URL=http://minio:9000
       - TEMPORAL_API_S3_REGION=us-east-1
+      # per-request stage timing + cache counts (logs + verbose details.profiling)
+      - TEMPORAL_API_PROFILE=${TEMPORAL_API_PROFILE:-false}
       # local-dev only — change credentials for any shared/staging environment
       - AWS_ACCESS_KEY_ID=minioadmin
       - AWS_SECRET_ACCESS_KEY=minioadmin

@@ -8,6 +8,7 @@ import yaml
 from temporal_model.api import model_runner as mr
 from temporal_model.api.model_runner import ModelRunner, read_manifest
 from temporal_model.core.protocol import Frame
+from temporal_model.core.stage_timer import StageTimer
 from temporal_model.core.types import FrameDetections
 
 
@@ -135,7 +136,7 @@ class _OrchestrationModel:
             for i, f in enumerate(frames)
         ]
 
-    def predict(self, frames, *, frame_detections=None):
+    def predict(self, frames, *, frame_detections=None, timer=None):
         self.predict_calls.append(set(frame_detections or {}))
         return SimpleNamespace(frame_ids=[f.frame_id for f in frames])
 
@@ -172,3 +173,71 @@ def test_predict_cache_disabled_detects_every_frame():
 
     assert model.detect_calls[0] == ["x_00", "x_01"]
     assert model.detect_calls[1] == ["x_00", "x_01", "x_02"]  # full each call
+
+
+class _StubFrame:
+    def __init__(self, fid):
+        self.frame_id = fid
+
+
+class _StubModel:
+    """Minimal model exposing the load_sequence/detect/predict surface."""
+
+    def __init__(self):
+        self.predict_timer = None
+
+    def load_sequence(self, paths):
+        return [_StubFrame(str(p)) for p in paths]
+
+    def detect(self, misses):
+        return [SimpleNamespace(frame_id=f.frame_id) for f in misses]
+
+    def predict(self, frames, *, frame_detections=None, timer=None):
+        self.predict_timer = timer
+        if timer is not None:
+            with timer.stage("classifier"):
+                pass
+        return SimpleNamespace(is_positive=False, trigger_frame_index=None, details={})
+
+
+def _runner_with(model, cache_size=4096):
+    return ModelRunner(
+        model,
+        name="m",
+        version="1",
+        calibrated=False,
+        detection_cache_size=cache_size,
+    )
+
+
+def test_predict_records_detector_timing_and_cache_counts():
+    model = _StubModel()
+    runner = _runner_with(model)
+    timer = StageTimer()
+    profile: dict = {}
+
+    asyncio.run(runner.predict(["a", "b", "c"], timer=timer, profile=profile))
+
+    timings = timer.as_dict()
+    assert "detector" in timings  # detect() was timed
+    assert model.predict_timer is timer  # same timer threaded into predict()
+    assert profile["n_frames"] == 3
+    assert profile["cache_misses"] == 3  # cold: all miss
+    assert profile["cache_hits"] == 0
+
+
+def test_second_predict_hits_cache():
+    model = _StubModel()
+    runner = _runner_with(model)
+    asyncio.run(runner.predict(["a", "b"]))  # warms the cache
+    profile: dict = {}
+    asyncio.run(runner.predict(["a", "b"], profile=profile))
+    assert profile["cache_hits"] == 2
+    assert profile["cache_misses"] == 0
+
+
+def test_predict_without_timer_still_works():
+    model = _StubModel()
+    runner = _runner_with(model)
+    out = asyncio.run(runner.predict(["a"]))
+    assert out.is_positive is False

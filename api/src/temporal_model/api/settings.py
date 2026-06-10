@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     # Per-frame detection LRU capacity (frame_id → detections). 0 disables.
     detection_cache_size: int = 4096
 
+    # When true, record per-stage timing + cache counts for each request and
+    # surface them in logs and the verbose response (`details.profiling`).
+    profile: bool = False
+
     s3_bucket: str = ""
     s3_region: str | None = None
     s3_endpoint_url: str | None = None

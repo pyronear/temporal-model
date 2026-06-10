@@ -155,3 +155,42 @@ def test_verbose_surfaces_threshold_override():
     decision = resp.model_dump(exclude_unset=True)["details"]["decision"]
     assert decision["threshold_overridden"] is True
     assert decision["packaged_threshold"] == 0.5
+
+
+def test_to_response_includes_profiling_when_verbose():
+    details = {
+        "decision": {
+            "aggregation": "max_logit",
+            "threshold": 0.5,
+            "trigger_tube_id": None,
+        },
+        "preprocessing": {
+            "num_frames_input": 6,
+            "num_truncated": 0,
+            "padded_frame_indices": [],
+        },
+        "tubes": {"num_candidates": 0, "kept": []},
+    }
+    out = SimpleNamespace(is_positive=False, trigger_frame_index=None, details=details)
+    profiling = {
+        "stages_ms": {"s3_fetch": 1.0},
+        "total_ms": 1.0,
+        "n_frames": 6,
+        "cache_hits": 4,
+        "cache_misses": 2,
+    }
+
+    resp = to_response(
+        out, name="m", version="1", calibrated=False, verbose=True, profiling=profiling
+    )
+    assert resp.details.profiling == profiling
+
+    # Omitted when not verbose, and harmless when profiling is None.
+    resp2 = to_response(
+        out, name="m", version="1", calibrated=False, verbose=False, profiling=profiling
+    )
+    assert resp2.details is None
+    resp3 = to_response(
+        out, name="m", version="1", calibrated=False, verbose=True, profiling=None
+    )
+    assert resp3.details.profiling is None

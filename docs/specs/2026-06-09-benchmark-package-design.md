@@ -212,6 +212,11 @@ def run_core(store_dir, model_path, *, device, reps, warmup, limit) -> pd.DataFr
 The `ResourceSampler` wraps the whole timed section; its timeline + peaks are
 saved alongside the raw table.
 
+> **Superseded.** §6–§7 below predate the detection-cache / eval-only-trigger /
+> S3-flow changes on `main`. The current Phase 2 design lives in
+> `2026-06-09-benchmark-api-e2e-design.md`; the sections below are kept only as
+> the original sketch.
+
 ### 6. API-path runner (`benchmark/run_api.py`) — **Phase 2**
 
 ```python

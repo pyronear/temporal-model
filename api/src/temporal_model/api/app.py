@@ -1,5 +1,6 @@
 """FastAPI application: load a packaged model and serve smoke predictions."""
 
+import json
 import logging
 import tempfile
 from contextlib import asynccontextmanager
@@ -10,6 +11,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 from starlette.concurrency import run_in_threadpool
+
+from temporal_model.core.stage_timer import StageTimer, stage_ctx
 
 from .errors import ApiError, InferenceError, InvalidRequest, ModelNotLoaded
 from .model_runner import ModelRunner
@@ -117,11 +120,29 @@ async def predict(
 
     with tempfile.TemporaryDirectory() as tmp:
         try:
-            # fetch_frames is blocking boto3 I/O — run it off the event loop.
-            paths = await run_in_threadpool(
-                fetch_frames, s3_client, bucket, body.frames, Path(tmp)
-            )
-            out = await runner.predict(paths)
+            # Timer carries the model device so GPU/MPS stages are synced for
+            # honest timing; on the CPU serving target this is a no-op.
+            timer = StageTimer(settings.device) if settings.profile else None
+            profile: dict | None = {} if settings.profile else None
+
+            with stage_ctx(timer, "s3_fetch"):
+                # fetch_frames is blocking boto3 I/O — run it off the event loop.
+                paths = await run_in_threadpool(
+                    fetch_frames, s3_client, bucket, body.frames, Path(tmp)
+                )
+
+            out = await runner.predict(paths, timer=timer, profile=profile)
+
+            profiling = None
+            if timer is not None:
+                stages = timer.as_dict()
+                profiling = {
+                    "stages_ms": stages,
+                    "total_ms": round(sum(stages.values()), 3),
+                    **(profile or {}),
+                }
+                logger.info("profile %s", json.dumps(profiling))
+
             return to_response(
                 out,
                 name=runner.name,
@@ -130,6 +151,7 @@ async def predict(
                 verbose=verbose,
                 threshold_overridden=runner.threshold_overridden,
                 packaged_threshold=runner.packaged_threshold,
+                profiling=profiling,
             )
         except ApiError:
             raise
