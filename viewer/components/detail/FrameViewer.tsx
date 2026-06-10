@@ -35,9 +35,11 @@ export function FrameViewer({
       <div className="flex items-center gap-3">
         <button
           onClick={() => setPlaying((p) => !p)}
-          className="rounded border border-slate-300 px-2 py-0.5 text-sm"
+          aria-label={playing ? "pause" : "play"}
+          title={playing ? "pause" : "play"}
+          className="rounded border border-slate-300 px-2 py-0.5 text-sm leading-none"
         >
-          {playing ? "⏸ pause" : "▶ play"}
+          {playing ? "⏸" : "▶"}
         </button>
         <input
           type="range"
