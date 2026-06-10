@@ -23,6 +23,12 @@ class PredictRequest(BaseModel):
     # omitted (alert-api stacks use per-org dynamic bucket names that no single
     # setting can cover).
     bucket: str | None = None
+    # Optional region of interest as normalized corners
+    # (x_min, y_min, x_max, y_max) — ultralytics xyxyn convention, suffixed to
+    # disambiguate from the xywhn bboxes in responses. Tubes with no real
+    # detection intersecting it are dropped before scoring (see
+    # docs/specs/2026-06-10-api-roi-design.md).
+    roi_xyxyn: tuple[float, float, float, float] | None = None
 
     @field_validator("frames")
     @classmethod
@@ -43,6 +49,20 @@ class PredictRequest(BaseModel):
             raise ValueError("bucket must not be empty")
         if not _BUCKET_RE.match(v) or ".." in v:
             raise ValueError(f"bucket is not a valid S3 bucket name: {v!r}")
+        return v
+
+    @field_validator("roi_xyxyn")
+    @classmethod
+    def _validate_roi(
+        cls, v: tuple[float, float, float, float] | None
+    ) -> tuple[float, float, float, float] | None:
+        if v is None:
+            return v
+        x_min, y_min, x_max, y_max = v
+        if not all(0.0 <= c <= 1.0 for c in v):
+            raise ValueError("roi_xyxyn coordinates must be in [0, 1]")
+        if x_min >= x_max or y_min >= y_max:
+            raise ValueError("roi_xyxyn requires x_min < x_max and y_min < y_max")
         return v
 
 

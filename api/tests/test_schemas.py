@@ -194,3 +194,34 @@ def test_to_response_includes_profiling_when_verbose():
         out, name="m", version="1", calibrated=False, verbose=True, profiling=None
     )
     assert resp3.details.profiling is None
+
+
+def test_request_roi_defaults_to_none():
+    assert PredictRequest(frames=["a.jpg"]).roi_xyxyn is None
+
+
+def test_request_accepts_valid_roi():
+    req = PredictRequest(frames=["a.jpg"], roi_xyxyn=[0.1, 0.2, 0.3, 0.4])
+    assert req.roi_xyxyn == (0.1, 0.2, 0.3, 0.4)
+
+
+def test_request_accepts_whole_frame_roi():
+    req = PredictRequest(frames=["a.jpg"], roi_xyxyn=[0.0, 0.0, 1.0, 1.0])
+    assert req.roi_xyxyn == (0.0, 0.0, 1.0, 1.0)
+
+
+@pytest.mark.parametrize(
+    "roi",
+    [
+        [-0.1, 0.2, 0.3, 0.4],  # out of range low
+        [0.1, 0.2, 0.3, 1.4],  # out of range high
+        [0.3, 0.2, 0.1, 0.4],  # x_min >= x_max
+        [0.1, 0.4, 0.3, 0.4],  # y_min >= y_max (zero height)
+        [0.1, 0.2, 0.3],  # too short
+        [0.1, 0.2, 0.3, 0.4, 0.5],  # too long
+        ["a", 0.2, 0.3, 0.4],  # non-numeric
+    ],
+)
+def test_request_rejects_invalid_roi(roi):
+    with pytest.raises(ValidationError):
+        PredictRequest(frames=["a.jpg"], roi_xyxyn=roi)
