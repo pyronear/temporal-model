@@ -306,10 +306,10 @@ MODEL_CONFIG_HELP = {
     "instead of tracking the per-frame bbox.",
     "context factor": "How much the bbox is expanded before cropping the classifier "
     "patch (more context).",
-    "max frames": "Max frames per tube fed to the temporal classifier; longer tubes "
-    "are truncated.",
-    "pad": "Short tubes are padded up to a minimum number of frames using this "
-    "strategy.",
+    "max frames": "The input sequence is truncated to its first N frames before "
+    "detection; also caps frames per tube fed to the temporal classifier.",
+    "pad": "Short input sequences are padded up to a minimum number of frames "
+    "(duplicating first/last frames) before detection, using this strategy.",
 }
 
 
@@ -317,7 +317,7 @@ def render_model_config(source: str) -> None:  # pragma: no cover - Streamlit UI
     """Sidebar panel: headline model fields (info-on-hover) + full-config expander."""
     cfg = load_model_config(source)
     st.sidebar.divider()
-    st.sidebar.caption("Model config")
+    st.sidebar.caption("Model config · hover a field for details")
     if not cfg:
         st.sidebar.caption("model config unavailable")
         return
@@ -343,12 +343,17 @@ def render_model_config(source: str) -> None:  # pragma: no cover - Streamlit UI
             f"{infer.get('pad_to_min_frames', '—')}",
         ),
     ]
-    # Each label is an <abbr title=...> so hovering shows the param's explanation.
+    # Clean stacked rows: muted label over value, whole row hoverable (title) for
+    # the param's description — no underline noise.
     rows = [
-        f'<abbr title="{MODEL_CONFIG_HELP[label]}"><b>{label}</b></abbr> {value}'
+        f'<div title="{MODEL_CONFIG_HELP[label]}" style="cursor:help;'
+        f'margin-bottom:6px;line-height:1.25">'
+        f'<span style="color:#8a8a8a;font-size:0.72rem;text-transform:uppercase;'
+        f'letter-spacing:.04em">{label}</span><br>'
+        f'<span style="font-size:0.9rem">{value}</span></div>'
         for label, value in fields
     ]
-    st.sidebar.markdown("<br>".join(rows), unsafe_allow_html=True)
+    st.sidebar.markdown("".join(rows), unsafe_allow_html=True)
     with st.sidebar.expander("full config"):
         st.json(cfg)
 
