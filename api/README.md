@@ -31,8 +31,8 @@ refuses to start if the file is missing. (`docker compose up --build` directly
 will fail at the `COPY` step without it.)
 
 Configuration via env vars (prefix `TEMPORAL_API_`): `MODEL_PATH`, `DEVICE`,
-`CALIBRATOR_THRESHOLD`, `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT_URL` (empty = real
-AWS; set for OVH or MinIO), `HOST`, `PORT`. AWS/OVH/MinIO credentials come from
+`CALIBRATOR_THRESHOLD`, `TOKEN`, `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT_URL`
+(empty = real AWS; set for OVH or MinIO), `HOST`, `PORT`. AWS/OVH/MinIO credentials come from
 the standard boto3 chain (env vars / IAM role). `S3_BUCKET` is an optional
 default; a request may override it per call with its `bucket` field (needed for
 alert-api stacks whose per-org bucket names are not known ahead of time). A
@@ -43,6 +43,11 @@ calibrator decision threshold for every prediction; out-of-range values fail
 startup, and it is ignored (with a warning) for uncalibrated packages. With
 `?verbose=true`, the response's `details.decision` reports `threshold_overridden`
 and the original `packaged_threshold`.
+
+`TOKEN` (optional) guards `POST /predict`: when set, callers must send
+`Authorization: Bearer <token>` or receive `401 unauthorized`. When unset, auth
+is disabled (the API logs a warning at startup) and `/predict` is open.
+`GET /health` is never guarded, so load balancers can probe it without a token.
 
 ## Test
 
