@@ -75,7 +75,9 @@ app = FastAPI(title="Temporal Model API", version="0.1.0", lifespan=lifespan)
 @app.exception_handler(ApiError)
 async def _api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
     return JSONResponse(
-        status_code=exc.status_code, content={"detail": exc.detail, "code": exc.code}
+        status_code=exc.status_code,
+        content={"detail": exc.detail, "code": exc.code},
+        headers=exc.headers,
     )
 
 
