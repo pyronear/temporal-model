@@ -150,9 +150,11 @@ def test_lifespan_logs_auth_enabled(monkeypatch, caplog):
     monkeypatch.setattr(
         ModelRunner, "load", lambda *a, **k: FakeRunner(output=_smoke_output())
     )
-    with caplog.at_level(logging.INFO, logger="temporal_model.api.app"):
-        with TestClient(app):
-            pass
+    with (
+        caplog.at_level(logging.INFO, logger="temporal_model.api.app"),
+        TestClient(app),
+    ):
+        pass
     assert "auth enabled" in caplog.text
 
 
@@ -162,9 +164,11 @@ def test_lifespan_warns_auth_disabled(monkeypatch, caplog):
     monkeypatch.setattr(
         ModelRunner, "load", lambda *a, **k: FakeRunner(output=_smoke_output())
     )
-    with caplog.at_level(logging.WARNING, logger="temporal_model.api.app"):
-        with TestClient(app):
-            pass
+    with (
+        caplog.at_level(logging.WARNING, logger="temporal_model.api.app"),
+        TestClient(app),
+    ):
+        pass
     assert "auth disabled" in caplog.text
 
 

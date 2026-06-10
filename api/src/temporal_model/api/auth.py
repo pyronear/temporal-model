@@ -16,10 +16,13 @@ from .settings import settings
 # auto_error=False so we render our own {detail, code} 401 instead of FastAPI's
 # default 403 on a missing/garbled Authorization header.
 _bearer = HTTPBearer(auto_error=False)
+# Module-level Depends instance — keeps the call out of the argument default
+# (ruff B008) while preserving the standard FastAPI dependency wiring.
+_bearer_dep = Depends(_bearer)
 
 
 def require_token(
-    creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    creds: HTTPAuthorizationCredentials | None = _bearer_dep,
 ) -> None:
     """Reject requests lacking a valid bearer token (no-op when auth is off)."""
     expected = settings.token
