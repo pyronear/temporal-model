@@ -366,5 +366,6 @@ The monorepo packages map onto the lifecycle:
 | 6 · Decide | `make_decision_fn`, `LogisticCalibrator`, `find_first_crossing_trigger` | [core/.../inference.py](../core/src/temporal_model/core/inference.py), [core/.../logistic_calibrator.py](../core/src/temporal_model/core/logistic_calibrator.py) |
 | Packaging | `build_model_package` / `load_model_package` | [core/.../package.py](../core/src/temporal_model/core/package.py) |
 
-Design history and rationale for individual decisions live in
-[docs/specs/](specs/).
+Every figure in this document is regenerable with the scripts in
+[assets/scripts/](assets/scripts/). Design history and rationale for
+individual decisions live in [docs/specs/](specs/).
