@@ -33,10 +33,13 @@ def test_missing_credentials_raise_when_token_set(monkeypatch):
         require_token(None)
 
 
-def test_non_ascii_token_compares_safely(monkeypatch):
-    # secrets.compare_digest raises TypeError on non-ASCII str; we must compare
-    # bytes so a non-ASCII token authenticates instead of erroring with a 500.
-    monkeypatch.setattr(settings, "token", "café-š3cr3t")
-    assert require_token(_creds("café-š3cr3t")) is None
-    with pytest.raises(Unauthorized):
-        require_token(_creds("wrong"))
+def test_non_ascii_token_fails_closed_not_500(monkeypatch):
+    # Bearer tokens are ASCII (RFC 6750). A misconfigured non-ASCII token can't
+    # authenticate over HTTP anyway — the header arrives latin-1-decoded while
+    # the env var is UTF-8, so they never match. The contract we guarantee is
+    # fail-closed: a clean 401, never a 500. (compare_digest raises TypeError on
+    # non-ASCII *str*; comparing bytes turns that into a normal mismatch.)
+    monkeypatch.setattr(settings, "token", "wörd-123")
+    wire_credential = "wörd-123".encode("utf-8").decode("latin-1")  # what arrives
+    with pytest.raises(Unauthorized):  # not TypeError
+        require_token(_creds(wire_credential))

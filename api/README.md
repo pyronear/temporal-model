@@ -44,10 +44,11 @@ startup, and it is ignored (with a warning) for uncalibrated packages. With
 `?verbose=true`, the response's `details.decision` reports `threshold_overridden`
 and the original `packaged_threshold`.
 
-`TOKEN` (optional) guards `POST /predict`: when set, callers must send
-`Authorization: Bearer <token>` or receive `401 unauthorized`. When unset, auth
-is disabled (the API logs a warning at startup) and `/predict` is open.
-`GET /health` is never guarded, so load balancers can probe it without a token.
+`TOKEN` (optional, use an ASCII value) guards `POST /predict`: when set, callers
+must send `Authorization: Bearer <token>` or receive `401 unauthorized`. When
+unset, auth is disabled (the API logs a warning at startup) and `/predict` is
+open. `GET /health` is never guarded, so load balancers can probe it without a
+token.
 
 ## Test
 
