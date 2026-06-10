@@ -27,13 +27,15 @@ export function ModelConfigPanel({ cfg }: { cfg: ModelConfig }) {
   const mi = cfg.model_input ?? {};
   const inf = cfg.infer ?? {};
   const cl = cfg.classifier ?? {};
+  const round3 = (v: number | null | undefined) =>
+    typeof v === "number" ? v.toFixed(3) : "—";
   const fields: Field[] = [
     { label: "detector", value: cfg.detector?.source ?? "—", mono: true, wide: true },
     { label: "variant", value: cfg.variant ?? "—" },
     { label: "train sha", value: (cfg.train_git_sha ?? "").slice(0, 8) || "—", mono: true },
     { label: "aggregation", value: String(d.aggregation ?? "—") },
-    { label: "threshold", value: String(d.threshold ?? "—") },
-    { label: "logistic threshold", value: String(d.logistic_threshold ?? "—") },
+    { label: "threshold", value: round3(d.threshold) },
+    { label: "logistic threshold", value: round3(d.logistic_threshold) },
     { label: "stabilize", value: String(mi.stabilize ?? "—") },
     { label: "context factor", value: String(mi.context_factor ?? "—") },
     { label: "max frames", value: String(cl.max_frames ?? "—") },
@@ -50,7 +52,7 @@ export function ModelConfigPanel({ cfg }: { cfg: ModelConfig }) {
         {fields.map((f) => (
           <div key={f.label} title={HELP[f.label]} className={`cursor-help ${f.wide ? "col-span-2" : ""}`}>
             <dt className="text-[10px] uppercase tracking-wide text-slate-400">{f.label}</dt>
-            <dd className={`text-sm break-words text-slate-800 ${f.mono ? "font-mono text-xs" : ""}`}>
+            <dd className={`text-sm break-words text-slate-800 ${f.mono ? "font-mono" : ""}`}>
               {f.value}
             </dd>
           </div>
