@@ -551,9 +551,7 @@ def _box_rank(det: Detection) -> tuple[float, float, float]:
     return (_area(det), det.confidence, det.cx)
 
 
-def tube_intersects_roi(
-    tube: Tube, roi: tuple[float, float, float, float]
-) -> bool:
+def tube_intersects_roi(tube: Tube, roi: tuple[float, float, float, float]) -> bool:
     """True if any real (non-gap) detection bbox overlaps the ROI rectangle.
 
     ``roi`` is ``(x_min, y_min, x_max, y_max)`` normalized to [0, 1];

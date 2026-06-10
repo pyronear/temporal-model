@@ -76,8 +76,7 @@ class TestTubeIntersectsRoi:
 def _two_cluster_model(red_frames, tiny_classifier):
     """Model whose fake YOLO emits two spatial clusters -> two tubes."""
     per_frame = [
-        [(0.2, 0.5, 0.1, 0.1, 0.9), (0.7, 0.5, 0.1, 0.1, 0.9)]
-        for _ in red_frames
+        [(0.2, 0.5, 0.1, 0.1, 0.9), (0.7, 0.5, 0.1, 0.1, 0.9)] for _ in red_frames
     ]
     return BboxTubeTemporalModel(
         yolo_model=_fake_yolo_factory(per_frame),
@@ -100,9 +99,7 @@ class TestPredictWithRoi:
         # num_candidates keeps its pre-ROI meaning.
         assert out.details["tubes"]["num_candidates"] == 2
 
-    def test_roi_excluding_everything_is_negative(
-        self, red_frames, tiny_classifier
-    ):
+    def test_roi_excluding_everything_is_negative(self, red_frames, tiny_classifier):
         model = _two_cluster_model(red_frames, tiny_classifier)
         out = model.predict(frames=red_frames, roi=(0.45, 0.05, 0.55, 0.15))
 

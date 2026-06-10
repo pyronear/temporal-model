@@ -111,9 +111,7 @@ def test_details_parses_legacy_dump_without_num_outside_roi():
             num_frames_input=1, num_truncated=0, padded_frame_indices=[]
         ),
         tubes=Tubes(num_candidates=0, kept=[]),
-        decision=Decision(
-            aggregation="max_logit", threshold=0.0, trigger_tube_id=None
-        ),
+        decision=Decision(aggregation="max_logit", threshold=0.0, trigger_tube_id=None),
     )
     dump = details.model_dump()
     del dump["tubes"]["num_outside_roi"]
