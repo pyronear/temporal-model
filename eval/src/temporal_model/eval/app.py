@@ -39,8 +39,16 @@ from temporal_model.eval.render import (
 REPORTING = Path("data/08_reporting")
 MODEL_NAME = "vit_dinov2_finetune"
 PLAY_FPS = 1  # autoplay speed (frames/sec); fixed, no UI control
+# Mirrors core.model.DEFAULT_LOGISTIC_THRESHOLD; kept local so the read-only viewer
+# stays torch-free (importing core.model would pull in the full model stack).
+DEFAULT_LOGISTIC_THRESHOLD = 0.5
+
+# The reporting tree is static for the lifetime of a session, so the file loads
+# below are cached: without this they re-read + re-parse on every rerun (each slider
+# tick, each autoplay tick). Use the Streamlit menu's "Clear cache" after a re-run.
 
 
+@st.cache_data(show_spinner=False)
 def reporting_dirs() -> list[Path]:
     """Every <source>/vit_dinov2_finetune reporting dir that has a results.json."""
     if not REPORTING.exists():
@@ -48,6 +56,7 @@ def reporting_dirs() -> list[Path]:
     return sorted(p.parent for p in REPORTING.glob(f"*/{MODEL_NAME}/results.json"))
 
 
+@st.cache_data(show_spinner=False)
 def load_results() -> pd.DataFrame:
     """Concatenate results.json across all sources (empty frame if none)."""
     frames = []
@@ -57,16 +66,19 @@ def load_results() -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
+@st.cache_data(show_spinner=False)
 def load_details(source: str, key: str) -> dict:
     path = REPORTING / source / MODEL_NAME / "details" / f"{key}.json"
     return json.loads(path.read_text()) if path.exists() else {}
 
 
+@st.cache_data(show_spinner=False)
 def load_sequence_view(source: str, key: str) -> dict:
     path = REPORTING / source / MODEL_NAME / "sequences" / f"{key}.json"
     return json.loads(path.read_text()) if path.exists() else {}
 
 
+@st.cache_data(show_spinner=False)
 def load_model_config(source: str) -> dict:
     path = REPORTING / source / MODEL_NAME / "model_config.json"
     return json.loads(path.read_text()) if path.exists() else {}
@@ -384,22 +396,30 @@ def main() -> None:  # pragma: no cover - Streamlit UI
     has_org = view["organization_name"].notna().any()
     has_cam = view["camera_name"].notna().any()
 
-    # Logistic-threshold explorer. The slider value is stored in session_state by
-    # key, so the cards/table (read it BEFORE the slider renders) reflect it live;
-    # the slider widget renders just below the cards. Only shown for calibrated
-    # sources (some non-null probability).
-    has_prob = bool(view["probability"].notna().any())
-    default_thr = float(
-        (load_model_config(source).get("decision") or {}).get("logistic_threshold", 0.5)
+    # Logistic-threshold explorer. Shown only when the model decides by 'logistic'
+    # aggregation AND the source has calibrated probabilities: a max_logit model
+    # decides on the raw logit, not a probability, so re-deciding on probability
+    # would not match it. The slider value is stored in session_state by key, so the
+    # cards/table (read it BEFORE the slider renders) reflect it live; the widget
+    # itself renders just below the cards.
+    decision_cfg = load_model_config(source).get("decision") or {}
+    raw_thr = decision_cfg.get("logistic_threshold")
+    default_thr = (
+        float(raw_thr)
+        if isinstance(raw_thr, (int, float))
+        else DEFAULT_LOGISTIC_THRESHOLD
+    )
+    show_slider = decision_cfg.get("aggregation") == "logistic" and bool(
+        view["probability"].notna().any()
     )
     thr_key = f"thr_{source}"
-    if has_prob:
+    if show_slider:
         st.session_state.setdefault(thr_key, default_thr)
         view = apply_threshold(view, float(st.session_state[thr_key]))
 
     render_performance(view)
 
-    if has_prob:
+    if show_slider:
 
         def _reset_threshold(key: str = thr_key, value: float = default_thr) -> None:
             # Runs as a callback before the next render's widget init, so writing
