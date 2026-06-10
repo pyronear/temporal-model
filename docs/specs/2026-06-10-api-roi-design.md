@@ -121,6 +121,11 @@ entries are synthetic and do not count.
 - **Detection cache unaffected:** keyed by `frame_id`, stores raw full-frame
   detections; ROI filtering happens downstream at the tube level, so the same
   cached detections serve requests with different ROIs correctly.
+  **Invariant to preserve:** only full-frame detections ever enter the cache.
+  Anything that filters detections by ROI before `put()` (or crops images to
+  the ROI before detection) would poison the shared LRU for subsequent
+  requests with a different ROI — that is why filtering must stay at the tube
+  level, after cache resolution.
 - API `Preprocessing` response DTO gains `num_tubes_outside_roi: int = 0`,
   populated from the core tubes block.
 
