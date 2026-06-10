@@ -300,8 +300,11 @@ MODEL_CONFIG_HELP = {
     "train sha": "Git commit of the training run that produced this model.",
     "aggregation": "Rule combining per-tube scores into the sequence keep/discard "
     "decision (max_logit or logistic).",
-    "threshold": "Decision threshold on the aggregated max-logit score.",
-    "logistic threshold": "Probability threshold applied when aggregation is logistic.",
+    "threshold": "Keep cutoff on a tube's raw classifier logit — governs the "
+    "decision only under 'max_logit' aggregation.",
+    "logistic threshold": "Keep cutoff on a tube's calibrated probability — governs "
+    "the decision under 'logistic' aggregation (this model's active rule, and what "
+    "the slider tunes).",
     "stabilize": "If true, each tube is cropped from one fixed window (stabilized) "
     "instead of tracking the per-frame bbox.",
     "context factor": "How much the bbox is expanded before cropping the classifier "
