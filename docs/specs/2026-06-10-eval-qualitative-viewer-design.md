@@ -66,8 +66,9 @@ These were settled during brainstorming:
   so the displayed predictions come from the exact model eval evaluates.
 - **Persist the stabilized window (Approach B).** Add `stabilized_window` to the
   `KeptTube` details schema and emit the window already computed in `inference.py`.
-  The viewer crops every active frame of a tube from this fixed window — the exact
-  region the classifier saw.
+  The viewer crops every active frame of a tube from this same fixed window the
+  classifier used, shown with a little extra surrounding context (display context
+  2.0 vs the model's 1.5) for legibility.
 - **Stabilized is the only crop mode in the UI.** Per the production decision,
   stabilization is always on. The viewer shows the stabilized window as the single
   tube-crop mode: no per-frame/bbox-tracking fallback, no "stabilized" badge, no
@@ -153,10 +154,12 @@ lines into one file):
   the emitted artifacts; never runs the model.
 
 **5. Data copy**
-A `scripts/` helper (and/or `make` target) performs the one-time copy of the
+The pyro-annotator sequences are brought in by a **one-time manual copy** of the
 explorer's `data/03_primary/sequences/pyro-annotator/**` into
-`data/01_raw/pyro-annotator/`, DVC-tracked in eval's remote so it travels via
-`dvc pull`. `dvc.yaml` gains a `foreach` entry to score this source.
+`data/01_raw/pyro-annotator/`, then `dvc add`ed so they travel via eval's remote
+(`dvc pull`). This is a provenance step documented in the eval README — not a
+committed script. `dvc.yaml` gains a dedicated `evaluate_pyro_annotator` stage to
+score this source.
 
 ### Data contract (frontend-agnostic interface)
 

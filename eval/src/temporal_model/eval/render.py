@@ -1,8 +1,10 @@
 """Pure render helpers for the eval viewer (no Streamlit).
 
 Ported from the temporal-model-explorer app's frame/tube drawing layer, repointed
-to ``temporal_model.core.crop`` for the crop geometry so the displayed tube crops
-match what the classifier sees. Kept Streamlit-free so it stays unit-testable.
+to ``temporal_model.core.crop`` so the displayed tube crops use the same crop
+geometry as the classifier — centered on the same stabilized window, but expanded
+by a wider display ``CROP_CONTEXT`` (2.0) than the model's 1.5 for legibility.
+Kept Streamlit-free so it stays unit-testable.
 """
 
 from __future__ import annotations
@@ -217,8 +219,10 @@ def crop_around_bbox(
     context_factor: float = CROP_CONTEXT,
     patch_size: int = CROP_SIZE,
 ) -> Image.Image:
-    """Square crop centred on a normalized bbox, expanded for context (reuses the
-    lib's model-input crop so it matches what the classifier sees)."""
+    """Square crop centred on a normalized bbox, expanded by ``context_factor``
+    (reuses the lib's model-input crop geometry). The default ``CROP_CONTEXT`` (2.0)
+    is a bit wider than the model's 1.5, so the crop shows the same window the
+    classifier used with a little extra context."""
     img = np.array(Image.open(image_path).convert("RGB"))
     img_h, img_w = img.shape[:2]
     cx, cy, bw, bh = bbox_norm

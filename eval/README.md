@@ -30,7 +30,8 @@ as `python -m temporal_model.eval.evaluate`). Depends on `temporal-model-core`.
 `make app` launches a local, read-only Streamlit viewer over the reporting tree.
 For each sequence it shows the frames with YOLO bboxes overlaid (the decisive /
 would-trigger tubes flagged), the per-tube timeline, each kept tube's **stabilized
-crop** (the fixed window the classifier saw) synced to the current frame, and the
+crop** (the same fixed window the classifier used, shown with a little extra
+context) synced to the current frame, and the
 keep/discard decision. Sequences are listed in an error-coloured, filterable table
 (missed smoke / false alarm / smoke kept / fp filtered). The viewer never runs the
 model — it only reads generated artifacts.
