@@ -7,6 +7,7 @@ import { SequenceTable } from "@/components/SequenceTable";
 import { fetchModelConfig, fetchResults, fetchSequence, fetchSources } from "@/lib/api";
 import { applyFilters, cameraOptions, defaultFilters, type Filters } from "@/lib/filters";
 import { applyThreshold } from "@/lib/outcomes";
+import { nextSort, sortRows, type Sort } from "@/lib/sort";
 import type { BboxTubeDetails, ModelConfig, ResultRow, SequenceView } from "@/lib/types";
 
 const DEFAULT_LOGISTIC_THRESHOLD = 0.5;
@@ -67,7 +68,11 @@ export default function Page() {
     setFilters(defaultFilters());
   }
   const cameras = useMemo(() => cameraOptions(sourceRows), [sourceRows]);
-  const tableRows = useMemo(() => applyFilters(rows, filters), [rows, filters]);
+  const [sort, setSort] = useState<Sort | null>(null);
+  const tableRows = useMemo(
+    () => sortRows(applyFilters(rows, filters), sort),
+    [rows, filters, sort],
+  );
 
   // Effective selection is derived: fall back to the first visible row when the
   // user's pick is filtered out / absent — no state-sync effect needed.
@@ -106,7 +111,13 @@ export default function Page() {
           totalCount={rows.length}
         />
         <div className="min-h-0 flex-1">
-          <SequenceTable rows={tableRows} selectedKey={selected} onSelect={setSelectedKey} />
+          <SequenceTable
+            rows={tableRows}
+            selectedKey={selected}
+            onSelect={setSelectedKey}
+            sort={sort}
+            onSort={(col) => setSort((cur) => nextSort(cur, col))}
+          />
         </div>
       </div>
       <div className="w-[40%] shrink-0 border-l border-slate-200">

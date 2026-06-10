@@ -1,18 +1,51 @@
 "use client";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, type ReactNode } from "react";
 import { correctnessLabel, outcomeTokens, rowTokens } from "@/lib/correctness";
+import type { Sort, SortCol } from "@/lib/sort";
 import type { ResultRow } from "@/lib/types";
 
 const num = (v: number | null) => (v == null ? "—" : v.toFixed(3));
+
+interface Column {
+  header: string;
+  sortCol: SortCol | null;
+  render: (r: ResultRow) => ReactNode;
+  cellStyle?: (r: ResultRow) => React.CSSProperties;
+}
+
+const COLUMNS: Column[] = [
+  { header: "camera", sortCol: "camera", render: (r) => r.camera_name ?? "—" },
+  { header: "ground truth", sortCol: "label", render: (r) => r.label },
+  { header: "verdict", sortCol: "decision", render: (r) => r.decision },
+  {
+    header: "correctness",
+    sortCol: "outcome",
+    cellStyle: (r) => ({ color: rowTokens(r.outcome, r.decision).text }),
+    render: (r) => (
+      <>
+        <span
+          className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle"
+          style={{ background: outcomeTokens[r.outcome].dot }}
+        />
+        {correctnessLabel(r.outcome)}
+      </>
+    ),
+  },
+  { header: "prob", sortCol: "probability", render: (r) => num(r.probability) },
+];
 
 export function SequenceTable({
   rows,
   selectedKey,
   onSelect,
+  sort = null,
+  onSort,
 }: {
   rows: ResultRow[];
   selectedKey: string | null;
   onSelect: (key: string) => void;
+  sort?: Sort | null;
+  onSort?: (col: SortCol) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const order = useMemo(() => rows.map((r) => r.key), [rows]);
@@ -22,6 +55,9 @@ export function SequenceTable({
     const i = Math.max(0, order.indexOf(selectedKey ?? order[0]));
     onSelect(order[Math.min(order.length - 1, Math.max(0, i + delta))]);
   }
+
+  const arrow = (col: SortCol | null) =>
+    col && sort?.col === col ? (sort.dir === "asc" ? " ▲" : " ▼") : "";
 
   return (
     <div
@@ -42,9 +78,16 @@ export function SequenceTable({
       <table className="w-full border-collapse text-sm">
         <thead className="sticky top-0 bg-white text-left text-xs uppercase tracking-wide text-slate-500">
           <tr>
-            {["camera", "ground truth", "verdict", "correctness", "prob"].map((h) => (
-              <th key={h} className="border-b border-slate-200 px-3 py-2">
-                {h}
+            {COLUMNS.map((c) => (
+              <th
+                key={c.header}
+                onClick={() => c.sortCol && onSort?.(c.sortCol)}
+                className={`border-b border-slate-200 px-3 py-2 ${
+                  c.sortCol && onSort ? "cursor-pointer select-none hover:text-slate-700" : ""
+                }`}
+              >
+                {c.header}
+                {arrow(c.sortCol)}
               </th>
             ))}
           </tr>
@@ -60,17 +103,15 @@ export function SequenceTable({
                 style={{ background: t.bg }}
                 className={`cursor-pointer ${sel ? "ring-2 ring-inset ring-slate-400" : ""}`}
               >
-                <td className="px-3 py-1.5 text-slate-700">{r.camera_name ?? "—"}</td>
-                <td className="px-3 py-1.5 text-slate-700">{r.label}</td>
-                <td className="px-3 py-1.5 text-slate-700">{r.decision}</td>
-                <td className="px-3 py-1.5" style={{ color: t.text }}>
-                  <span
-                    className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle"
-                    style={{ background: outcomeTokens[r.outcome].dot }}
-                  />
-                  {correctnessLabel(r.outcome)}
-                </td>
-                <td className="px-3 py-1.5 text-slate-600">{num(r.probability)}</td>
+                {COLUMNS.map((c) => (
+                  <td
+                    key={c.header}
+                    className="px-3 py-1.5 text-slate-700"
+                    style={c.cellStyle?.(r)}
+                  >
+                    {c.render(r)}
+                  </td>
+                ))}
               </tr>
             );
           })}
