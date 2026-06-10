@@ -1,11 +1,45 @@
 """Tests for the API benchmark client's request planning + row assembly."""
 
 from temporal_model.benchmark.run_api import (
+    _http_post,
     build_requests,
     frame_key,
     rows_for_sequence,
 )
 from temporal_model.core.protocol import Frame
+
+
+class _FakeResp:
+    status_code = 200
+
+    def json(self):
+        return {}
+
+
+def test_http_post_sends_bearer_token_when_env_set(monkeypatch):
+    captured = {}
+
+    def fake_post(url, **kwargs):
+        captured.update(kwargs)
+        return _FakeResp()
+
+    monkeypatch.setenv("TEMPORAL_API_TOKEN", "s3cr3t")
+    monkeypatch.setattr("temporal_model.benchmark.run_api.requests.post", fake_post)
+    _http_post("http://x", ["a.jpg"])
+    assert captured["headers"] == {"Authorization": "Bearer s3cr3t"}
+
+
+def test_http_post_no_auth_header_when_env_unset(monkeypatch):
+    captured = {}
+
+    def fake_post(url, **kwargs):
+        captured.update(kwargs)
+        return _FakeResp()
+
+    monkeypatch.delenv("TEMPORAL_API_TOKEN", raising=False)
+    monkeypatch.setattr("temporal_model.benchmark.run_api.requests.post", fake_post)
+    _http_post("http://x", ["a.jpg"])
+    assert captured["headers"] is None
 
 
 def _seq(store, n):

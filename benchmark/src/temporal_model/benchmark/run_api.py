@@ -2,6 +2,7 @@
 e2e latency and the server-side profiling block."""
 
 import logging
+import os
 import time
 from pathlib import Path
 
@@ -42,9 +43,14 @@ def build_requests(
 
 def _http_post(base_url: str, keys: list[str]) -> tuple[int, dict, float]:
     """POST one request; return (status, json_body, e2e_ms)."""
+    token = os.environ.get("TEMPORAL_API_TOKEN")
+    headers = {"Authorization": f"Bearer {token}"} if token else None
     started = time.perf_counter()
     resp = requests.post(
-        f"{base_url}/predict?verbose=true", json={"frames": keys}, timeout=300
+        f"{base_url}/predict?verbose=true",
+        json={"frames": keys},
+        headers=headers,
+        timeout=300,
     )
     e2e_ms = (time.perf_counter() - started) * 1000.0
     try:
