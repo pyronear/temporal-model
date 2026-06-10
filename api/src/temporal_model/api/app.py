@@ -143,7 +143,9 @@ async def predict(
                     fetch_frames, s3_client, bucket, body.frames, Path(tmp)
                 )
 
-            out = await runner.predict(paths, timer=timer, profile=profile)
+            out = await runner.predict(
+                paths, roi=body.roi_xyxyn, timer=timer, profile=profile
+            )
 
             profiling = None
             if timer is not None:

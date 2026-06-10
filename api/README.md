@@ -8,8 +8,11 @@ Import as `temporal_model.api`. Depends on `temporal-model-core`.
 ## Endpoints
 
 - `GET /health` — readiness + loaded model name/version.
-- `POST /predict` — body `{ "frames": ["<s3-key>", ...], "bucket": "<name>" }`
-  (ordered S3 keys; `bucket` optional, falls back to `S3_BUCKET`);
+- `POST /predict` — body `{ "frames": ["<s3-key>", ...], "bucket": "<name>",
+  "roi_xyxyn": [x_min, y_min, x_max, y_max] }`
+  (ordered S3 keys; `bucket` optional, falls back to `S3_BUCKET`;
+  `roi_xyxyn` optional normalized region of interest — tubes with no real
+  detection intersecting it are dropped before scoring);
   returns `{ is_smoke, probability, model }` (`probability` = max kept-tube
   calibrated probability, `null` if uncalibrated).
   `POST /predict?verbose=true` adds a `details` block (decision, preprocessing,
