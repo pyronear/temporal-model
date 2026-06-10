@@ -316,6 +316,8 @@ MODEL_CONFIG_HELP = {
 def render_model_config(source: str) -> None:  # pragma: no cover - Streamlit UI
     """Sidebar panel: headline model fields with info-on-hover."""
     cfg = load_model_config(source)
+    # Spacer pushes the whole panel toward the bottom of the sidebar.
+    st.sidebar.markdown("<div style='margin-top:42vh'></div>", unsafe_allow_html=True)
     st.sidebar.divider()
     st.sidebar.caption("Model config · hover a field for details")
     if not cfg:
