@@ -212,3 +212,99 @@ stages:
       hash: md5
       md5: 2360f6e3b090ac9db14dc2490f035e66
       size: 31822
+  evaluate_pyro_annotator:
+    cmd: uv run python -m temporal_model.eval.evaluate --model-zip 
+      data/06_models/vit_dinov2_finetune/model.zip --sequences-dir 
+      data/01_raw/pyro-annotator --output-dir 
+      data/08_reporting/pyro-annotator/vit_dinov2_finetune --model-name 
+      vit_dinov2_finetune-pyro-annotator --source pyro-annotator --store
+    deps:
+    - path: ../core/src/temporal_model/core/crop.py
+      hash: md5
+      md5: ac007c4aa7fc43c331313a7d504df7d1
+      size: 1608
+    - path: ../core/src/temporal_model/core/details_schema.py
+      hash: md5
+      md5: 245e375c871549b2237d3c3d48874930
+      size: 1488
+    - path: ../core/src/temporal_model/core/inference.py
+      hash: md5
+      md5: e8d6bb9ed9ab6dccd625d12721ed382e
+      size: 17580
+    - path: ../core/src/temporal_model/core/model.py
+      hash: md5
+      md5: 29916a99ebdfd722c4c5a671977b5c07
+      size: 15581
+    - path: ../core/src/temporal_model/core/protocol.py
+      hash: md5
+      md5: 2d44441b0b89790f11b845406ebd6026
+      size: 5560
+    - path: ../core/src/temporal_model/core/stabilize.py
+      hash: md5
+      md5: 124b0153ce4ce83e7bb346a11c51acca
+      size: 3052
+    - path: data/01_raw/pyro-annotator
+      hash: md5
+      md5: b1ff41224c407344f0a57ec8ca5663e1.dir
+      size: 575544716
+      nfiles: 5083
+    - path: data/06_models/vit_dinov2_finetune/model.zip
+      hash: md5
+      md5: e976a17cb5b9c8ae758352fc787e3fc5
+      size: 162765214
+    - path: src/temporal_model/eval/eval_plots.py
+      hash: md5
+      md5: f76a38b124a936129d9e0cc6910b9e33
+      size: 3399
+    - path: src/temporal_model/eval/evaluate.py
+      hash: md5
+      md5: 19aaf5512930294564a72eb5d200b183
+      size: 9185
+    - path: src/temporal_model/eval/outcomes.py
+      hash: md5
+      md5: f573431eeb6b75c308e64d24140f1ac3
+      size: 3037
+    - path: src/temporal_model/eval/protocol_eval.py
+      hash: md5
+      md5: 21445c4108c78c9469b3d1bf960075d5
+      size: 5348
+    - path: src/temporal_model/eval/store.py
+      hash: md5
+      md5: 4fb7277397d805e0fcbd2c939d813799
+      size: 2966
+    - path: src/temporal_model/eval/view_store.py
+      hash: md5
+      md5: 754f43e533aadb679729029d568a874c
+      size: 1038
+    outs:
+    - path: data/08_reporting/pyro-annotator/vit_dinov2_finetune/details
+      hash: md5
+      md5: 34e71fd856b43757bd9ed4992eb01de8.dir
+      size: 1454580
+      nfiles: 332
+    - path: data/08_reporting/pyro-annotator/vit_dinov2_finetune/dropped.json
+      hash: md5
+      md5: d751713988987e9331980363e24189ce
+      size: 2
+    - path: data/08_reporting/pyro-annotator/vit_dinov2_finetune/metrics.json
+      hash: md5
+      md5: 28815651773bd88c82fc02e341280082
+      size: 298
+    - path: 
+        data/08_reporting/pyro-annotator/vit_dinov2_finetune/predictions.json
+      hash: md5
+      md5: 4d07311055b91d7877a766ff99e31148
+      size: 1438741
+    - path: data/08_reporting/pyro-annotator/vit_dinov2_finetune/results.json
+      hash: md5
+      md5: df1d1ca3aea09bcd770f083ad07a164b
+      size: 122264
+    - path: data/08_reporting/pyro-annotator/vit_dinov2_finetune/results.parquet
+      hash: md5
+      md5: d900a1eebc611e4b4090c4b6c3e0249f
+      size: 20265
+    - path: data/08_reporting/pyro-annotator/vit_dinov2_finetune/sequences
+      hash: md5
+      md5: 7839c81ea976f28f1d6c337f20257c11.dir
+      size: 516144
+      nfiles: 332
