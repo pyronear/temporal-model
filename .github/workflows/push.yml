@@ -44,4 +44,6 @@ jobs:
           context: .
           file: api/Dockerfile
           push: true
-          tags: ${{ env.BACKEND_IMAGE_NAME }}:${{ env.VERSION }}
+          tags: |
+            ${{ env.BACKEND_IMAGE_NAME }}:${{ env.VERSION }}
+            ${{ env.BACKEND_IMAGE_NAME }}:latest
