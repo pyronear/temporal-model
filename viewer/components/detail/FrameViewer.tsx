@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { frameUrl } from "@/lib/api";
 import { BboxOverlay, type OverlayBox } from "@/components/detail/BboxOverlay";
+import { FrameModal } from "@/components/detail/FrameModal";
 
 export function FrameViewer({
   frames,
@@ -19,17 +20,12 @@ export function FrameViewer({
   const [zoom, setZoom] = useState(false);
 
   useEffect(() => {
+    // Autoplay keeps running even while the modal is open, so the enlarged view
+    // plays the sequence; the modal's zoom/pan is its own state and persists.
     if (!playing || n === 0) return;
     const t = setInterval(() => setI((p) => (p + 1) % n), 1000);
     return () => clearInterval(t);
   }, [playing, n, setI]);
-
-  useEffect(() => {
-    if (!zoom) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setZoom(false);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [zoom]);
 
   if (n === 0) return null;
   const cur = i % n;
@@ -67,23 +63,12 @@ export function FrameViewer({
       </div>
 
       {zoom && (
-        <div
-          onClick={() => setZoom(false)}
-          className="fixed inset-0 z-50 flex cursor-zoom-out items-center justify-center bg-black/80 p-4"
-        >
-          <div className="relative inline-block">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={frameUrl(frames[cur])}
-              alt={`frame ${cur}`}
-              className="block max-h-[92vh] max-w-[92vw] object-contain"
-            />
-            <BboxOverlay boxes={boxesByFrame(cur)} />
-            <span className="absolute right-2 top-2 rounded bg-black/60 px-2 py-0.5 text-xs text-white">
-              frame {cur + 1}/{n} · Esc to close
-            </span>
-          </div>
-        </div>
+        <FrameModal
+          src={frameUrl(frames[cur])}
+          boxes={boxesByFrame(cur)}
+          label={`frame ${cur + 1}/${n}`}
+          onClose={() => setZoom(false)}
+        />
       )}
     </div>
   );
