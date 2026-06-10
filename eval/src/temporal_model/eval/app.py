@@ -67,6 +67,11 @@ def load_sequence_view(source: str, key: str) -> dict:
     return json.loads(path.read_text()) if path.exists() else {}
 
 
+def load_model_config(source: str) -> dict:
+    path = REPORTING / source / MODEL_NAME / "model_config.json"
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
 def _tube_timeline_chart(
     alt,
     tube_rows,
@@ -286,6 +291,38 @@ def render_performance(df: pd.DataFrame) -> None:  # pragma: no cover - Streamli
             col.caption(frac)
 
 
+def render_model_config(source: str) -> None:  # pragma: no cover - Streamlit UI
+    """Sidebar panel: headline model fields + a full-config expander."""
+    cfg = load_model_config(source)
+    st.sidebar.divider()
+    st.sidebar.caption("Model config")
+    if not cfg:
+        st.sidebar.caption("model config unavailable")
+        return
+    detector = (cfg.get("detector") or {}).get("source", "—")
+    decision = cfg.get("decision") or {}
+    model_input = cfg.get("model_input") or {}
+    infer = cfg.get("infer") or {}
+    classifier = cfg.get("classifier") or {}
+    sha = (cfg.get("train_git_sha") or "")[:8] or "—"
+    lines = [
+        f"**detector** `{detector}`",
+        f"**variant** {cfg.get('variant', '—')}",
+        f"**train sha** `{sha}`",
+        f"**aggregation** {decision.get('aggregation', '—')}",
+        f"**threshold** {decision.get('threshold', '—')}",
+        f"**logistic threshold** {decision.get('logistic_threshold', '—')}",
+        f"**stabilize** {model_input.get('stabilize', '—')}",
+        f"**context factor** {model_input.get('context_factor', '—')}",
+        f"**max frames** {classifier.get('max_frames', '—')}",
+        f"**pad** {infer.get('pad_strategy', '—')} / min "
+        f"{infer.get('pad_to_min_frames', '—')}",
+    ]
+    st.sidebar.markdown("  \n".join(lines))
+    with st.sidebar.expander("full config"):
+        st.json(cfg)
+
+
 def main() -> None:  # pragma: no cover - Streamlit UI
     st.set_page_config(page_title="Eval Qualitative Viewer", layout="wide")
     st.title("Eval Qualitative Viewer")
@@ -302,6 +339,7 @@ def main() -> None:  # pragma: no cover - Streamlit UI
         key=lambda s: (s != "pyro-annotator", s),
     )
     source = st.sidebar.selectbox("source", sources, key="source")
+    render_model_config(source)
     view = df[df["source"] == source].reset_index(drop=True)
     has_org = view["organization_name"].notna().any()
     has_cam = view["camera_name"].notna().any()
