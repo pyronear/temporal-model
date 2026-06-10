@@ -1,7 +1,9 @@
 PACKAGES := core train eval api benchmark
 
 # Released model.zip version fetched from HuggingFace by `fetch-model`.
-MODEL_VERSION ?= 0.2.0
+# Pinned in api/MODEL_VERSION — the repo version and the model version are
+# decoupled (code can change without retraining).
+MODEL_VERSION ?= $(shell cat api/MODEL_VERSION)
 MODEL_ZIP := api/models/model.zip
 
 .DEFAULT_GOAL := help
