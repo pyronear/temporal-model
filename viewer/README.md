@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Eval Qualitative Viewer (React / Next.js)
 
-## Getting Started
+A local, read-only web viewer over the temporal-model **eval reporting tree** — the
+React/Next.js + Tailwind port of the Streamlit viewer (`eval/src/temporal_model/eval/app.py`).
+Same data, polished UI: a master–detail layout, light palette, and client-side rendering of
+frames, bounding boxes, and stabilized tube crops.
 
-First, run the development server:
+It reads only the artifacts eval emits (see
+`docs/specs/2026-06-10-eval-viewer-nextjs-redesign-design.md`): `results.json`,
+`details/<key>.json`, `sequences/<key>.json`, `model_config.json`, plus the frame images — it
+never runs the model.
+
+## Prerequisites
+
+- Node 22+, npm.
+- A populated eval reporting tree (`<DATA_ROOT>/data/08_reporting/...`) and the frame images it
+  points at. Generate with `uv run dvc repro` in `eval/`, or `dvc pull`.
+
+## Run
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd viewer
+cp .env.local.example .env.local   # set DATA_ROOT to your eval/ dir (default ../eval)
+npm install
+npm run dev                        # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`DATA_ROOT` points at the `eval/` package directory; the app derives the reporting tree
+(`$DATA_ROOT/data/08_reporting`) and resolves frame paths (relative to `$DATA_ROOT`). The frame
+route refuses any path that escapes `DATA_ROOT`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## What it shows
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Left rail:** source selector, performance cards, the live **logistic-threshold slider**
+  (+ reset), and the model-config panel (hover a field for its description).
+- **Center:** an error-coloured, keyboard-navigable (↑/↓) sequence table.
+- **Right:** the selected sequence's autoplaying frame viewer with bbox overlay, the per-tube
+  timeline, and the stabilized tube crops. The threshold slider re-decides the cards + table
+  live; the drill-down shows the model's actual run.
 
-## Learn More
+## Develop
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm test            # vitest (pure-logic parity + component tests)
+npm run lint        # eslint
+npm run build       # production build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The pure helpers in `lib/` (`outcomes`, `details`, `crop`, `correctness`) mirror the Python
+viewer and are unit-tested against the same cases — the Python is the source of truth if a
+number ever disagrees.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Scope
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Feature parity with the Streamlit viewer. The table filter popover + column sort are a
+documented fast-follow (they layer onto the row list without touching data or detail code).
