@@ -1,4 +1,5 @@
 """Step 6 visuals: how the logistic calibrator maps tube features to probability."""
+
 import json
 import math
 import zipfile
@@ -13,15 +14,18 @@ OUT = ROOT / "docs/assets"
 with zipfile.ZipFile(ROOT / "api/models/model.zip") as zf:
     cal = json.loads(zf.read("logistic_calibrator.json"))
     import yaml
+
     cfg = yaml.safe_load(zf.read("config.yaml"))
 
 W = np.asarray(cal["coefficients"])  # [logit, log_len, mean_conf, n_tubes]
 B = float(cal["intercept"])
 THR = float(cfg["decision"]["logistic_threshold"])
 
+
 def proba(logit, length, mean_conf, n_tubes):
     z = W @ np.array([logit, math.log1p(length), mean_conf, float(n_tubes)]) + B
     return 1.0 / (1.0 + np.exp(-z))
+
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 3.8), dpi=150)
 
@@ -47,10 +51,18 @@ ax1.set_ylim(-0.02, 1.02)
 lo = np.linspace(-10, 12, 220)
 ln = np.arange(2, 21)
 P = np.array([[proba(x, length, 0.30, 2) for x in lo] for length in ln])
-im = ax2.imshow(P, aspect="auto", origin="lower", cmap="RdYlGn",
-                extent=[lo[0], lo[-1], ln[0], ln[-1]], vmin=0, vmax=1)
-cs = ax2.contour(lo, ln, P, levels=[THR], colors="black", linewidths=1.5,
-                 linestyles="--")
+im = ax2.imshow(
+    P,
+    aspect="auto",
+    origin="lower",
+    cmap="RdYlGn",
+    extent=[lo[0], lo[-1], ln[0], ln[-1]],
+    vmin=0,
+    vmax=1,
+)
+cs = ax2.contour(
+    lo, ln, P, levels=[THR], colors="black", linewidths=1.5, linestyles="--"
+)
 ax2.clabel(cs, fmt={THR: "decision boundary"}, fontsize=8)
 ax2.set_xlabel("raw classifier logit")
 ax2.set_ylabel("tube length (frames)")
