@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+from temporal_model.core.details_schema import KeptTube
 from temporal_model.core.stabilize import tube_stabilized_window
 
 
@@ -39,7 +40,12 @@ def test_window_ignores_gap_only_entries_without_detection():
         _Entry(_Det(0.5, 0.5, 0.2, 0.2)),
     ]
     cx, cy, w, h = tube_stabilized_window(entries)
-    assert (round(cx, 4), round(cy, 4), round(w, 4), round(h, 4)) == (0.5, 0.5, 0.2, 0.2)
+    assert (round(cx, 4), round(cy, 4), round(w, 4), round(h, 4)) == (
+        0.5,
+        0.5,
+        0.2,
+        0.2,
+    )
 
 
 def test_window_none_when_no_usable_detection():
@@ -48,8 +54,6 @@ def test_window_none_when_no_usable_detection():
 
 
 def test_kept_tube_schema_accepts_window():
-    from temporal_model.core.details_schema import KeptTube
-
     t = KeptTube(
         tube_id=0,
         start_frame=0,
@@ -64,8 +68,6 @@ def test_kept_tube_schema_accepts_window():
 
 
 def test_kept_tube_window_defaults_none():
-    from temporal_model.core.details_schema import KeptTube
-
     t = KeptTube(
         tube_id=0,
         start_frame=0,
