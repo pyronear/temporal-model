@@ -314,7 +314,7 @@ MODEL_CONFIG_HELP = {
 
 
 def render_model_config(source: str) -> None:  # pragma: no cover - Streamlit UI
-    """Sidebar panel: headline model fields (info-on-hover) + full-config expander."""
+    """Sidebar panel: headline model fields with info-on-hover."""
     cfg = load_model_config(source)
     st.sidebar.divider()
     st.sidebar.caption("Model config · hover a field for details")
@@ -354,8 +354,6 @@ def render_model_config(source: str) -> None:  # pragma: no cover - Streamlit UI
         for label, value in fields
     ]
     st.sidebar.markdown("".join(rows), unsafe_allow_html=True)
-    with st.sidebar.expander("full config"):
-        st.json(cfg)
 
 
 def main() -> None:  # pragma: no cover - Streamlit UI
