@@ -28,5 +28,9 @@ def require_token(
     expected = settings.token
     if not expected:
         return
-    if creds is None or not secrets.compare_digest(creds.credentials, expected):
+    # Compare UTF-8 bytes: secrets.compare_digest rejects non-ASCII str inputs
+    # with a TypeError, which would otherwise surface as a 500.
+    if creds is None or not secrets.compare_digest(
+        creds.credentials.encode("utf-8"), expected.encode("utf-8")
+    ):
         raise Unauthorized("missing or invalid token")
