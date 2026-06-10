@@ -36,7 +36,7 @@ from .logistic_calibrator import (
 from .package import DEFAULT_AGGREGATION, ModelPackage, load_model_package
 from .protocol import Frame, TemporalModel, TemporalModelOutput
 from .stage_timer import StageTimer, stage_ctx
-from .tubes import build_tubes
+from .tubes import build_tubes, tube_intersects_roi
 from .types import FrameDetections
 
 __all__ = [
@@ -191,9 +191,23 @@ class BboxTubeTemporalModel(TemporalModel):
         frames: list[Frame],
         *,
         frame_detections: dict[str, FrameDetections] | None = None,
+        roi: tuple[float, float, float, float] | None = None,
         timer: StageTimer | None = None,
         compute_trigger: bool = False,
     ) -> TemporalModelOutput:
+        if roi is not None:
+            x_min, y_min, x_max, y_max = roi
+            if (
+                not all(0.0 <= c <= 1.0 for c in roi)
+                or x_min >= x_max
+                or y_min >= y_max
+            ):
+                raise ValueError(
+                    f"invalid roi {roi!r}: expected normalized "
+                    "(x_min, y_min, x_max, y_max) with x_min < x_max "
+                    "and y_min < y_max"
+                )
+
         infer = self._cfg["infer"]
         tubes_cfg = self._cfg["tubes"]
         mi = self._cfg["model_input"]
@@ -213,6 +227,7 @@ class BboxTubeTemporalModel(TemporalModel):
             num_truncated: int,
             padded_indices: list[int],
             num_candidates: int,
+            num_outside_roi: int,
             kept_tubes_models: list[KeptTube],
             trigger_tube_id: int | None,
         ) -> dict:
@@ -224,6 +239,7 @@ class BboxTubeTemporalModel(TemporalModel):
                 ),
                 tubes=Tubes(
                     num_candidates=num_candidates,
+                    num_outside_roi=num_outside_roi,
                     kept=kept_tubes_models,
                 ),
                 decision=Decision(
@@ -243,6 +259,7 @@ class BboxTubeTemporalModel(TemporalModel):
                     num_truncated=0,
                     padded_indices=[],
                     num_candidates=0,
+                    num_outside_roi=0,
                     kept_tubes_models=[],
                     trigger_tube_id=None,
                 ),
@@ -293,6 +310,11 @@ class BboxTubeTemporalModel(TemporalModel):
                 merge_prox_factor=tubes_cfg.get("merge_prox_factor"),
                 merge_max_gap=tubes_cfg.get("merge_max_gap"),
             )
+            num_outside_roi = 0
+            if roi is not None:
+                n_before = len(kept)
+                kept = [t for t in kept if tube_intersects_roi(t, roi)]
+                num_outside_roi = n_before - len(kept)
 
         if not kept:
             return TemporalModelOutput(
@@ -303,6 +325,7 @@ class BboxTubeTemporalModel(TemporalModel):
                     num_truncated=n_truncated,
                     padded_indices=padded_indices,
                     num_candidates=len(candidate_tubes),
+                    num_outside_roi=num_outside_roi,
                     kept_tubes_models=[],
                     trigger_tube_id=None,
                 ),
@@ -417,6 +440,7 @@ class BboxTubeTemporalModel(TemporalModel):
                 num_truncated=n_truncated,
                 padded_indices=padded_indices,
                 num_candidates=len(candidate_tubes),
+                num_outside_roi=num_outside_roi,
                 kept_tubes_models=kept_models,
                 trigger_tube_id=trigger_tube_id,
             ),
