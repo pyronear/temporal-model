@@ -225,3 +225,20 @@ def test_request_accepts_whole_frame_roi():
 def test_request_rejects_invalid_roi(roi):
     with pytest.raises(ValidationError):
         PredictRequest(frames=["a.jpg"], roi_xyxyn=roi)
+
+
+def test_verbose_details_map_num_tubes_outside_roi():
+    details = _details([_tube(1, 0.9)])
+    details["tubes"]["num_outside_roi"] = 3
+    out = SimpleNamespace(is_positive=True, trigger_frame_index=3, details=details)
+    resp = to_response(out, name="m", version="1", calibrated=True, verbose=True)
+    assert resp.details.preprocessing.num_tubes_outside_roi == 3
+
+
+def test_verbose_details_num_tubes_outside_roi_defaults_to_zero():
+    # Core dumps from before the ROI feature lack the key.
+    details = _details([_tube(1, 0.9)])
+    assert "num_outside_roi" not in details["tubes"]
+    out = SimpleNamespace(is_positive=True, trigger_frame_index=3, details=details)
+    resp = to_response(out, name="m", version="1", calibrated=True, verbose=True)
+    assert resp.details.preprocessing.num_tubes_outside_roi == 0

@@ -99,6 +99,7 @@ class Preprocessing(BaseModel):
     num_truncated: int
     padded_frame_indices: list[int]
     num_tube_candidates: int
+    num_tubes_outside_roi: int = 0
 
 
 class Details(BaseModel):
@@ -155,6 +156,7 @@ def _to_details(
             num_truncated=pre["num_truncated"],
             padded_frame_indices=pre["padded_frame_indices"],
             num_tube_candidates=tubes_block["num_candidates"],
+            num_tubes_outside_roi=tubes_block.get("num_outside_roi", 0),
         ),
         tubes=[Tube(**t) for t in tubes_block["kept"]],
         profiling=profiling,
