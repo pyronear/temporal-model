@@ -381,36 +381,43 @@ def main() -> None:  # pragma: no cover - Streamlit UI
     has_org = view["organization_name"].notna().any()
     has_cam = view["camera_name"].notna().any()
 
-    # Logistic-threshold explorer. Read the current slider value from session_state
-    # BEFORE the cards/table (Streamlit widgets persist their value by key), so they
-    # reflect it; the slider widget itself renders just below the cards. Only shown
-    # for calibrated sources (some non-null probability).
+    # Logistic-threshold explorer. The slider value is stored in session_state by
+    # key, so the cards/table (read it BEFORE the slider renders) reflect it live;
+    # the slider widget renders just below the cards. Only shown for calibrated
+    # sources (some non-null probability).
     has_prob = bool(view["probability"].notna().any())
     default_thr = float(
         (load_model_config(source).get("decision") or {}).get("logistic_threshold", 0.5)
     )
     thr_key = f"thr_{source}"
-    thr = float(st.session_state.get(thr_key, default_thr)) if has_prob else default_thr
     if has_prob:
-        view = apply_threshold(view, thr)
+        st.session_state.setdefault(thr_key, default_thr)
+        view = apply_threshold(view, float(st.session_state[thr_key]))
 
     render_performance(view)
 
     if has_prob:
+
+        def _reset_threshold(key: str = thr_key, value: float = default_thr) -> None:
+            # Runs as a callback before the next render's widget init, so writing
+            # the slider's key here is allowed (unlike after the widget exists).
+            st.session_state[key] = value
+
         scol, rcol = st.columns([5, 1], vertical_alignment="bottom")
         scol.slider(
             "logistic threshold",
             0.0,
             1.0,
-            value=default_thr,
             step=0.01,
             key=thr_key,
             help="Re-decides keep/discard live (cards + table). "
             "Drill-down shows the model's actual run.",
         )
-        if rcol.button("↺ reset", help=f"model default: {default_thr:.3f}"):
-            st.session_state.pop(thr_key, None)
-            st.rerun()
+        rcol.button(
+            "↺ reset",
+            on_click=_reset_threshold,
+            help=f"model default: {default_thr:.3f}",
+        )
         st.caption(f"model default logistic threshold: {default_thr:.3f}")
 
     has_day = False
