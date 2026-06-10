@@ -229,6 +229,19 @@ flowchart TD
   masked out of attention. A linear layer on the `[CLS]` output yields **one
   logit per tube**.
 
+**Why a budget of exactly 20 slots?** The positional embeddings are *learned*
+parameters (a `[max_frames + 1, 384]` table, +1 for `[CLS]`), not a sinusoidal
+formula, so the maximum sequence length must be fixed when the model is
+built. The value matches the data: the training dataset's sequences cap out
+at 20 frames (median 19) — at the production cadence of one frame per ~30 s,
+that is a ~10-minute window, the horizon within which early detection is
+worth something. Longer inputs are truncated in Step 1; shorter ones occupy
+fewer slots and the rest are masked out of attention. The number is inherited
+from the original `vision-rd` experiments rather than an ablation recorded in
+this repo — and it is not a compute constraint either: the per-frame ViT
+forward dominates inference, so the temporal encoder's 21 tokens are nowhere
+near a bottleneck.
+
 ### What the model actually receives
 
 The figures below are computed with the released model on the tube from
