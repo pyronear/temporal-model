@@ -11,22 +11,24 @@ behind it, see [`docs/specs/2026-06-03-model-versioning-design.md`](specs/2026-0
 ## 1. The version of a served model
 
 A served model is one self-contained artifact: a packaged `model.zip`. It is
-identified by a single **semantic version** (`X.Y.Z`) that is meant to appear,
-identically, in three places:
+identified by its own **semantic version** (`X.Y.Z`), which is **decoupled from
+the repo version**: the API code can change (and be re-released) without
+retraining, so the two numbers move independently.
 
 | Where | Value |
 |---|---|
-| Git tag | `vX.Y.Z` |
-| Docker image tag (deferred) | `<registry>/temporal-api:X.Y.Z` |
-| `model.zip` manifest | `model_version: "X.Y.Z"` |
+| Git tag / Docker image tag | repo version — `vX.Y.Z` / `pyronear/temporal-model-api:X.Y.Z` |
+| `api/MODEL_VERSION` | **model** version the repo ships — `X.Y.Z` |
+| `model.zip` manifest | `model_version: "X.Y.Z"` (matches `api/MODEL_VERSION`) |
 
-The version bumps on **either** a model change or an API code change — the
-deployable is treated as one product. The model's own lineage stays fully
-recoverable from the manifest's `provenance` block (below), so the human-facing
-version can be a single number.
-
-> The container registry and the tag-triggered release automation are **deferred**
-> (pyronear has no confirmed registry yet). See the spec's "Release flow" section.
+The link between the two is the **pin file `api/MODEL_VERSION`**: it names the
+model release bundled into the Docker image. Tagging the repo `vX.Y.Z` triggers
+the release workflow, which fetches `model.zip` at HF revision
+`v$(cat api/MODEL_VERSION)` and tags the image with the repo version.
+**Bumping the served model = editing this one file** (plus publishing the new
+`model.zip` to HuggingFace first). A repo/code release does **not** imply a
+model release. The model's own lineage stays fully recoverable from the
+manifest's `provenance` block (below).
 
 ## 2. What's inside `model.zip`
 
@@ -197,9 +199,10 @@ This is how the currently-served detector was confirmed to be
 
 Documented here for completeness; not yet implemented (see the spec):
 
-- The **CI release automation** (tag → fetch `model.zip` from HF → bake into image
-  → push to Docker Hub) — designed in the API release spec.
 - The **packaging stage** that produces `model.zip` from a trained checkpoint and
   `publish`es it to HuggingFace.
 - A maintainer HF write token (local, for `publish`). The `pyronear/temporal-model`
   repo is **public**, so CI `fetch` needs no token.
+
+The **CI release automation** (tag → fetch the pinned `model.zip` from HF → bake
+into image → push to Docker Hub) is implemented in `.github/workflows/push.yml`.
