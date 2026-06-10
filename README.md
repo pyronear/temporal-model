@@ -8,6 +8,9 @@ are linked into temporal tubes (greedy IoU), each tube's frames are cropped to
 224×224 patches and scored by a **ViT (DINOv2) backbone + transformer head**
 that emits one logit per tube.
 
+**[How the model works →](docs/README.md)** — illustrated step-by-step guide
+through the full pipeline, with figures generated from real sequences.
+
 ## Packages
 
 Five independent packages, each with its own `pyproject.toml` and `tests/`.
