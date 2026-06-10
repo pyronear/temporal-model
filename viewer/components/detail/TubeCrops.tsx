@@ -57,17 +57,20 @@ export function TubeCrops({
   framePath,
   activeBoxByTube,
   triggerByTube,
+  colorByTube,
 }: {
   tubes: KeptTube[];
   framePath: string;
   activeBoxByTube: Map<number, [number, number, number, number]>;
   triggerByTube: Map<number, TriggerState>;
+  colorByTube: Map<number, string>;
 }) {
   return (
     <div className="space-y-2">
       {tubes.map((t) => {
         const tr = triggerByTube.get(t.tube_id) ?? null;
         const decisive = tr === "decisive";
+        const color = colorByTube.get(t.tube_id) ?? "#64748b";
         return (
           <div
             key={t.tube_id}
@@ -76,11 +79,20 @@ export function TubeCrops({
             }`}
           >
             <div className="flex items-baseline gap-2 text-xs text-slate-500">
-              <span className={decisive ? "font-medium text-slate-700" : undefined}>
-                T{t.tube_id} ·{" "}
-                {t.probability != null
-                  ? `prob ${t.probability.toFixed(2)}`
-                  : `logit ${t.logit.toFixed(2)}`}
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className="inline-block h-2 w-2 shrink-0 rounded-full"
+                  style={{ background: color }}
+                />
+                <span className="font-semibold" style={{ color }}>
+                  T{t.tube_id}
+                </span>
+                <span>
+                  ·{" "}
+                  {t.probability != null
+                    ? `prob ${t.probability.toFixed(2)}`
+                    : `logit ${t.logit.toFixed(2)}`}
+                </span>
               </span>
               <TriggerBadge state={tr} />
             </div>

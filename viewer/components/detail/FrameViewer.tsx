@@ -37,7 +37,7 @@ export function FrameViewer({
           onClick={() => setPlaying((p) => !p)}
           aria-label={playing ? "pause" : "play"}
           title={playing ? "pause" : "play"}
-          className="rounded border border-slate-300 px-2 py-0.5 text-sm leading-none"
+          className="inline-flex h-6 w-7 shrink-0 items-center justify-center rounded border border-slate-300 text-sm leading-none"
         >
           {playing ? "⏸" : "▶"}
         </button>

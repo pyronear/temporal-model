@@ -20,13 +20,24 @@ const PALETTE = [
 ];
 const tubeColor = (id: number) => PALETTE[id % PALETTE.length];
 
-function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
+function Stat({
+  label,
+  value,
+  hint,
+  color,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  color?: string;
+}) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-2">
-      <div className="text-[10px] uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="text-sm font-medium" style={color ? { color } : undefined}>
+    <div className="flex flex-col rounded-xl border border-slate-200 bg-white p-2.5" title={hint}>
+      <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="mt-0.5 text-sm font-semibold" style={color ? { color } : undefined}>
         {value}
       </div>
+      <div className="mt-1 text-[10px] leading-snug text-slate-400">{hint}</div>
     </div>
   );
 }
@@ -95,6 +106,7 @@ export function DetailPanel({
   const triggerByTube = new Map(
     kept.map((t) => [t.tube_id, triggerState(t.tube_id, triggerTubeId, wouldIds)] as const),
   );
+  const colorByTube = new Map(kept.map((t) => [t.tube_id, tubeColor(t.tube_id)] as const));
 
   // The parent owns the frame index so the viewer, timeline, and crops stay in sync.
   const [i, setI] = useState(0);
@@ -107,16 +119,27 @@ export function DetailPanel({
         <code className="text-sm font-medium text-slate-700">{row.key}</code>
       </header>
       <div className="grid grid-cols-4 gap-2 text-sm">
-        <Stat label="verdict" value={row.decision} />
+        <Stat
+          label="verdict"
+          value={row.decision}
+          color={row.decision === "keep" ? "#059669" : "#475569"}
+          hint="the model's keep / discard decision for this sequence"
+        />
         <Stat
           label="correctness"
           value={correctnessLabel(row.outcome)}
           color={outcomeTokens[row.outcome].text}
+          hint="the verdict vs. the ground-truth label"
         />
-        <Stat label="trigger frame" value={trig == null ? "—" : String(trig)} />
+        <Stat
+          label="trigger frame"
+          value={trig == null ? "—" : String(trig)}
+          hint="first frame the model fired (— if discarded)"
+        />
         <Stat
           label="probability"
           value={row.probability == null ? "—" : row.probability.toFixed(3)}
+          hint="max calibrated tube probability driving the decision"
         />
       </div>
       {n > 0 && (
@@ -130,6 +153,7 @@ export function DetailPanel({
             framePath={frames[cur]}
             activeBoxByTube={activeBoxByTube(cur)}
             triggerByTube={triggerByTube}
+            colorByTube={colorByTube}
           />
         </div>
       )}
