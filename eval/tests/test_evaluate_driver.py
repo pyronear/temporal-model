@@ -203,6 +203,9 @@ def test_evaluate_packaged_writes_viewer_artifacts(tmp_path, monkeypatch):
 
     # results table (json + parquet), one row per sequence
     assert (output_dir / "results.parquet").is_file()
+    # model_config.json is always emitted (here {} since the fake zip is absent)
+    assert (output_dir / "model_config.json").is_file()
+    assert json.loads((output_dir / "model_config.json").read_text()) == {}
     rows = json.loads((output_dir / "results.json").read_text())
     by_key = {r["key"]: r for r in rows}
     assert set(by_key) == {"wf_seq_a", "fp_seq_c"}

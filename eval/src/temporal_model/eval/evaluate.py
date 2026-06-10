@@ -28,6 +28,7 @@ from temporal_model.eval.eval_plots import (
     plot_pr_curve,
     plot_roc_curve,
 )
+from temporal_model.eval.model_config import read_model_config
 from temporal_model.eval.outcomes import (
     compute_outcome,
     decision_from_output,
@@ -107,6 +108,10 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     model = BboxTubeTemporalModel.from_archive(args.model_zip, device=args.device)
+
+    (args.output_dir / "model_config.json").write_text(
+        json.dumps(read_model_config(args.model_zip), indent=2, default=str)
+    )
 
     source = args.source or args.sequences_dir.name
     details_dir = args.output_dir / "details"
