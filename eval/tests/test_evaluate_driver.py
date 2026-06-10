@@ -162,6 +162,59 @@ def test_evaluate_packaged_writes_expected_outputs(tmp_path, monkeypatch):
     assert a_positive["kept_tubes"][0]["logit"] == 2.5
 
 
+def test_evaluate_packaged_writes_viewer_artifacts(tmp_path, monkeypatch):
+    import pandas as pd
+
+    sequences_dir = tmp_path / "sequences"
+    output_dir = tmp_path / "out"
+    _make_sequence(sequences_dir, "wildfire", "wf_seq_a", n_frames=4)  # TP
+    _make_sequence(sequences_dir, "fp", "fp_seq_c", n_frames=4)  # FP
+
+    monkeypatch.setattr(
+        model_module.BboxTubeTemporalModel,
+        "from_archive",
+        classmethod(lambda cls, path, device=None: _FakeModel()),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "evaluate_packaged.py",
+            "--model-zip",
+            str(tmp_path / "placeholder.zip"),
+            "--sequences-dir",
+            str(sequences_dir),
+            "--output-dir",
+            str(output_dir),
+            "--model-name",
+            "vit_dinov2_finetune-train",
+            "--source",
+            "train",
+        ],
+    )
+    evaluate_packaged.main()
+
+    # per-sequence details + view records
+    assert (output_dir / "details" / "wf_seq_a.json").is_file()
+    assert (output_dir / "sequences" / "wf_seq_a.json").is_file()
+    view = json.loads((output_dir / "sequences" / "wf_seq_a.json").read_text())
+    assert view["source"] == "train"
+    assert view["label"] == "smoke"
+    assert len(view["frames"]) == 4
+
+    # results table (json + parquet), one row per sequence
+    assert (output_dir / "results.parquet").is_file()
+    rows = json.loads((output_dir / "results.json").read_text())
+    by_key = {r["key"]: r for r in rows}
+    assert set(by_key) == {"wf_seq_a", "fp_seq_c"}
+    assert by_key["wf_seq_a"]["decision"] == "keep"
+    assert by_key["wf_seq_a"]["outcome"] == "kept-smoke"
+    assert by_key["wf_seq_a"]["source"] == "train"
+    assert by_key["fp_seq_c"]["outcome"] == "kept-fp"  # FakeModel keeps 4-frame seqs
+    df = pd.read_parquet(output_dir / "results.parquet")
+    assert len(df) == 2
+
+
 def test_evaluate_packaged_strict_errors_abort(tmp_path, monkeypatch):
     """Any predict() exception must bubble out — strict policy."""
     sequences_dir = tmp_path / "sequences"

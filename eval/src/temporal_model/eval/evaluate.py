@@ -14,6 +14,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 from tqdm import tqdm
 
 from temporal_model.core.model import BboxTubeTemporalModel
@@ -27,11 +28,17 @@ from temporal_model.eval.eval_plots import (
     plot_pr_curve,
     plot_roc_curve,
 )
+from temporal_model.eval.outcomes import (
+    compute_outcome,
+    decision_from_output,
+    max_probability,
+)
 from temporal_model.eval.protocol_eval import (
     SequenceRecord,
     build_record,
     compute_metrics,
 )
+from temporal_model.eval.view_store import SequenceView, write_sequence_view
 
 
 def _parse_args() -> argparse.Namespace:
@@ -48,6 +55,12 @@ def _parse_args() -> argparse.Namespace:
         "--device",
         default=None,
         help="Override device selection (cuda/mps/cpu). Defaults to auto.",
+    )
+    parser.add_argument(
+        "--source",
+        default=None,
+        help="Source label for the results table (e.g. 'train', 'val', "
+        "'pyro-annotator'). Defaults to the sequences-dir name.",
     )
     return parser.parse_args()
 
@@ -88,6 +101,11 @@ def main() -> None:
 
     model = BboxTubeTemporalModel.from_archive(args.model_zip, device=args.device)
 
+    source = args.source or args.sequences_dir.name
+    details_dir = args.output_dir / "details"
+    sequences_dir = args.output_dir / "sequences"
+    result_rows: list[dict] = []
+
     sequences = list_sequences(args.sequences_dir)
     records: list[SequenceRecord] = []
     dropped: list[dict] = []
@@ -107,6 +125,42 @@ def main() -> None:
                 frames=frames,
                 output=output,
             )
+        )
+
+        key = seq_dir.name
+        decision = decision_from_output(output.is_positive)
+        outcome = compute_outcome(decision, label)
+        details_dir.mkdir(parents=True, exist_ok=True)
+        (details_dir / f"{key}.json").write_text(
+            json.dumps(output.details, indent=2, default=str)
+        )
+        write_sequence_view(
+            sequences_dir,
+            SequenceView(
+                key=key,
+                source=source,
+                label=label,
+                organization_name=None,
+                camera_name=None,
+                started_at=None,
+                frames=[p.as_posix() for p in frame_paths],
+            ),
+        )
+        kept = output.details.get("tubes", {}).get("kept", [])
+        result_rows.append(
+            {
+                "key": key,
+                "source": source,
+                "label": label,
+                "decision": decision,
+                "outcome": outcome,
+                "score": max(t["logit"] for t in kept) if kept else None,
+                "probability": max_probability(output.details),
+                "trigger_frame_index": output.trigger_frame_index,
+                "organization_name": None,
+                "camera_name": None,
+                "started_at": None,
+            }
         )
 
     metrics = compute_metrics(args.model_name, records)
@@ -167,6 +221,10 @@ def main() -> None:
     plot_roc_curve(
         y_true, scores_finite, args.output_dir / "roc_curve.png", title=args.model_name
     )
+
+    results_df = pd.DataFrame(result_rows)
+    results_df.to_parquet(args.output_dir / "results.parquet")
+    (args.output_dir / "results.json").write_text(json.dumps(result_rows, indent=2))
 
     print(json.dumps(metrics, indent=2))
     print(
