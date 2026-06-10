@@ -120,6 +120,7 @@ class _OrchestrationModel:
     def __init__(self):
         self.detect_calls: list[list[str]] = []
         self.predict_calls: list[set[str]] = []
+        self.roi_calls: list[tuple | None] = []
 
     def load_sequence(self, paths):
         return [
@@ -136,8 +137,9 @@ class _OrchestrationModel:
             for i, f in enumerate(frames)
         ]
 
-    def predict(self, frames, *, frame_detections=None, timer=None):
+    def predict(self, frames, *, frame_detections=None, roi=None, timer=None):
         self.predict_calls.append(set(frame_detections or {}))
+        self.roi_calls.append(roi)
         return SimpleNamespace(frame_ids=[f.frame_id for f in frames])
 
 
@@ -149,6 +151,20 @@ def test_predict_resolves_all_detections_for_model():
     assert out.frame_ids == ["x_00", "x_01"]
     # predict() receives detections for every frame in the sequence.
     assert model.predict_calls[-1] == {"x_00", "x_01"}
+
+
+def test_predict_threads_roi_to_model():
+    model = _OrchestrationModel()
+    runner = ModelRunner(model, name="m", version="1", calibrated=True)
+    asyncio.run(runner.predict(["c/x_00.jpg"], roi=(0.1, 0.2, 0.3, 0.4)))
+    assert model.roi_calls[-1] == (0.1, 0.2, 0.3, 0.4)
+
+
+def test_predict_roi_defaults_to_none():
+    model = _OrchestrationModel()
+    runner = ModelRunner(model, name="m", version="1", calibrated=True)
+    asyncio.run(runner.predict(["c/x_00.jpg"]))
+    assert model.roi_calls[-1] is None
 
 
 def test_predict_caches_and_reuses_detections():
@@ -192,7 +208,7 @@ class _StubModel:
     def detect(self, misses):
         return [SimpleNamespace(frame_id=f.frame_id) for f in misses]
 
-    def predict(self, frames, *, frame_detections=None, timer=None):
+    def predict(self, frames, *, frame_detections=None, roi=None, timer=None):
         self.predict_timer = timer
         if timer is not None:
             with timer.stage("classifier"):
