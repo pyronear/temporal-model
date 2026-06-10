@@ -1,14 +1,17 @@
-import json
 import zipfile
 from pathlib import Path
 
 from temporal_model.eval.model_config import read_model_config
 
 MANIFEST = """\
-detector:
-  source: hf:pyronear/yolo11s_nimble-narwhal_v6.0.0
-  type: yolo
-train_git_sha: 4b4d43ad77c401bab6d01d561b0aa2337f7ee031
+format_version: 1
+provenance:
+  backbone: vit_small_patch14_dinov2.lvd142m
+  detector:
+    name: yolo11s_nimble-narwhal_v6.0.0
+    source: hf:pyronear/yolo11s_nimble-narwhal_v6.0.0
+    type: yolo
+  train_git_sha: 4b4d43ad77c401bab6d01d561b0aa2337f7ee031
 variant: vit_dinov2_finetune
 yolo_weights: yolo_weights.pt
 """

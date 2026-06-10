@@ -42,10 +42,12 @@ def read_model_config(model_zip: Path) -> dict:
             calibrator = _read_member(z, "logistic_calibrator.json")
     except (zipfile.BadZipFile, OSError):
         return {}
+    # Detector + train sha live under manifest["provenance"]; variant is top-level.
+    provenance = manifest.get("provenance") or {}
     return {
-        "detector": manifest.get("detector"),
+        "detector": provenance.get("detector"),
         "variant": manifest.get("variant"),
-        "train_git_sha": manifest.get("train_git_sha"),
+        "train_git_sha": provenance.get("train_git_sha"),
         "decision": config.get("decision"),
         "infer": config.get("infer"),
         "model_input": config.get("model_input"),
