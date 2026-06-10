@@ -18,6 +18,8 @@ __all__ = [
     "select_longest_tube",
     "tube_from_record",
     "merge_colocated_tubes",
+    "tube_intersects_roi",
+    "validate_roi",
 ]
 
 
@@ -548,3 +550,45 @@ def _box_rank(det: Detection) -> tuple[float, float, float]:
     confidence, then larger cx — a total order, so the choice is independent of
     the input tube order (no silent nondeterminism on equal-area ties)."""
     return (_area(det), det.confidence, det.cx)
+
+
+def validate_roi(roi: tuple[float, float, float, float]) -> None:
+    """Validate a normalized ROI rectangle, raising ``ValueError`` if invalid.
+
+    Single source of truth for ROI validity — the API request validator and
+    ``BboxTubeTemporalModel.predict`` both call this, so the rules cannot
+    drift between layers. Valid: 4 values in [0, 1] with x_min < x_max and
+    y_min < y_max.
+    """
+    if len(roi) != 4:
+        raise ValueError(
+            f"invalid roi {roi!r}: expected 4 values (x_min, y_min, x_max, y_max)"
+        )
+    x_min, y_min, x_max, y_max = roi
+    if not all(0.0 <= c <= 1.0 for c in roi) or x_min >= x_max or y_min >= y_max:
+        raise ValueError(
+            f"invalid roi {roi!r}: expected normalized "
+            "(x_min, y_min, x_max, y_max) with x_min < x_max and y_min < y_max"
+        )
+
+
+def tube_intersects_roi(tube: Tube, roi: tuple[float, float, float, float]) -> bool:
+    """True if any real (non-gap) detection bbox overlaps the ROI rectangle.
+
+    ``roi`` is ``(x_min, y_min, x_max, y_max)`` normalized to [0, 1];
+    touching edges count as overlap. Gap entries are synthetic (interpolated)
+    and do not count.
+    """
+    x_min, y_min, x_max, y_max = roi
+    for entry in tube.entries:
+        if entry.is_gap or entry.detection is None:
+            continue
+        d = entry.detection
+        if (
+            d.cx - d.w / 2 <= x_max
+            and d.cx + d.w / 2 >= x_min
+            and d.cy - d.h / 2 <= y_max
+            and d.cy + d.h / 2 >= y_min
+        ):
+            return True
+    return False

@@ -18,7 +18,7 @@ def _details(kept):
             "num_truncated": 0,
             "padded_frame_indices": [],
         },
-        "tubes": {"num_candidates": len(kept) + 1, "kept": kept},
+        "tubes": {"num_candidates": len(kept) + 1, "num_outside_roi": 0, "kept": kept},
     }
 
 
@@ -169,7 +169,7 @@ def test_to_response_includes_profiling_when_verbose():
             "num_truncated": 0,
             "padded_frame_indices": [],
         },
-        "tubes": {"num_candidates": 0, "kept": []},
+        "tubes": {"num_candidates": 0, "num_outside_roi": 0, "kept": []},
     }
     out = SimpleNamespace(is_positive=False, trigger_frame_index=None, details=details)
     profiling = {
@@ -194,3 +194,52 @@ def test_to_response_includes_profiling_when_verbose():
         out, name="m", version="1", calibrated=False, verbose=True, profiling=None
     )
     assert resp3.details.profiling is None
+
+
+def test_request_roi_defaults_to_none():
+    assert PredictRequest(frames=["a.jpg"]).roi_xyxyn is None
+
+
+def test_request_accepts_valid_roi():
+    req = PredictRequest(frames=["a.jpg"], roi_xyxyn=[0.1, 0.2, 0.3, 0.4])
+    assert req.roi_xyxyn == (0.1, 0.2, 0.3, 0.4)
+
+
+def test_request_accepts_whole_frame_roi():
+    req = PredictRequest(frames=["a.jpg"], roi_xyxyn=[0.0, 0.0, 1.0, 1.0])
+    assert req.roi_xyxyn == (0.0, 0.0, 1.0, 1.0)
+
+
+@pytest.mark.parametrize(
+    "roi",
+    [
+        [-0.1, 0.2, 0.3, 0.4],  # out of range low
+        [0.1, 0.2, 0.3, 1.4],  # out of range high
+        [0.3, 0.2, 0.1, 0.4],  # x_min >= x_max
+        [0.1, 0.4, 0.3, 0.4],  # y_min >= y_max (zero height)
+        [0.1, 0.2, 0.3],  # too short
+        [0.1, 0.2, 0.3, 0.4, 0.5],  # too long
+        ["a", 0.2, 0.3, 0.4],  # non-numeric
+    ],
+)
+def test_request_rejects_invalid_roi(roi):
+    with pytest.raises(ValidationError):
+        PredictRequest(frames=["a.jpg"], roi_xyxyn=roi)
+
+
+def test_verbose_details_map_num_tubes_outside_roi():
+    details = _details([_tube(1, 0.9)])
+    details["tubes"]["num_outside_roi"] = 3
+    out = SimpleNamespace(is_positive=True, trigger_frame_index=3, details=details)
+    resp = to_response(out, name="m", version="1", calibrated=True, verbose=True)
+    assert resp.details.preprocessing.num_tubes_outside_roi == 3
+
+
+def test_verbose_details_num_tubes_outside_roi_is_strict():
+    # Read strictly like num_candidates: core always emits the key, and a
+    # missing key must fail loudly rather than silently report 0.
+    details = _details([_tube(1, 0.9)])
+    del details["tubes"]["num_outside_roi"]
+    out = SimpleNamespace(is_positive=True, trigger_frame_index=3, details=details)
+    with pytest.raises(KeyError):
+        to_response(out, name="m", version="1", calibrated=True, verbose=True)

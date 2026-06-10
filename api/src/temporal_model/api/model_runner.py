@@ -121,6 +121,7 @@ class ModelRunner:
         self,
         frame_paths: list[Path],
         *,
+        roi: tuple[float, float, float, float] | None = None,
         timer: StageTimer | None = None,
         profile: dict[str, Any] | None = None,
     ) -> Any:
@@ -129,15 +130,18 @@ class ModelRunner:
         The whole orchestration runs in a worker thread under the lock, so the
         cache is accessed by one prediction at a time. When ``timer``/``profile``
         are supplied, the ``detector`` stage is timed and cache counts recorded.
+        ``roi`` is passed through to the core model untouched — the cache stays
+        full-frame (see the invariant in the ROI spec).
         """
         async with self._lock:
             return await run_in_threadpool(
-                self._predict_sync, frame_paths, timer, profile
+                self._predict_sync, frame_paths, roi, timer, profile
             )
 
     def _predict_sync(
         self,
         frame_paths: list[Path],
+        roi: tuple[float, float, float, float] | None = None,
         timer: StageTimer | None = None,
         profile: dict[str, Any] | None = None,
     ) -> Any:
@@ -155,7 +159,9 @@ class ModelRunner:
         for fd in detected:
             self._cache.put(fd.frame_id, fd)
             resolved[fd.frame_id] = fd
-        out = self._model.predict(frames, frame_detections=resolved, timer=timer)
+        out = self._model.predict(
+            frames, frame_detections=resolved, roi=roi, timer=timer
+        )
         if profile is not None:
             profile["n_frames"] = len(frames)
             profile["cache_hits"] = len(frames) - len(misses)

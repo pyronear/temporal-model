@@ -51,6 +51,7 @@ class Preprocessing(_Frozen):
 
 class Tubes(_Frozen):
     num_candidates: int
+    num_outside_roi: int = 0
     kept: list[KeptTube]
 
 

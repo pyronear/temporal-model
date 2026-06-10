@@ -10,6 +10,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from temporal_model.core.tubes import validate_roi
+
 # DNS-style S3 bucket naming: 3-63 chars, lowercase alphanumerics, dots and
 # hyphens, starting/ending alphanumeric. Rejects whitespace, uppercase, ARNs
 # (colons), slashes and other malformed names early as a 400 instead of letting
@@ -23,6 +25,12 @@ class PredictRequest(BaseModel):
     # omitted (alert-api stacks use per-org dynamic bucket names that no single
     # setting can cover).
     bucket: str | None = None
+    # Optional region of interest as normalized corners
+    # (x_min, y_min, x_max, y_max) — ultralytics xyxyn convention, suffixed to
+    # disambiguate from the xywhn bboxes in responses. Tubes with no real
+    # detection intersecting it are dropped before scoring (see
+    # docs/specs/2026-06-10-api-roi-design.md).
+    roi_xyxyn: tuple[float, float, float, float] | None = None
 
     @field_validator("frames")
     @classmethod
@@ -43,6 +51,21 @@ class PredictRequest(BaseModel):
             raise ValueError("bucket must not be empty")
         if not _BUCKET_RE.match(v) or ".." in v:
             raise ValueError(f"bucket is not a valid S3 bucket name: {v!r}")
+        return v
+
+    @field_validator("roi_xyxyn")
+    @classmethod
+    def _validate_roi(
+        cls, v: tuple[float, float, float, float] | None
+    ) -> tuple[float, float, float, float] | None:
+        if v is None:
+            return v
+        # Rules live in core (single source of truth shared with
+        # model.predict); only the field name in the message is added here.
+        try:
+            validate_roi(v)
+        except ValueError as e:
+            raise ValueError(f"roi_xyxyn: {e}") from e
         return v
 
 
@@ -79,6 +102,7 @@ class Preprocessing(BaseModel):
     num_truncated: int
     padded_frame_indices: list[int]
     num_tube_candidates: int
+    num_tubes_outside_roi: int
 
 
 class Details(BaseModel):
@@ -135,6 +159,9 @@ def _to_details(
             num_truncated=pre["num_truncated"],
             padded_frame_indices=pre["padded_frame_indices"],
             num_tube_candidates=tubes_block["num_candidates"],
+            # Strict like num_candidates: core (same-commit path dependency)
+            # always emits the key; a silent 0 here would mask a core rename.
+            num_tubes_outside_roi=tubes_block["num_outside_roi"],
         ),
         tubes=[Tube(**t) for t in tubes_block["kept"]],
         profiling=profiling,

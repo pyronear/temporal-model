@@ -27,7 +27,7 @@ def _details(kept, trigger):
             "num_truncated": 0,
             "padded_frame_indices": [],
         },
-        "tubes": {"num_candidates": 2, "kept": kept},
+        "tubes": {"num_candidates": 2, "num_outside_roi": 0, "kept": kept},
     }
 
 
@@ -65,8 +65,10 @@ class FakeRunner:
     def __init__(self, output=None, error=None):
         self._output = output
         self._error = error
+        self.roi = None
 
-    async def predict(self, paths, *, timer=None, profile=None):
+    async def predict(self, paths, *, roi=None, timer=None, profile=None):
+        self.roi = roi
         if self._error:
             raise self._error
         if timer is not None:
@@ -386,3 +388,27 @@ def test_lifespan_uncalibrated_model_degrades_to_unavailable(monkeypatch):
     assert r.status_code == 200
     assert r.json()["status"] == "unavailable"
     assert r.json()["model_loaded"] is False
+
+
+def test_predict_passes_roi_to_runner(client):
+    r = client.post(
+        "/predict", json={"frames": KEYS, "roi_xyxyn": [0.1, 0.2, 0.3, 0.4]}
+    )
+    assert r.status_code == 200
+    assert client.app.state.runner.roi == (0.1, 0.2, 0.3, 0.4)
+
+
+def test_predict_without_roi_passes_none(client):
+    r = client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 200
+    assert client.app.state.runner.roi is None
+
+
+def test_predict_invalid_roi_is_400(client):
+    r = client.post(
+        "/predict", json={"frames": KEYS, "roi_xyxyn": [0.3, 0.2, 0.1, 0.4]}
+    )
+    assert r.status_code == 400
+    body = r.json()
+    assert body["code"] == "invalid_request"
+    assert "roi_xyxyn" in body["detail"]
