@@ -148,6 +148,9 @@ class Preprocessing(BaseModel):
     padded_frame_indices: list[int]
     num_tube_candidates: int
     num_tubes_outside_roi: int
+    # Provenance: "request" when the caller supplied the detections (bundled
+    # detector bypassed), "detector" when the bundled YOLO produced them.
+    detections_source: Literal["request", "detector"]
 
 
 class Details(BaseModel):
@@ -189,6 +192,7 @@ def _to_details(
     *,
     threshold_overridden: bool,
     packaged_threshold: float | None,
+    detections_source: Literal["request", "detector"],
     profiling: dict[str, Any] | None = None,
 ) -> Details:
     tubes_block = details["tubes"]
@@ -207,6 +211,7 @@ def _to_details(
             # Strict like num_candidates: core (same-commit path dependency)
             # always emits the key; a silent 0 here would mask a core rename.
             num_tubes_outside_roi=tubes_block["num_outside_roi"],
+            detections_source=detections_source,
         ),
         tubes=[Tube(**t) for t in tubes_block["kept"]],
         profiling=profiling,
@@ -222,6 +227,7 @@ def to_response(
     verbose: bool,
     threshold_overridden: bool = False,
     packaged_threshold: float | None = None,
+    detections_source: Literal["request", "detector"] = "detector",
     profiling: dict[str, Any] | None = None,
 ) -> PredictResponse:
     """Reshape a core model output into the public response DTO."""
@@ -235,6 +241,7 @@ def to_response(
             out.details,
             threshold_overridden=threshold_overridden,
             packaged_threshold=packaged_threshold,
+            detections_source=detections_source,
             profiling=profiling,
         )
     return PredictResponse(**kwargs)

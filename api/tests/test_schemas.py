@@ -245,6 +245,29 @@ def test_verbose_details_num_tubes_outside_roi_is_strict():
         to_response(out, name="m", version="1", calibrated=True, verbose=True)
 
 
+def test_verbose_details_detections_source_request():
+    out = SimpleNamespace(
+        is_positive=False, trigger_frame_index=None, details=_details([])
+    )
+    resp = to_response(
+        out,
+        name="m",
+        version="1",
+        calibrated=True,
+        verbose=True,
+        detections_source="request",
+    )
+    assert resp.details.preprocessing.detections_source == "request"
+
+
+def test_verbose_details_detections_source_defaults_to_detector():
+    out = SimpleNamespace(
+        is_positive=False, trigger_frame_index=None, details=_details([])
+    )
+    resp = to_response(out, name="m", version="1", calibrated=True, verbose=True)
+    assert resp.details.preprocessing.detections_source == "detector"
+
+
 def test_request_detections_default_to_none():
     assert PredictRequest(frames=["a.jpg"]).detections is None
 
