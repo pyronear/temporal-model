@@ -40,10 +40,12 @@ class PredictRequest(BaseModel):
     @classmethod
     def _validate_frames(cls, v: list[str]) -> list[str]:
         if not v:
-            raise ValueError("frames must contain at least one S3 key")
+            raise ValueError("frames must contain at least one entry")
         for key in v:
             if "://" in key:
-                raise ValueError(f"frame key must be a bare S3 key, not a URL: {key!r}")
+                raise ValueError(
+                    f"frame must be a bare key or relative path, not a URL: {key!r}"
+                )
         return v
 
     @field_validator("bucket")
