@@ -235,6 +235,20 @@ def test_verbose_details_map_num_tubes_outside_roi():
     assert resp.details.preprocessing.num_tubes_outside_roi == 3
 
 
+def test_request_source_defaults_to_none():
+    assert PredictRequest(frames=["a.jpg"]).source is None
+
+
+@pytest.mark.parametrize("source", ["s3", "local"])
+def test_request_accepts_source(source):
+    assert PredictRequest(frames=["a.jpg"], source=source).source == source
+
+
+def test_request_rejects_unknown_source():
+    with pytest.raises(ValidationError):
+        PredictRequest(frames=["a.jpg"], source="ftp")
+
+
 def test_verbose_details_num_tubes_outside_roi_is_strict():
     # Read strictly like num_candidates: core always emits the key, and a
     # missing key must fail loudly rather than silently report 0.

@@ -21,6 +21,10 @@ _BUCKET_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
 
 class PredictRequest(BaseModel):
     frames: list[str]
+    # Where `frames` live: "s3" (keys in a bucket) or "local" (relative paths
+    # under the server's frames_root). None → the server's configured default
+    # (settings.frame_source).
+    source: Literal["s3", "local"] | None = None
     # Optional per-request S3 bucket. Falls back to settings.s3_bucket when
     # omitted (alert-api stacks use per-org dynamic bucket names that no single
     # setting can cover).
