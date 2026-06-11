@@ -1,8 +1,10 @@
 """Public request/response DTOs and the mapper from the core model output.
 
 The default response is the lean verdict; ``?verbose=true`` adds a ``details``
-block. ``details`` is only set when verbose, so the route serializes with
-``exclude_unset=True`` to omit it otherwise (while keeping explicit ``null``s).
+block and ``?compute_trigger=true`` adds the time-to-detection fields. Both
+are only set when requested, so the route serializes with
+``exclude_unset=True`` to omit them otherwise (while keeping explicit
+``null``s).
 """
 
 import re
@@ -87,6 +89,7 @@ class Tube(BaseModel):
     end_frame: int
     logit: float
     probability: float | None
+    first_crossing_frame: int | None = None
     entries: list[FrameEntry]
 
 
@@ -95,6 +98,7 @@ class Decision(BaseModel):
     threshold: float
     threshold_overridden: bool = False
     packaged_threshold: float | None = None
+    trigger_tube_id: int | None = None
 
 
 class Preprocessing(BaseModel):
@@ -127,6 +131,7 @@ class Version(BaseModel):
 class PredictResponse(BaseModel):
     is_smoke: bool
     probability: float | None
+    trigger_frame_index: int | None = None
     version: Version
     details: Details | None = None
 
@@ -150,12 +155,23 @@ def _to_details(
     threshold_overridden: bool,
     packaged_threshold: float | None,
     profiling: dict[str, Any] | None = None,
+    compute_trigger: bool = False,
 ) -> Details:
     tubes_block = details["tubes"]
     pre = details["preprocessing"]
+    decision = dict(details["decision"])
+    kept = tubes_block["kept"]
+    if not compute_trigger:
+        # Core emits these keys even on the fast path (always null there);
+        # dropping them keeps the DTO fields unset so exclude_unset omits
+        # them and the no-flag response is unchanged.
+        decision.pop("trigger_tube_id", None)
+        kept = [
+            {k: v for k, v in t.items() if k != "first_crossing_frame"} for t in kept
+        ]
     return Details(
         decision=Decision(
-            **details["decision"],
+            **decision,
             threshold_overridden=threshold_overridden,
             packaged_threshold=packaged_threshold,
         ),
@@ -168,7 +184,7 @@ def _to_details(
             # always emits the key; a silent 0 here would mask a core rename.
             num_tubes_outside_roi=tubes_block["num_outside_roi"],
         ),
-        tubes=[Tube(**t) for t in tubes_block["kept"]],
+        tubes=[Tube(**t) for t in kept],
         profiling=profiling,
     )
 
@@ -180,6 +196,7 @@ def to_response(
     model_version: str | None,
     calibrated: bool,
     verbose: bool,
+    compute_trigger: bool = False,
     threshold_overridden: bool = False,
     packaged_threshold: float | None = None,
     profiling: dict[str, Any] | None = None,
@@ -190,11 +207,15 @@ def to_response(
         "probability": _decision_probability(out.details, calibrated),
         "version": Version(api=api_version, model=model_version),
     }
+    if compute_trigger:
+        # Explicit null is meaningful here: searched, no crossing found.
+        kwargs["trigger_frame_index"] = out.trigger_frame_index
     if verbose:
         kwargs["details"] = _to_details(
             out.details,
             threshold_overridden=threshold_overridden,
             packaged_threshold=packaged_threshold,
             profiling=profiling,
+            compute_trigger=compute_trigger,
         )
     return PredictResponse(**kwargs)
