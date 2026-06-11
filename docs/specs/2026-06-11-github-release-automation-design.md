@@ -21,8 +21,10 @@ model. And the whole release flow should be documented so it is repeatable.
 
 In scope:
 
-- A new `release` job in `.github/workflows/push.yml` that creates the GitHub
-  Release on every `vX.Y.Z` tag push.
+- A `scripts/create-github-release.sh` script (with a stub-`gh` contract test)
+  holding the header + `gh release create` logic.
+- A new `release` job in `.github/workflows/push.yml` that calls the script on
+  every `vX.Y.Z` tag push.
 - A `docs/releasing.md` runbook documenting the end-to-end release flow.
 
 Explicitly out of scope (unchanged):
@@ -61,27 +63,36 @@ Add a `release` job:
 Steps in the `release` job:
 
 1. `actions/checkout@v6` at the tagged commit.
-2. Resolve versions (same logic the `docker` job already uses):
-   - `VERSION=${GITHUB_REF#refs/tags/v}`
-   - `MODEL_VERSION=$(cat api/MODEL_VERSION)` (fail if empty, matching `docker`).
-3. Build a notes-header file:
+2. Run `scripts/create-github-release.sh "$GITHUB_REF_NAME"` with
+   `GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}` in the step env.
+
+The logic lives in a script, not inline YAML, so it is testable (see
+Verification) and mirrors the existing `scripts/release-api.sh`.
+
+### Script — `scripts/create-github-release.sh`
+
+Takes the tag (`vX.Y.Z`) as `$1` and:
+
+1. Derives `VERSION="${TAG#v}"`.
+2. Reads `MODEL_VERSION=$(cat api/MODEL_VERSION)`; exits non-zero if empty
+   (matching the `docker` job's guard).
+3. Writes a notes-header to a temp file:
 
    ```
    **Docker image:** `pyronear/temporal-model-api:<VERSION>`
    **Bundled model:** v<MODEL_VERSION> (api/MODEL_VERSION)
    ```
 
-4. Create the Release:
+4. Runs:
 
    ```
-   gh release create "$GITHUB_REF_NAME" \
-     --notes-file <header-file> \
-     --generate-notes
+   gh release create "$TAG" --notes-file <header-file> --generate-notes
    ```
 
-   `--generate-notes` makes GitHub append its auto-generated "What's Changed"
-   (merged PRs / commits since the previous tag) below the header. Auth uses the
-   built-in `GITHUB_TOKEN` (`env: GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`).
+`--generate-notes` makes GitHub append its auto-generated "What's Changed"
+(merged PRs / commits since the previous tag) below the header. Auth uses the
+built-in `GITHUB_TOKEN`, read from `GH_TOKEN` in the environment. The script is
+`set -euo pipefail` and runs from the repo root (so `api/MODEL_VERSION` resolves).
 
 ### Behavior
 
@@ -105,17 +116,28 @@ A runbook covering the full flow:
 
 ## Verification
 
-This workflow only fires on real tag pushes, so the genuine end-to-end check is
-the next tag. Before that:
+The `release` job only fires on real tag pushes, and a real run has outward side
+effects (public image push + public GitHub Release), so it is not exercised as
+routine verification. Coverage is layered:
 
-- Lint the workflow YAML (`actionlint` if available) and confirm the job graph
-  (`docker` → `release`) and per-job permissions parse correctly.
-- Dry-run the notes-header construction locally (shell snippet producing the
-  header file from a sample `VERSION` / `MODEL_VERSION`).
-- Eyeball that `GH_TOKEN` / `permissions: contents: write` are wired on the
-  `release` job.
+- **Script contract test** (`scripts/test-create-github-release.sh` or a bats
+  test) — put a stub `gh` on `PATH` that records its arguments, run the script
+  with sample `TAG` / a temp `api/MODEL_VERSION`, and assert: (a) the header file
+  content (image tag + bundled model line), and (b) the exact `gh release create`
+  args (`<tag>`, `--notes-file`, `--generate-notes`). Also assert it exits
+  non-zero when `MODEL_VERSION` is empty. This is the on-demand pass/fail check
+  for the script's behavior.
+- **`actionlint`** on `push.yml` — confirms the job graph (`docker` → `release`),
+  per-job permissions (`contents: write` on `release`), and the `GH_TOKEN` env
+  wiring parse correctly.
+- **Live GitHub integration** (Release actually created, "What's Changed" notes
+  generated) — this is GitHub's behavior, not ours, and is confirmed by observing
+  the next genuine release tag. No throwaway test tag is pushed.
 
 ## Files touched
 
-- `.github/workflows/push.yml` — add the `release` job and per-job permissions.
+- `scripts/create-github-release.sh` — new; header + `gh release create` logic.
+- `scripts/test-create-github-release.sh` — new; stub-`gh` contract test.
+- `.github/workflows/push.yml` — add the `release` job (calls the script) and
+  per-job permissions.
 - `docs/releasing.md` — new release runbook.
