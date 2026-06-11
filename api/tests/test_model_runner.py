@@ -139,9 +139,7 @@ class _OrchestrationModel:
                 frame_id=f.frame_id,
                 timestamp=None,
                 detections=[
-                    Detection(
-                        class_id=0, cx=0.5, cy=0.5, w=0.5, h=0.5, confidence=0.75
-                    )
+                    Detection(class_id=0, cx=0.5, cy=0.5, w=0.5, h=0.5, confidence=0.75)
                 ],
             )
             for i, f in enumerate(frames)
@@ -210,9 +208,7 @@ def test_predict_with_supplied_detections_skips_detect():
     model = _OrchestrationModel()
     runner = ModelRunner(model, name="m", version="1", calibrated=True)
     asyncio.run(
-        runner.predict(
-            ["c/x_00.jpg", "c/x_01.jpg"], detections=[[_supplied_box()], []]
-        )
+        runner.predict(["c/x_00.jpg", "c/x_01.jpg"], detections=[[_supplied_box()], []])
     )
 
     assert model.detect_calls == []
@@ -270,9 +266,7 @@ def test_predict_supplied_detections_profile_counters():
     runner = ModelRunner(model, name="m", version="1", calibrated=True)
     profile: dict = {}
     asyncio.run(
-        runner.predict(
-            ["c/x_00.jpg"], detections=[[_supplied_box()]], profile=profile
-        )
+        runner.predict(["c/x_00.jpg"], detections=[[_supplied_box()]], profile=profile)
     )
 
     assert profile == {"n_frames": 1, "cache_hits": 0, "cache_misses": 0}
