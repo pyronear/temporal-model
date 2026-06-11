@@ -17,7 +17,7 @@ serve: ## run the API locally with uvicorn
 
 # Benchmark/dev only — see the README's "GPU" section. torch/torchvision are
 # pinned to the uv.lock releases; keep them in sync when bumping the lock.
-gpu-setup: ## swap venv torch for CUDA wheels (one-time; driver >= 580)
+gpu-setup: ## swap venv torch for CUDA wheels (one-time; see README "GPU")
 	uv sync
 	uv pip install --reinstall-package torch --reinstall-package torchvision \
 		torch==2.12.0 torchvision==0.27.0 --index-url https://download.pytorch.org/whl/cu130

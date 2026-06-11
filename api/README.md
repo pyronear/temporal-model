@@ -80,7 +80,9 @@ default only exists inside the container (`make fetch-model` from the repo
 root downloads to `api/models/`). The model auto-detects `cuda` when
 `TEMPORAL_API_DEVICE` is unset; the S3 env vars apply as above. `run-gpu`
 binds `0.0.0.0:8000`, so set `TEMPORAL_API_TOKEN` on shared networks —
-without it `/predict` is open to anyone who can reach the host.
+without it `/predict` is open to anyone who can reach the host. The compose
+`api` service publishes the same port: when using compose just for S3, start
+only the pieces you need (`docker compose up -d minio createbuckets`).
 
 ## Test
 
