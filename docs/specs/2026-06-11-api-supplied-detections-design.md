@@ -94,7 +94,13 @@ class SuppliedDetection(BaseModel):
 
     @field_validator("xyxyn")
     @classmethod
-    def _validate_xyxyn(cls, v): ...  # same checks as roi_xyxyn
+    def _validate_xyxyn(cls, v):
+        x_min, y_min, x_max, y_max = v
+        if not all(0.0 <= c <= 1.0 for c in v):
+            raise ValueError("xyxyn coordinates must be in [0, 1]")
+        if x_min >= x_max or y_min >= y_max:
+            raise ValueError("xyxyn requires x_min < x_max and y_min < y_max")
+        return v
 
 
 class PredictRequest(BaseModel):
@@ -104,8 +110,19 @@ class PredictRequest(BaseModel):
     detections: list[list[SuppliedDetection]] | None = None
 
     @model_validator(mode="after")
-    def _detections_match_frames(self): ...  # length check
+    def _detections_match_frames(self):
+        if self.detections is not None and len(self.detections) != len(self.frames):
+            raise ValueError(
+                "detections must have exactly one entry per frame "
+                f"(got {len(self.detections)} entries for {len(self.frames)} frames)"
+            )
+        return self
 ```
+
+Pydantic's type system handles the rest of the well-formedness for free:
+a detection that is not an object, lacks `xyxyn`/`confidence`, has a
+non-numeric value, or an `xyxyn` that is not exactly 4 numbers all fail type
+validation before the custom validators run.
 
 ### Response
 
