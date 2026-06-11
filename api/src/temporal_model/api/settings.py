@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -47,6 +47,18 @@ class Settings(BaseSettings):
 
     host: str = "0.0.0.0"
     port: int = 8000
+
+    @model_validator(mode="after")
+    def _require_frames_root_for_local(self) -> "Settings":
+        # A local-default server without a root would 400 on every request;
+        # fail at boot like other server-level misconfig. (A per-request
+        # `source: "local"` override on an s3-default server is still checked
+        # in the route — it cannot be known at startup.)
+        if self.frame_source == "local" and not self.frames_root:
+            raise ValueError(
+                "TEMPORAL_API_FRAME_SOURCE=local requires TEMPORAL_API_FRAMES_ROOT"
+            )
+        return self
 
 
 settings = Settings()
