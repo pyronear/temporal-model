@@ -92,3 +92,19 @@ def test_frames_root_default_empty():
 def test_frames_root_env_override(monkeypatch):
     monkeypatch.setenv("TEMPORAL_API_FRAMES_ROOT", "/data/frames")
     assert Settings(_env_file=None).frames_root == "/data/frames"
+
+
+def test_api_version_default_none():
+    assert Settings(_env_file=None).api_version is None
+
+
+def test_api_version_env_override(monkeypatch):
+    monkeypatch.setenv("TEMPORAL_API_VERSION", "0.3.0")
+    assert Settings(_env_file=None).api_version == "0.3.0"
+
+
+def test_api_version_empty_env_is_none(monkeypatch):
+    # The Dockerfile always sets ENV TEMPORAL_API_VERSION=${VERSION}; a build
+    # without the arg yields "" — must normalize to None (not a release).
+    monkeypatch.setenv("TEMPORAL_API_VERSION", "")
+    assert Settings(_env_file=None).api_version is None

@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,6 +30,14 @@ class Settings(BaseSettings):
     # Unset/empty disables auth (open /predict) — a startup log line reports
     # which mode is active.
     token: str | None = None
+
+    # Release version of the serving code, stamped into the Docker image from
+    # the git tag (env TEMPORAL_API_VERSION via a build arg). None on
+    # non-release builds → surfaced as null in responses. The alias avoids the
+    # env_prefix doubling ("TEMPORAL_API_API_VERSION").
+    api_version: str | None = Field(
+        default=None, validation_alias="TEMPORAL_API_VERSION"
+    )
 
     s3_bucket: str = ""
     s3_region: str | None = None
@@ -59,6 +67,12 @@ class Settings(BaseSettings):
                 "TEMPORAL_API_FRAME_SOURCE=local requires TEMPORAL_API_FRAMES_ROOT"
             )
         return self
+
+    @field_validator("api_version")
+    @classmethod
+    def _empty_api_version_is_none(cls, v: str | None) -> str | None:
+        # ENV TEMPORAL_API_VERSION=${VERSION} with an absent build arg sets "".
+        return v or None
 
 
 settings = Settings()
