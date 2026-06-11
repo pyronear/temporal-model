@@ -1,5 +1,7 @@
 """Runtime configuration for the API, read from ``TEMPORAL_API_*`` env vars."""
 
+from typing import Literal
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -32,6 +34,16 @@ class Settings(BaseSettings):
     s3_bucket: str = ""
     s3_region: str | None = None
     s3_endpoint_url: str | None = None
+
+    # Where /predict frames come from when a request omits its `source` field:
+    # "s3" downloads keys from a bucket; "local" resolves relative paths under
+    # `frames_root` (see docs/specs/2026-06-11-api-local-frames-design.md).
+    frame_source: Literal["s3", "local"] = "s3"
+
+    # Root directory for local frames. Required when serving local frames.
+    # Settings-only by design — a request-supplied root would let callers
+    # probe arbitrary server paths.
+    frames_root: str = ""
 
     host: str = "0.0.0.0"
     port: int = 8000

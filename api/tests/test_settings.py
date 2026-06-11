@@ -59,3 +59,27 @@ def test_api_token_default_none():
 def test_api_token_env_override(monkeypatch):
     monkeypatch.setenv("TEMPORAL_API_TOKEN", "s3cr3t")
     assert Settings(_env_file=None).token == "s3cr3t"
+
+
+def test_frame_source_default_s3():
+    assert Settings(_env_file=None).frame_source == "s3"
+
+
+def test_frame_source_env_override(monkeypatch):
+    monkeypatch.setenv("TEMPORAL_API_FRAME_SOURCE", "local")
+    assert Settings(_env_file=None).frame_source == "local"
+
+
+def test_frame_source_rejects_unknown(monkeypatch):
+    monkeypatch.setenv("TEMPORAL_API_FRAME_SOURCE", "ftp")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
+def test_frames_root_default_empty():
+    assert Settings(_env_file=None).frames_root == ""
+
+
+def test_frames_root_env_override(monkeypatch):
+    monkeypatch.setenv("TEMPORAL_API_FRAMES_ROOT", "/data/frames")
+    assert Settings(_env_file=None).frames_root == "/data/frames"
