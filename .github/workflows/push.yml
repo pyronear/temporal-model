@@ -56,6 +56,8 @@ jobs:
           context: .
           file: api/Dockerfile
           push: true
+          build-args: |
+            VERSION=${{ env.VERSION }}
           tags: |
             ${{ env.BACKEND_IMAGE_NAME }}:${{ env.VERSION }}
             ${{ env.BACKEND_IMAGE_NAME }}:latest

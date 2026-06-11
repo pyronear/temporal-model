@@ -7,14 +7,16 @@ Import as `temporal_model.api`. Depends on `temporal-model-core`.
 
 ## Endpoints
 
-- `GET /health` — readiness + loaded model name/version.
+- `GET /health` — readiness + loaded model name/version + API code version.
 - `POST /predict` — body `{ "frames": ["<s3-key>", ...], "bucket": "<name>",
   "roi_xyxyn": [x_min, y_min, x_max, y_max] }`
   (ordered S3 keys; `bucket` optional, falls back to `S3_BUCKET`;
   `roi_xyxyn` optional normalized region of interest — tubes with no real
   detection intersecting it are dropped before scoring);
-  returns `{ is_smoke, probability, model }` (`probability` = max kept-tube
+  returns `{ is_smoke, probability, version }` (`probability` = max kept-tube
   calibrated probability, `null` if uncalibrated).
+  `version` is `{api, model}` — the code release (== the Docker image tag,
+  `null` on non-release builds) and the packaged model release.
   `POST /predict?verbose=true` adds a `details` block (decision, preprocessing,
   per-tube tracks). See `docs/specs/2026-06-02-api-service-design.md` for the
   full contract.

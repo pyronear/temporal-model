@@ -24,6 +24,12 @@ RUN uv sync --no-dev
 # to MODEL_PATH (settings default: /models/model.zip).
 COPY api/models/model.zip /models/model.zip
 
+# Stamp the release version (the git tag, == the image tag) into the runtime
+# so the API reports it as version.api. Absent on local builds → the env var
+# is empty and settings normalize it to null.
+ARG VERSION
+ENV TEMPORAL_API_VERSION=${VERSION}
+
 EXPOSE 8000
 # --no-dev: don't let `uv run` re-sync dev deps into the runtime at startup.
 CMD ["uv", "run", "--no-dev", "uvicorn", "temporal_model.api.app:app", "--host", "0.0.0.0", "--port", "8000"]

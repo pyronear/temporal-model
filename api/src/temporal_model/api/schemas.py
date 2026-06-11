@@ -8,7 +8,7 @@ block. ``details`` is only set when verbose, so the route serializes with
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from temporal_model.core.tubes import validate_roi
 
@@ -112,17 +112,22 @@ class Details(BaseModel):
     profiling: dict[str, Any] | None = None
 
 
-class ModelInfo(BaseModel):
-    name: str
-    version: str | None
+class Version(BaseModel):
+    """Provenance of a prediction: the code release + the model release.
+
+    ``api`` equals the Docker image tag (null on non-release builds);
+    ``model`` is the packaged ``manifest.model_version`` (null on legacy
+    unstamped packages). Together they fully identify what produced a result.
+    """
+
+    api: str | None
+    model: str | None
 
 
 class PredictResponse(BaseModel):
-    model_config = ConfigDict(protected_namespaces=())
-
     is_smoke: bool
     probability: float | None
-    model: ModelInfo
+    version: Version
     details: Details | None = None
 
 
@@ -171,8 +176,8 @@ def _to_details(
 def to_response(
     out: Any,
     *,
-    name: str,
-    version: str | None,
+    api_version: str | None,
+    model_version: str | None,
     calibrated: bool,
     verbose: bool,
     threshold_overridden: bool = False,
@@ -183,7 +188,7 @@ def to_response(
     kwargs: dict[str, Any] = {
         "is_smoke": out.is_positive,
         "probability": _decision_probability(out.details, calibrated),
-        "model": ModelInfo(name=name, version=version),
+        "version": Version(api=api_version, model=model_version),
     }
     if verbose:
         kwargs["details"] = _to_details(
