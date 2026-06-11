@@ -128,7 +128,6 @@ async def predict(
             raise InvalidRequest(
                 "local frames not enabled: set TEMPORAL_API_FRAMES_ROOT"
             )
-        bucket = None
     else:
         bucket = body.bucket or settings.s3_bucket
         if not bucket:
@@ -150,7 +149,12 @@ async def predict(
             if source == "local":
                 # Local frames are read in place — no temp dir, no copy.
                 with stage_ctx(timer, "local_resolve"):
-                    paths = resolve_frames(Path(settings.frames_root), body.frames)
+                    # resolve_frames stats every frame — keep it off the event
+                    # loop like the S3 fetch (the root may be a slow shared
+                    # volume).
+                    paths = await run_in_threadpool(
+                        resolve_frames, Path(settings.frames_root), body.frames
+                    )
             else:
                 # The temp dir must outlive runner.predict — frames are read
                 # during inference.
