@@ -8,7 +8,13 @@ block. ``details`` is only set when verbose, so the route serializes with
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from temporal_model.core.tubes import validate_roi
 
@@ -17,6 +23,30 @@ from temporal_model.core.tubes import validate_roi
 # (colons), slashes and other malformed names early as a 400 instead of letting
 # them fail deep in boto3.
 _BUCKET_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
+
+
+class SuppliedDetection(BaseModel):
+    """One caller-supplied detection box (normalized xyxyn corners).
+
+    Geometry rules match ``roi_xyxyn``. Checked inline rather than via the
+    core ``validate_roi`` helper so the error message names the detection
+    field, not "roi".
+    """
+
+    xyxyn: tuple[float, float, float, float]
+    confidence: float = Field(ge=0.0, le=1.0)
+
+    @field_validator("xyxyn")
+    @classmethod
+    def _validate_xyxyn(
+        cls, v: tuple[float, float, float, float]
+    ) -> tuple[float, float, float, float]:
+        x_min, y_min, x_max, y_max = v
+        if not all(0.0 <= c <= 1.0 for c in v):
+            raise ValueError("xyxyn coordinates must be in [0, 1]")
+        if x_min >= x_max or y_min >= y_max:
+            raise ValueError("xyxyn requires x_min < x_max and y_min < y_max")
+        return v
 
 
 class PredictRequest(BaseModel):
@@ -31,6 +61,12 @@ class PredictRequest(BaseModel):
     # detection intersecting it are dropped before scoring (see
     # docs/specs/2026-06-10-api-roi-design.md).
     roi_xyxyn: tuple[float, float, float, float] | None = None
+    # Optional caller-supplied detections, one list per frame, index-aligned
+    # with `frames` ([] = that frame's detector saw nothing — never null).
+    # When set, the bundled YOLO and its cache are bypassed entirely and tubes
+    # are built from these boxes (see
+    # docs/specs/2026-06-11-api-supplied-detections-design.md).
+    detections: list[list[SuppliedDetection]] | None = None
 
     @field_validator("frames")
     @classmethod
@@ -67,6 +103,15 @@ class PredictRequest(BaseModel):
         except ValueError as e:
             raise ValueError(f"roi_xyxyn: {e}") from e
         return v
+
+    @model_validator(mode="after")
+    def _detections_match_frames(self) -> "PredictRequest":
+        if self.detections is not None and len(self.detections) != len(self.frames):
+            raise ValueError(
+                "detections must have exactly one entry per frame "
+                f"(got {len(self.detections)} entries for {len(self.frames)} frames)"
+            )
+        return self
 
 
 class FrameEntry(BaseModel):

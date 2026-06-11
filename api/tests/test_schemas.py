@@ -243,3 +243,55 @@ def test_verbose_details_num_tubes_outside_roi_is_strict():
     out = SimpleNamespace(is_positive=True, trigger_frame_index=3, details=details)
     with pytest.raises(KeyError):
         to_response(out, name="m", version="1", calibrated=True, verbose=True)
+
+
+def test_request_detections_default_to_none():
+    assert PredictRequest(frames=["a.jpg"]).detections is None
+
+
+def test_request_accepts_per_frame_detections():
+    req = PredictRequest(
+        frames=["a.jpg", "b.jpg"],
+        detections=[
+            [{"xyxyn": [0.1, 0.2, 0.3, 0.4], "confidence": 0.7}],
+            [],
+        ],
+    )
+    assert req.detections[0][0].xyxyn == (0.1, 0.2, 0.3, 0.4)
+    assert req.detections[0][0].confidence == 0.7
+    assert req.detections[1] == []
+
+
+@pytest.mark.parametrize("entries", [[], [[]], [[], [], []]])
+def test_request_rejects_detections_length_mismatch(entries):
+    # frames has 2 keys; 0, 1 and 3 detection entries must all fail.
+    with pytest.raises(ValidationError, match="one entry per frame"):
+        PredictRequest(frames=["a.jpg", "b.jpg"], detections=entries)
+
+
+def test_request_rejects_null_frame_entry():
+    # "no detections" must be an explicit [], never null.
+    with pytest.raises(ValidationError):
+        PredictRequest(frames=["a.jpg"], detections=[None])
+
+
+@pytest.mark.parametrize(
+    "box",
+    [
+        {"xyxyn": [-0.1, 0.2, 0.3, 0.4], "confidence": 0.5},  # coord < 0
+        {"xyxyn": [0.1, 0.2, 0.3, 1.4], "confidence": 0.5},  # coord > 1
+        {"xyxyn": [0.3, 0.2, 0.1, 0.4], "confidence": 0.5},  # x_min >= x_max
+        {"xyxyn": [0.1, 0.4, 0.3, 0.4], "confidence": 0.5},  # y_min >= y_max
+        {"xyxyn": [0.1, 0.2, 0.3], "confidence": 0.5},  # too short
+        {"xyxyn": [0.1, 0.2, 0.3, 0.4, 0.5], "confidence": 0.5},  # too long
+        {"xyxyn": ["a", 0.2, 0.3, 0.4], "confidence": 0.5},  # non-numeric
+        {"xyxyn": [0.1, 0.2, 0.3, 0.4], "confidence": 1.5},  # confidence > 1
+        {"xyxyn": [0.1, 0.2, 0.3, 0.4], "confidence": -0.1},  # confidence < 0
+        {"xyxyn": [0.1, 0.2, 0.3, 0.4]},  # missing confidence
+        {"confidence": 0.5},  # missing xyxyn
+        "not-an-object",  # wrong type entirely
+    ],
+)
+def test_request_rejects_malformed_detection(box):
+    with pytest.raises(ValidationError):
+        PredictRequest(frames=["a.jpg"], detections=[[box]])
