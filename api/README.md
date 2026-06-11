@@ -9,10 +9,15 @@ Import as `temporal_model.api`. Depends on `temporal-model-core`.
 
 - `GET /health` — readiness + loaded model name/version.
 - `POST /predict` — body `{ "frames": ["<s3-key>", ...], "bucket": "<name>",
-  "roi_xyxyn": [x_min, y_min, x_max, y_max] }`
+  "roi_xyxyn": [x_min, y_min, x_max, y_max],
+  "detections": [[{"xyxyn": [...], "confidence": 0.6}], []] }`
   (ordered S3 keys; `bucket` optional, falls back to `S3_BUCKET`;
   `roi_xyxyn` optional normalized region of interest — tubes with no real
-  detection intersecting it are dropped before scoring);
+  detection intersecting it are dropped before scoring;
+  `detections` optional caller-supplied boxes, one list per frame
+  index-aligned with `frames`, `[]` = that frame's detector saw nothing —
+  skips the bundled YOLO and its cache entirely, tubes are built from the
+  supplied boxes);
   returns `{ is_smoke, probability, model }` (`probability` = max kept-tube
   calibrated probability, `null` if uncalibrated).
   `POST /predict?verbose=true` adds a `details` block (decision, preprocessing,
