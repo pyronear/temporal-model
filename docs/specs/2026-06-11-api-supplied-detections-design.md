@@ -7,7 +7,7 @@
 
 The Pyronear edge devices (RPis running pyro-engine) already run a YOLO
 detector on every frame and ship the resulting bboxes with their alerts. When
-the platform calls `/predict` to get a temporal verdict on an alert sequence,
+the alert-api calls `/predict` to get a temporal verdict on an alert sequence,
 the API re-runs its own bundled YOLO on the same frames — a redundant GPU pass
 that adds latency and compute. This feature lets the caller supply the
 per-frame bboxes it already holds; the API skips the detector stage and feeds
@@ -31,7 +31,7 @@ decision — runs unchanged.
    explicit empty list. No partial coverage, no omitted-key rules a
    dict-keyed shape would need.
 3. **`xyxyn` + `confidence` inner objects.** Boxes arrive as normalized
-   corners — the convention pyro-engine produces and the platform stores, and
+   corners — the convention pyro-engine produces and the alert-api stores, and
    the same ultralytics vocabulary as the existing `roi_xyxyn` field. The API
    converts to the internal center-based `xywhn` (`Detection` dataclass) at
    the boundary. `class_id` is not exposed; supplied boxes are smoke
@@ -189,7 +189,7 @@ differ in tightness, confidence distribution, and threshold; tubes built from
 them may shift crop geometry and calibration. The classifier scores image
 crops, not box metadata, so the mechanism is expected to work — but
 calibration on real RPi boxes is unvalidated. Validation happens at
-platform-integration time, not in this work.
+alert-api-integration time, not in this work.
 
 ## Testing
 
