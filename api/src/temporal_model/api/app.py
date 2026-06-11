@@ -51,6 +51,7 @@ class HealthResponse(BaseModel):
     model_loaded: bool
     model_name: str | None = None
     model_version: str | None = None
+    api_version: str | None = None
 
 
 @asynccontextmanager
@@ -74,7 +75,11 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Temporal Model API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="Temporal Model API",
+    version=settings.api_version or "dev",
+    lifespan=lifespan,
+)
 
 
 @app.exception_handler(ApiError)
@@ -101,12 +106,17 @@ async def _validation_handler(
 def health(request: Request) -> HealthResponse:
     runner = getattr(request.app.state, "runner", None)
     if runner is None:
-        return HealthResponse(status="unavailable", model_loaded=False)
+        return HealthResponse(
+            status="unavailable",
+            model_loaded=False,
+            api_version=settings.api_version,
+        )
     return HealthResponse(
         status="ok",
         model_loaded=True,
         model_name=runner.name,
         model_version=runner.version,
+        api_version=settings.api_version,
     )
 
 
@@ -159,8 +169,8 @@ async def predict(
 
             return to_response(
                 out,
-                name=runner.name,
-                version=runner.version,
+                api_version=settings.api_version,
+                model_version=runner.version,
                 calibrated=runner.calibrated,
                 verbose=verbose,
                 threshold_overridden=runner.threshold_overridden,

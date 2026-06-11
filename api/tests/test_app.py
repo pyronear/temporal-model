@@ -101,6 +101,7 @@ def test_health_loaded(client):
         "model_loaded": True,
         "model_name": "bbox-tube-vit-dinov2",
         "model_version": "1.2.0",
+        "api_version": None,
     }
 
 
@@ -180,7 +181,7 @@ def test_predict_default(client):
     assert r.json() == {
         "is_smoke": True,
         "probability": 0.98,
-        "model": {"name": "bbox-tube-vit-dinov2", "version": "1.2.0"},
+        "version": {"api": None, "model": "1.2.0"},
     }
 
 
@@ -192,7 +193,7 @@ def test_predict_verbose(client):
     assert body["details"]["tubes"][0]["tube_id"] == 7
     assert body["is_smoke"] is True
     assert body["probability"] == 0.98
-    assert body["model"] == {"name": "bbox-tube-vit-dinov2", "version": "1.2.0"}
+    assert body["version"] == {"api": None, "model": "1.2.0"}
     assert body["details"]["decision"] == {
         "aggregation": "max_logit",
         "threshold": 0.5,
@@ -211,6 +212,21 @@ def test_predict_verbose_surfaces_override(client):
     assert decision["packaged_threshold"] == 0.5
 
 
+def test_predict_reports_api_version(client, monkeypatch):
+    # settings.api_version is read per request, so a monkeypatched value
+    # must show up as version.api.
+    monkeypatch.setattr(settings, "api_version", "0.3.0")
+    r = client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 200
+    assert r.json()["version"] == {"api": "0.3.0", "model": "1.2.0"}
+
+
+def test_health_reports_api_version(client, monkeypatch):
+    monkeypatch.setattr(settings, "api_version", "0.3.0")
+    r = client.get("/health")
+    assert r.json()["api_version"] == "0.3.0"
+
+
 def test_health_unavailable(client):
     client.app.state.runner = None
     r = client.get("/health")
@@ -220,6 +236,7 @@ def test_health_unavailable(client):
         "model_loaded": False,
         "model_name": None,
         "model_version": None,
+        "api_version": None,
     }
 
 
