@@ -59,19 +59,28 @@ token.
 
 The published Docker image is CPU-only by design: torch is pinned to the
 `pytorch-cpu` wheel index (`pyproject.toml`) to keep the image small, so the
-container cannot use CUDA even on a GPU host. To serve on a GPU, run natively:
+container cannot use CUDA even on a GPU host. To serve on a GPU, run natively
+from `api/`:
 
 ```bash
-make run-gpu                # binds 0.0.0.0:8000, model auto-picks cuda
+make gpu-setup              # one-time: swap venv torch for CUDA wheels (multi-GB)
+TEMPORAL_API_MODEL_PATH=$PWD/models/model.zip make run-gpu
 ```
 
-This swaps the venv's torch/torchvision for CUDA wheels (`cu130` index — needs
-an NVIDIA driver supporting CUDA 13, i.e. >= 580) and serves with
-`uv run --no-sync`. The venv then diverges from `uv.lock`: any plain `uv run`
-or `uv sync` restores the locked CPU wheels (rerun `make run-gpu` to flip
-back — wheels are cached after the first multi-GB download). The model
-auto-detects `cuda` when `TEMPORAL_API_DEVICE` is unset; the usual env vars
-(`MODEL_PATH`, `S3_*`, …) apply as above.
+`gpu-setup` replaces the venv's torch/torchvision with CUDA wheels (`cu130`
+index, pinned to the `uv.lock` releases — needs an NVIDIA driver supporting
+CUDA 13, i.e. >= 580). The venv then diverges from `uv.lock`: any plain
+`uv run` or `uv sync` — including `make test`/`make lint`/`make format` —
+restores the locked CPU wheels. `run-gpu` serves with `uv run --no-sync` and
+refuses to start when the CUDA wheels are gone, so rerun `make gpu-setup`
+after one of those (cheap once the wheels are cached).
+
+Unlike the Docker flow, `MODEL_PATH` must be set: the `/models/model.zip`
+default only exists inside the container (`make fetch-model` from the repo
+root downloads to `api/models/`). The model auto-detects `cuda` when
+`TEMPORAL_API_DEVICE` is unset; the S3 env vars apply as above. `run-gpu`
+binds `0.0.0.0:8000`, so set `TEMPORAL_API_TOKEN` on shared networks —
+without it `/predict` is open to anyone who can reach the host.
 
 ## Test
 
