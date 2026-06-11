@@ -55,6 +55,24 @@ unset, auth is disabled (the API logs a warning at startup) and `/predict` is
 open. `GET /health` is never guarded, so load balancers can probe it without a
 token.
 
+### GPU (benchmark/dev only)
+
+The published Docker image is CPU-only by design: torch is pinned to the
+`pytorch-cpu` wheel index (`pyproject.toml`) to keep the image small, so the
+container cannot use CUDA even on a GPU host. To serve on a GPU, run natively:
+
+```bash
+make run-gpu                # binds 0.0.0.0:8000, model auto-picks cuda
+```
+
+This swaps the venv's torch/torchvision for CUDA wheels (`cu130` index — needs
+an NVIDIA driver supporting CUDA 13, i.e. >= 580) and serves with
+`uv run --no-sync`. The venv then diverges from `uv.lock`: any plain `uv run`
+or `uv sync` restores the locked CPU wheels (rerun `make run-gpu` to flip
+back — wheels are cached after the first multi-GB download). The model
+auto-detects `cuda` when `TEMPORAL_API_DEVICE` is unset; the usual env vars
+(`MODEL_PATH`, `S3_*`, …) apply as above.
+
 ## Test
 
 ```bash
