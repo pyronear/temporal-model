@@ -23,10 +23,12 @@ decision — runs unchanged.
    as an explicit empty list, meaning "a detector ran and saw nothing"; such
    frames participate in tube gap handling exactly as if the bundled detector
    had returned nothing.
-2. **Index-aligned list shape.** `detections` is a list with exactly one
-   entry per frame, in the same order as `frames`. Length mismatch is a
-   validation error. This makes "no detections for frame i" unambiguous
-   (empty inner list) with trivial validation — no omitted-key rules a
+2. **Index-aligned list shape — every frame must be covered.** `detections`
+   is a list with exactly one entry per frame, in the same order as
+   `frames`. Missing detections for any frame is an error: a shorter (or
+   longer) list fails the length check, and `null` entries are rejected by
+   the schema — the *only* way to express "no detections for frame i" is an
+   explicit empty list. No partial coverage, no omitted-key rules a
    dict-keyed shape would need.
 3. **`xyxyn` + `confidence` inner objects.** Boxes arrive as normalized
    corners — the convention pyro-engine produces and the platform stores, and
@@ -72,7 +74,11 @@ Validation (Pydantic, fails as `400 invalid_request` via the existing
 `RequestValidationError` handler):
 
 - `len(detections) == len(frames)` (model-level validator, checked after
-  field validation).
+  field validation) — every frame must have an entry; partial coverage is
+  rejected.
+- Inner entries must be lists: `null` is rejected by the
+  `list[list[SuppliedDetection]]` type. "No detections" is only expressible
+  as an explicit `[]`.
 - Each box: `xyxyn` is exactly 4 floats, each in `[0, 1]` inclusive, with
   `x_min < x_max` and `y_min < y_max` — same rules and fail-closed rationale
   as `roi_xyxyn` (zero-area and inverted boxes rejected; catches most
@@ -172,9 +178,10 @@ platform-integration time, not in this work.
 
 **API** (`api/tests/`):
 
-- Validation matrix: length mismatch with `frames`; coordinate out of
-  `[0, 1]`; `x_min >= x_max`; `y_min >= y_max`; wrong tuple length;
-  confidence out of `[0, 1]` → 400 with message.
+- Validation matrix: length mismatch with `frames` (both shorter and
+  longer); `null` inner entry; coordinate out of `[0, 1]`;
+  `x_min >= x_max`; `y_min >= y_max`; wrong tuple length; confidence out of
+  `[0, 1]` → 400 with message.
 - Bypass proof: with `detections` supplied, the model's `detect()` is never
   called (mock/monkeypatch assertion) and the cache is neither read nor
   written.
