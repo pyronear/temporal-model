@@ -3,7 +3,8 @@
 Runs two short Lightning fits with the same seed on a tiny fake dataset and
 asserts that every weight in the final ``state_dict`` is bitwise identical.
 A third run with a different seed acts as a negative control so the test
-cannot silently pass if nothing is actually random.
+cannot silently pass if nothing is actually random. Runs on CPU always and
+on GPU when CUDA is available (skipped otherwise, e.g. in CI).
 
 Exercises the full seeding path used by ``scripts/train.py``:
 ``L.seed_everything(seed, workers=True)`` + ``Trainer(deterministic=True)``
@@ -18,6 +19,7 @@ from pathlib import Path
 
 import lightning as L
 import numpy as np
+import pytest
 import torch
 from PIL import Image
 from torch.utils.data import DataLoader
@@ -70,7 +72,7 @@ def _make_split(
 
 
 def _fit_once_transformer(
-    seed: int, train_dir: Path, val_dir: Path, log_dir: Path
+    seed: int, train_dir: Path, val_dir: Path, log_dir: Path, accelerator: str = "cpu"
 ) -> dict:
     L.seed_everything(seed, workers=True)
 
@@ -106,7 +108,7 @@ def _fit_once_transformer(
 
     trainer = L.Trainer(
         max_epochs=2,
-        accelerator="cpu",
+        accelerator=accelerator,
         devices=1,
         deterministic=True,
         logger=False,
@@ -120,9 +122,7 @@ def _fit_once_transformer(
     return {k: v.detach().clone() for k, v in lit.state_dict().items()}
 
 
-def test_transformer_training_is_bitwise_reproducible_with_fixed_seed(
-    tmp_path: Path,
-) -> None:
+def _assert_bitwise_reproducible(tmp_path: Path, accelerator: str) -> None:
     train_dir = _make_split(
         tmp_path,
         "train",
@@ -130,10 +130,14 @@ def test_transformer_training_is_bitwise_reproducible_with_fixed_seed(
     )
     val_dir = _make_split(tmp_path, "val", [("e", 1, 4), ("f", 0, 3)])
 
-    run1 = _fit_once_transformer(SEED, train_dir, val_dir, tmp_path / "run1")
-    run2 = _fit_once_transformer(SEED, train_dir, val_dir, tmp_path / "run2")
+    run1 = _fit_once_transformer(
+        SEED, train_dir, val_dir, tmp_path / "run1", accelerator
+    )
+    run2 = _fit_once_transformer(
+        SEED, train_dir, val_dir, tmp_path / "run2", accelerator
+    )
     run_other = _fit_once_transformer(
-        OTHER_SEED, train_dir, val_dir, tmp_path / "run_other"
+        OTHER_SEED, train_dir, val_dir, tmp_path / "run_other", accelerator
     )
 
     assert run1.keys() == run2.keys() == run_other.keys()
@@ -143,3 +147,22 @@ def test_transformer_training_is_bitwise_reproducible_with_fixed_seed(
         )
     differing = [key for key in run1 if not torch.equal(run1[key], run_other[key])]
     assert differing, "Different-seed run produced identical transformer weights"
+
+
+def test_transformer_training_is_bitwise_reproducible_with_fixed_seed(
+    tmp_path: Path,
+) -> None:
+    _assert_bitwise_reproducible(tmp_path, accelerator="cpu")
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires a CUDA GPU")
+def test_transformer_training_is_bitwise_reproducible_on_gpu(tmp_path: Path) -> None:
+    """GPU twin of the CPU test.
+
+    ``Trainer(deterministic=True)`` enables strict
+    ``torch.use_deterministic_algorithms`` and sets
+    ``CUBLAS_WORKSPACE_CONFIG``, so CUDA kernels must be deterministic too.
+    Guards against changes (e.g. mixed precision, attention backends) that
+    would silently break GPU run-to-run reproducibility.
+    """
+    _assert_bitwise_reproducible(tmp_path, accelerator="gpu")

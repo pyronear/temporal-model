@@ -28,3 +28,19 @@ make install
 uv run dvc repro            # full pipeline (uses GPU for training when available)
 uv run dvc repro train      # just the training stage (data-prep cached)
 ```
+
+## Determinism
+
+Training is fully deterministic: `train.py` seeds Python/NumPy/torch and the
+DataLoader workers (`L.seed_everything(seed, workers=True)`) and runs with
+`Trainer(deterministic=True)`, which also enables strict
+`torch.use_deterministic_algorithms` and sets `CUBLAS_WORKSPACE_CONFIG` on
+CUDA. Same seed + same device type + same torch/CUDA versions produce a
+bitwise-identical checkpoint, including optimizer state and best-epoch
+selection.
+
+Scope: a CPU run and a GPU run with the same seed do **not** match each
+other, and neither do different GPU models — different kernels round
+floating-point sums differently. That is inherent to floating point, not a
+bug. `tests/test_reproducibility.py` guards the guarantee (the GPU variant
+skips when CUDA is unavailable, e.g. in CI).
