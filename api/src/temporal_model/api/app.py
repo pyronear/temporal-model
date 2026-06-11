@@ -144,7 +144,12 @@ async def predict(
                 )
 
             out = await runner.predict(
-                paths, roi=body.roi_xyxyn, timer=timer, profile=profile
+                paths,
+                roi=body.roi_xyxyn,
+                bbox=body.bbox_xyxyn,
+                bbox_confidence=body.bbox_confidence,
+                timer=timer,
+                profile=profile,
             )
 
             profiling = None

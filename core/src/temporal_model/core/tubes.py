@@ -552,9 +552,7 @@ def _box_rank(det: Detection) -> tuple[float, float, float]:
     return (_area(det), det.confidence, det.cx)
 
 
-def validate_roi(
-    roi: tuple[float, float, float, float], *, name: str = "roi"
-) -> None:
+def validate_roi(roi: tuple[float, float, float, float], *, name: str = "roi") -> None:
     """Validate a normalized xyxyn rectangle, raising ``ValueError`` if invalid.
 
     Single source of truth for ROI validity — the API request validator and

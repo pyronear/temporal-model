@@ -227,6 +227,68 @@ def test_request_rejects_invalid_roi(roi):
         PredictRequest(frames=["a.jpg"], roi_xyxyn=roi)
 
 
+def test_request_bbox_defaults_to_none():
+    req = PredictRequest(frames=["a.jpg"])
+    assert req.bbox_xyxyn is None
+    assert req.bbox_confidence == 1.0
+
+
+def test_request_accepts_valid_bbox():
+    req = PredictRequest(
+        frames=["a.jpg"], bbox_xyxyn=[0.1, 0.2, 0.3, 0.4], bbox_confidence=0.7
+    )
+    assert req.bbox_xyxyn == (0.1, 0.2, 0.3, 0.4)
+    assert req.bbox_confidence == 0.7
+
+
+@pytest.mark.parametrize(
+    "bbox",
+    [
+        [-0.1, 0.2, 0.3, 0.4],  # out of range low
+        [0.1, 0.2, 0.3, 1.4],  # out of range high
+        [0.3, 0.2, 0.1, 0.4],  # x_min >= x_max
+        [0.1, 0.4, 0.3, 0.4],  # y_min >= y_max (zero height)
+        [0.1, 0.2, 0.3],  # too short
+        [0.1, 0.2, 0.3, 0.4, 0.5],  # too long
+        ["a", 0.2, 0.3, 0.4],  # non-numeric
+    ],
+)
+def test_request_rejects_invalid_bbox(bbox):
+    with pytest.raises(ValidationError):
+        PredictRequest(frames=["a.jpg"], bbox_xyxyn=bbox)
+
+
+@pytest.mark.parametrize("confidence", [0.0, -0.5, 1.5])
+def test_request_rejects_out_of_range_bbox_confidence(confidence):
+    with pytest.raises(ValidationError):
+        PredictRequest(
+            frames=["a.jpg"],
+            bbox_xyxyn=[0.1, 0.2, 0.3, 0.4],
+            bbox_confidence=confidence,
+        )
+
+
+def test_request_rejects_bbox_with_roi():
+    with pytest.raises(ValidationError, match="mutually exclusive"):
+        PredictRequest(
+            frames=["a.jpg"],
+            bbox_xyxyn=[0.1, 0.2, 0.3, 0.4],
+            roi_xyxyn=[0.0, 0.0, 1.0, 1.0],
+        )
+
+
+def test_request_rejects_bbox_confidence_without_bbox():
+    with pytest.raises(ValidationError, match="bbox_confidence requires"):
+        PredictRequest(frames=["a.jpg"], bbox_confidence=0.9)
+
+
+def test_request_allows_default_equal_bbox_confidence_only_implicitly():
+    # An explicit bbox_confidence is rejected without bbox_xyxyn even when it
+    # equals the default — explicitness, not the value, marks the client bug.
+    with pytest.raises(ValidationError, match="bbox_confidence requires"):
+        PredictRequest(frames=["a.jpg"], bbox_confidence=1.0)
+
+
 def test_verbose_details_map_num_tubes_outside_roi():
     details = _details([_tube(1, 0.9)])
     details["tubes"]["num_outside_roi"] = 3

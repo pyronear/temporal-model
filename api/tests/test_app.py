@@ -66,9 +66,22 @@ class FakeRunner:
         self._output = output
         self._error = error
         self.roi = None
+        self.bbox = None
+        self.bbox_confidence = None
 
-    async def predict(self, paths, *, roi=None, timer=None, profile=None):
+    async def predict(
+        self,
+        paths,
+        *,
+        roi=None,
+        bbox=None,
+        bbox_confidence=1.0,
+        timer=None,
+        profile=None,
+    ):
         self.roi = roi
+        self.bbox = bbox
+        self.bbox_confidence = bbox_confidence
         if self._error:
             raise self._error
         if timer is not None:
@@ -412,3 +425,60 @@ def test_predict_invalid_roi_is_400(client):
     body = r.json()
     assert body["code"] == "invalid_request"
     assert "roi_xyxyn" in body["detail"]
+
+
+def test_predict_passes_bbox_to_runner(client):
+    r = client.post(
+        "/predict",
+        json={
+            "frames": KEYS,
+            "bbox_xyxyn": [0.1, 0.2, 0.3, 0.4],
+            "bbox_confidence": 0.8,
+        },
+    )
+    assert r.status_code == 200
+    assert client.app.state.runner.bbox == (0.1, 0.2, 0.3, 0.4)
+    assert client.app.state.runner.bbox_confidence == 0.8
+
+
+def test_predict_bbox_confidence_defaults_to_one(client):
+    r = client.post(
+        "/predict", json={"frames": KEYS, "bbox_xyxyn": [0.1, 0.2, 0.3, 0.4]}
+    )
+    assert r.status_code == 200
+    assert client.app.state.runner.bbox_confidence == 1.0
+
+
+def test_predict_without_bbox_passes_none(client):
+    r = client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 200
+    assert client.app.state.runner.bbox is None
+
+
+def test_predict_invalid_bbox_is_400(client):
+    r = client.post(
+        "/predict", json={"frames": KEYS, "bbox_xyxyn": [0.3, 0.2, 0.1, 0.4]}
+    )
+    assert r.status_code == 400
+    body = r.json()
+    assert body["code"] == "invalid_request"
+    assert "bbox_xyxyn" in body["detail"]
+
+
+def test_predict_bbox_with_roi_is_400(client):
+    r = client.post(
+        "/predict",
+        json={
+            "frames": KEYS,
+            "bbox_xyxyn": [0.1, 0.2, 0.3, 0.4],
+            "roi_xyxyn": [0.0, 0.0, 1.0, 1.0],
+        },
+    )
+    assert r.status_code == 400
+    assert "mutually exclusive" in r.json()["detail"]
+
+
+def test_predict_bbox_confidence_without_bbox_is_400(client):
+    r = client.post("/predict", json={"frames": KEYS, "bbox_confidence": 0.9})
+    assert r.status_code == 400
+    assert "bbox_confidence" in r.json()["detail"]

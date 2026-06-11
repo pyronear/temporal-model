@@ -8,7 +8,13 @@ block. ``details`` is only set when verbose, so the route serializes with
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from temporal_model.core.tubes import validate_roi
 
@@ -31,6 +37,18 @@ class PredictRequest(BaseModel):
     # detection intersecting it are dropped before scoring (see
     # docs/specs/2026-06-10-api-roi-design.md).
     roi_xyxyn: tuple[float, float, float, float] | None = None
+    # Optional caller-supplied detection box, normalized corners
+    # (x_min, y_min, x_max, y_max) — same xyxyn convention as roi_xyxyn. When
+    # set, the YOLO detector is skipped entirely and this box is taken as the
+    # only detection on every frame, yielding one full-length tube (see
+    # docs/specs/2026-06-11-api-forced-bbox-design.md). Mutually exclusive
+    # with roi_xyxyn: the bbox already pins where the smoke is.
+    bbox_xyxyn: tuple[float, float, float, float] | None = None
+    # Confidence stamped on the forced detections (e.g. the upstream
+    # detector's score). Gates nothing, but feeds the calibrator's
+    # mean-confidence feature, so it shifts the returned probability. Only
+    # meaningful alongside bbox_xyxyn.
+    bbox_confidence: float = Field(default=1.0, gt=0.0, le=1.0)
 
     @field_validator("frames")
     @classmethod
@@ -67,6 +85,31 @@ class PredictRequest(BaseModel):
         except ValueError as e:
             raise ValueError(f"roi_xyxyn: {e}") from e
         return v
+
+    @field_validator("bbox_xyxyn")
+    @classmethod
+    def _validate_bbox(
+        cls, v: tuple[float, float, float, float] | None
+    ) -> tuple[float, float, float, float] | None:
+        if v is None:
+            return v
+        # Same geometry rules as the ROI (shared core validator).
+        try:
+            validate_roi(v, name="bbox")
+        except ValueError as e:
+            raise ValueError(f"bbox_xyxyn: {e}") from e
+        return v
+
+    @model_validator(mode="after")
+    def _validate_bbox_combinations(self) -> "PredictRequest":
+        if self.bbox_xyxyn is not None and self.roi_xyxyn is not None:
+            raise ValueError(
+                "bbox_xyxyn and roi_xyxyn are mutually exclusive: the bbox is "
+                "the detection, an ROI filter on top of it is meaningless"
+            )
+        if self.bbox_xyxyn is None and "bbox_confidence" in self.model_fields_set:
+            raise ValueError("bbox_confidence requires bbox_xyxyn")
+        return self
 
 
 class FrameEntry(BaseModel):

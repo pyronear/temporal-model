@@ -3,6 +3,7 @@ import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 import yaml
 
 from temporal_model.api import model_runner as mr
@@ -121,6 +122,7 @@ class _OrchestrationModel:
         self.detect_calls: list[list[str]] = []
         self.predict_calls: list[set[str]] = []
         self.roi_calls: list[tuple | None] = []
+        self.frame_detections_calls: list[dict] = []
 
     def load_sequence(self, paths):
         return [
@@ -140,6 +142,7 @@ class _OrchestrationModel:
     def predict(self, frames, *, frame_detections=None, roi=None, timer=None):
         self.predict_calls.append(set(frame_detections or {}))
         self.roi_calls.append(roi)
+        self.frame_detections_calls.append(frame_detections or {})
         return SimpleNamespace(frame_ids=[f.frame_id for f in frames])
 
 
@@ -189,6 +192,47 @@ def test_predict_cache_disabled_detects_every_frame():
 
     assert model.detect_calls[0] == ["x_00", "x_01"]
     assert model.detect_calls[1] == ["x_00", "x_01", "x_02"]  # full each call
+
+
+def test_predict_with_bbox_skips_detection():
+    model = _OrchestrationModel()
+    runner = ModelRunner(model, name="m", version="1", calibrated=True)
+    asyncio.run(
+        runner.predict(
+            ["c/x_00.jpg", "c/x_01.jpg"],
+            bbox=(0.1, 0.2, 0.5, 0.8),
+            bbox_confidence=0.7,
+        )
+    )
+
+    assert model.detect_calls == []
+    forced = model.frame_detections_calls[-1]
+    assert set(forced) == {"x_00", "x_01"}
+    det = forced["x_00"].detections[0]
+    assert (det.cx, det.cy, det.w, det.h) == pytest.approx((0.3, 0.5, 0.4, 0.6))
+    assert det.confidence == 0.7
+
+
+def test_predict_with_bbox_bypasses_cache():
+    model = _OrchestrationModel()
+    runner = ModelRunner(
+        model, name="m", version="1", calibrated=True, detection_cache_size=4096
+    )
+    asyncio.run(runner.predict(["c/x_00.jpg"], bbox=(0.1, 0.2, 0.3, 0.4)))
+    asyncio.run(runner.predict(["c/x_00.jpg"]))
+
+    # The forced run wrote nothing to the cache: the plain run re-detects.
+    assert model.detect_calls == [["x_00"]]
+
+
+def test_predict_with_bbox_records_profile_marker():
+    model = _OrchestrationModel()
+    runner = ModelRunner(model, name="m", version="1", calibrated=True)
+    profile: dict = {}
+    asyncio.run(
+        runner.predict(["c/x_00.jpg"], bbox=(0.1, 0.2, 0.3, 0.4), profile=profile)
+    )
+    assert profile == {"n_frames": 1, "forced_bbox": True}
 
 
 class _StubFrame:

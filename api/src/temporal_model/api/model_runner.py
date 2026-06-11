@@ -122,6 +122,8 @@ class ModelRunner:
         frame_paths: list[Path],
         *,
         roi: tuple[float, float, float, float] | None = None,
+        bbox: tuple[float, float, float, float] | None = None,
+        bbox_confidence: float = 1.0,
         timer: StageTimer | None = None,
         profile: dict[str, Any] | None = None,
     ) -> Any:
@@ -131,22 +133,53 @@ class ModelRunner:
         cache is accessed by one prediction at a time. When ``timer``/``profile``
         are supplied, the ``detector`` stage is timed and cache counts recorded.
         ``roi`` is passed through to the core model untouched — the cache stays
-        full-frame (see the invariant in the ROI spec).
+        full-frame (see the invariant in the ROI spec). When ``bbox`` is set,
+        the detector and its cache are bypassed entirely: the box (stamped with
+        ``bbox_confidence``) is the only detection on every frame.
         """
         async with self._lock:
             return await run_in_threadpool(
-                self._predict_sync, frame_paths, roi, timer, profile
+                self._predict_sync,
+                frame_paths,
+                roi,
+                bbox,
+                bbox_confidence,
+                timer,
+                profile,
             )
 
     def _predict_sync(
         self,
         frame_paths: list[Path],
         roi: tuple[float, float, float, float] | None = None,
+        bbox: tuple[float, float, float, float] | None = None,
+        bbox_confidence: float = 1.0,
         timer: StageTimer | None = None,
         profile: dict[str, Any] | None = None,
     ) -> Any:
         started = time.perf_counter()
         frames = self._model.load_sequence(frame_paths)
+        if bbox is not None:
+            # Heavy core import deferred like _load_core_model.
+            from temporal_model.core.inference import (  # noqa: PLC0415
+                make_forced_detections,
+            )
+
+            forced = make_forced_detections(
+                frames, bbox_xyxyn=bbox, confidence=bbox_confidence
+            )
+            out = self._model.predict(
+                frames, frame_detections=forced, roi=roi, timer=timer
+            )
+            if profile is not None:
+                profile["n_frames"] = len(frames)
+                profile["forced_bbox"] = True
+            logger.info(
+                "predict: forced bbox, seq_len=%d, %.0fms",
+                len(frames),
+                (time.perf_counter() - started) * 1000.0,
+            )
+            return out
         resolved: dict[str, Any] = {}
         misses = []
         for f in frames:
