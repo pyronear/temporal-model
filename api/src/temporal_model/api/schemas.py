@@ -8,7 +8,7 @@ block. ``details`` is only set when verbose, so the route serializes with
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from temporal_model.core.tubes import validate_roi
 
@@ -119,8 +119,6 @@ class Version(BaseModel):
     ``model`` is the packaged ``manifest.model_version`` (null on legacy
     unstamped packages). Together they fully identify what produced a result.
     """
-
-    model_config = ConfigDict(protected_namespaces=())
 
     api: str | None
     model: str | None
