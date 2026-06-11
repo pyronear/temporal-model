@@ -9,6 +9,7 @@ import json
 import sys
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from temporal_model.core import model as model_module
@@ -162,6 +163,61 @@ def test_evaluate_packaged_writes_expected_outputs(tmp_path, monkeypatch):
     assert a_positive["kept_tubes"][0]["logit"] == 2.5
 
 
+def test_evaluate_packaged_writes_viewer_artifacts(tmp_path, monkeypatch):
+    sequences_dir = tmp_path / "sequences"
+    output_dir = tmp_path / "out"
+    _make_sequence(sequences_dir, "wildfire", "wf_seq_a", n_frames=4)  # TP
+    _make_sequence(sequences_dir, "fp", "fp_seq_c", n_frames=4)  # FP
+
+    monkeypatch.setattr(
+        model_module.BboxTubeTemporalModel,
+        "from_archive",
+        classmethod(lambda cls, path, device=None: _FakeModel()),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "evaluate_packaged.py",
+            "--model-zip",
+            str(tmp_path / "placeholder.zip"),
+            "--sequences-dir",
+            str(sequences_dir),
+            "--output-dir",
+            str(output_dir),
+            "--model-name",
+            "vit_dinov2_finetune-train",
+            "--source",
+            "train",
+        ],
+    )
+    evaluate_packaged.main()
+
+    # per-sequence details + view records
+    assert (output_dir / "details" / "wf_seq_a.json").is_file()
+    assert (output_dir / "sequences" / "wf_seq_a.json").is_file()
+    view = json.loads((output_dir / "sequences" / "wf_seq_a.json").read_text())
+    assert view["source"] == "train"
+    assert view["label"] == "smoke"
+    assert len(view["frames"]) == 4
+
+    # results table (json + parquet), one row per sequence
+    assert (output_dir / "results.parquet").is_file()
+    # model_config.json is always emitted (here {} since the fake zip is absent)
+    assert (output_dir / "model_config.json").is_file()
+    assert json.loads((output_dir / "model_config.json").read_text()) == {}
+    rows = json.loads((output_dir / "results.json").read_text())
+    by_key = {r["key"]: r for r in rows}
+    assert set(by_key) == {"wf_seq_a", "fp_seq_c"}
+    assert by_key["wf_seq_a"]["decision"] == "keep"
+    assert by_key["wf_seq_a"]["outcome"] == "kept-smoke"
+    assert by_key["wf_seq_a"]["source"] == "train"
+    assert by_key["wf_seq_a"]["num_tubes_kept"] == 1  # FakeModel keeps one tube
+    assert by_key["fp_seq_c"]["outcome"] == "kept-fp"  # FakeModel keeps 4-frame seqs
+    df = pd.read_parquet(output_dir / "results.parquet")
+    assert len(df) == 2
+
+
 def test_evaluate_packaged_strict_errors_abort(tmp_path, monkeypatch):
     """Any predict() exception must bubble out — strict policy."""
     sequences_dir = tmp_path / "sequences"
@@ -232,3 +288,75 @@ def test_evaluate_packaged_skips_sequences_without_images(tmp_path, monkeypatch)
 
     metrics = json.loads((output_dir / "metrics.json").read_text())
     assert metrics["num_sequences"] == 1
+
+
+def _write_store_seq(root, key, label, n_frames):
+    seq = root / "org-a" / "cam-1" / key
+    (seq / "images").mkdir(parents=True)
+    frames = []
+    for i in range(n_frames):
+        (seq / "images" / f"f{i}.jpg").write_bytes(b"\xff")
+        frames.append(
+            {"file": f"images/f{i}.jpg", "detection_id": None, "created_at": None}
+        )
+    meta = {
+        "key": key,
+        "sequence_id": key,
+        "source": "pyro-annotator",
+        "label": label,
+        "label_detail": None,
+        "label_source": "pyro_annotator_folder",
+        "frames": frames,
+        "camera_id": 1,
+        "camera_name": "cam-1",
+        "organization_id": 7,
+        "organization_name": "org-a",
+        "started_at": "2026-05-19T14:10:01",
+    }
+    (seq / "meta.json").write_text(json.dumps(meta))
+    return seq
+
+
+def test_evaluate_store_source_excludes_unknown_from_metrics(tmp_path, monkeypatch):
+    store_dir = tmp_path / "pyro"
+    output_dir = tmp_path / "out"
+    _write_store_seq(store_dir, "seq_smoke", "smoke", n_frames=4)  # TP
+    _write_store_seq(store_dir, "seq_unknown", "unknown", n_frames=4)  # not labeled
+
+    monkeypatch.setattr(
+        model_module.BboxTubeTemporalModel,
+        "from_archive",
+        classmethod(lambda cls, path, device=None: _FakeModel()),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "evaluate_packaged.py",
+            "--model-zip",
+            str(tmp_path / "placeholder.zip"),
+            "--sequences-dir",
+            str(store_dir),
+            "--output-dir",
+            str(output_dir),
+            "--model-name",
+            "vit_dinov2_finetune-pyro-annotator",
+            "--source",
+            "pyro-annotator",
+            "--store",
+        ],
+    )
+    evaluate_packaged.main()
+
+    metrics = json.loads((output_dir / "metrics.json").read_text())
+    assert metrics["num_sequences"] == 1  # unknown excluded from metrics
+
+    rows = json.loads((output_dir / "results.json").read_text())
+    by_key = {r["key"]: r for r in rows}
+    assert set(by_key) == {"seq_smoke", "seq_unknown"}  # both viewable
+    assert by_key["seq_unknown"]["outcome"] == "n/a"
+    assert by_key["seq_smoke"]["organization_name"] == "org-a"
+    assert by_key["seq_smoke"]["camera_name"] == "cam-1"
+
+    view = json.loads((output_dir / "sequences" / "seq_unknown.json").read_text())
+    assert view["organization_name"] == "org-a"

@@ -14,6 +14,9 @@ stages:
         - src/temporal_model/eval/evaluate.py
         - src/temporal_model/eval/protocol_eval.py
         - src/temporal_model/eval/eval_plots.py
+        - src/temporal_model/eval/store.py
+        - src/temporal_model/eval/outcomes.py
+        - src/temporal_model/eval/view_store.py
         - ../core/src/temporal_model/core/sequences.py
         - ../core/src/temporal_model/core/model.py
         - ../core/src/temporal_model/core/inference.py
@@ -33,6 +36,16 @@ stages:
             cache: false
         - data/08_reporting/${item}/vit_dinov2_finetune/dropped.json:
             cache: false
+        - data/08_reporting/${item}/vit_dinov2_finetune/results.json:
+            cache: false
+        - data/08_reporting/${item}/vit_dinov2_finetune/results.parquet:
+            cache: false
+        - data/08_reporting/${item}/vit_dinov2_finetune/model_config.json:
+            cache: false
+        - data/08_reporting/${item}/vit_dinov2_finetune/details:
+            cache: false
+        - data/08_reporting/${item}/vit_dinov2_finetune/sequences:
+            cache: false
       metrics:
         - data/08_reporting/${item}/vit_dinov2_finetune/metrics.json:
             cache: false
@@ -41,3 +54,46 @@ stages:
         - data/08_reporting/${item}/vit_dinov2_finetune/roc_curve.png
         - data/08_reporting/${item}/vit_dinov2_finetune/confusion_matrix.png
         - data/08_reporting/${item}/vit_dinov2_finetune/confusion_matrix_normalized.png
+
+  evaluate_pyro_annotator:
+    cmd: >-
+      uv run python -m temporal_model.eval.evaluate
+      --model-zip data/06_models/vit_dinov2_finetune/model.zip
+      --sequences-dir data/01_raw/pyro-annotator
+      --output-dir data/08_reporting/pyro-annotator/vit_dinov2_finetune
+      --model-name vit_dinov2_finetune-pyro-annotator
+      --source pyro-annotator
+      --store
+    deps:
+      - src/temporal_model/eval/evaluate.py
+      - src/temporal_model/eval/protocol_eval.py
+      - src/temporal_model/eval/eval_plots.py
+      - src/temporal_model/eval/store.py
+      - src/temporal_model/eval/outcomes.py
+      - src/temporal_model/eval/view_store.py
+      - ../core/src/temporal_model/core/model.py
+      - ../core/src/temporal_model/core/inference.py
+      - ../core/src/temporal_model/core/stabilize.py
+      - ../core/src/temporal_model/core/crop.py
+      - ../core/src/temporal_model/core/protocol.py
+      - ../core/src/temporal_model/core/details_schema.py
+      - data/06_models/vit_dinov2_finetune/model.zip
+      - data/01_raw/pyro-annotator
+    outs:
+      - data/08_reporting/pyro-annotator/vit_dinov2_finetune/predictions.json:
+          cache: false
+      - data/08_reporting/pyro-annotator/vit_dinov2_finetune/dropped.json:
+          cache: false
+      - data/08_reporting/pyro-annotator/vit_dinov2_finetune/results.json:
+          cache: false
+      - data/08_reporting/pyro-annotator/vit_dinov2_finetune/results.parquet:
+          cache: false
+      - data/08_reporting/pyro-annotator/vit_dinov2_finetune/model_config.json:
+          cache: false
+      - data/08_reporting/pyro-annotator/vit_dinov2_finetune/details:
+          cache: false
+      - data/08_reporting/pyro-annotator/vit_dinov2_finetune/sequences:
+          cache: false
+    metrics:
+      - data/08_reporting/pyro-annotator/vit_dinov2_finetune/metrics.json:
+          cache: false
