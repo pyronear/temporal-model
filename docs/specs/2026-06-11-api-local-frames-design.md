@@ -105,11 +105,18 @@ All errors reuse the existing `ApiError` machinery (`{detail, code}`):
 | Condition | Status / code |
 |---|---|
 | `source: "local"` but `frames_root` unset | 400 `invalid_request` (message names `TEMPORAL_API_FRAMES_ROOT`) |
+| `frames_root` set but not a directory (typo, unmounted volume) | 400 `invalid_request` — distinct from per-frame 404 so misconfiguration is not masked as missing frames |
 | `bucket` present with effective local source | 400 `invalid_request` |
-| frame absolute, contains `..`, or resolves outside root | 400 `invalid_request` (message echoes the request string, never the resolved server path) |
+| frame empty, `.`, absolute, contains `..`, or resolves outside root | 400 `invalid_request` (message echoes the request string, never the resolved server path) |
 | frame file missing | 404 `frame_not_found` |
 | frame unreadable (permissions, IO) | 500 `inference_error` (existing catch-all) |
 | `source` not `"s3"`/`"local"` | 400 `invalid_request` (Pydantic `Literal`) |
+
+Additionally, `FRAME_SOURCE=local` with no `FRAMES_ROOT` fails at startup
+(settings validator) — a local-default server without a root would be dead on
+every request, and server-level misconfig should fail at boot like a missing
+model path. The route-level 400 remains for per-request `source: "local"`
+overrides on an s3-default server, which cannot be known at startup.
 
 ## Settings
 

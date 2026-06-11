@@ -51,7 +51,16 @@ frames sit on a shared volume), `frames` are relative paths resolved under
 root would let callers probe arbitrary server paths — and absolute paths or
 `..` segments are rejected with `400 invalid_request`. A missing file is the
 same `404 frame_not_found` as a missing S3 key, and local requests skip the
-S3 download entirely (frames are read in place).
+S3 download entirely (frames are read in place). `FRAME_SOURCE=local` without
+`FRAMES_ROOT` fails at startup; a root that is not a directory at request
+time (typo, unmounted volume) is a distinct `400`, not a per-frame 404.
+
+Two invariants for local frame producers: frames are read in place at predict
+time, so publish them atomically (write to a temp name, then rename) — a
+frame mid-write can fail the request or score a truncated image. And when
+the detection cache is enabled, frame basenames (stems) must stay globally
+unique across cameras and time — the same invariant S3 keys already carry
+(the cache is keyed by stem; see `detection_cache.py`).
 
 `CALIBRATOR_THRESHOLD` (a probability in `[0, 1]`) overrides the packaged
 calibrator decision threshold for every prediction; out-of-range values fail
