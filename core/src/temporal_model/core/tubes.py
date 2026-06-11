@@ -552,22 +552,25 @@ def _box_rank(det: Detection) -> tuple[float, float, float]:
     return (_area(det), det.confidence, det.cx)
 
 
-def validate_roi(roi: tuple[float, float, float, float]) -> None:
-    """Validate a normalized ROI rectangle, raising ``ValueError`` if invalid.
+def validate_roi(
+    roi: tuple[float, float, float, float], *, name: str = "roi"
+) -> None:
+    """Validate a normalized xyxyn rectangle, raising ``ValueError`` if invalid.
 
     Single source of truth for ROI validity — the API request validator and
     ``BboxTubeTemporalModel.predict`` both call this, so the rules cannot
     drift between layers. Valid: 4 values in [0, 1] with x_min < x_max and
-    y_min < y_max.
+    y_min < y_max. ``name`` labels the rectangle in error messages for callers
+    validating other xyxyn boxes (e.g. a forced detection bbox).
     """
     if len(roi) != 4:
         raise ValueError(
-            f"invalid roi {roi!r}: expected 4 values (x_min, y_min, x_max, y_max)"
+            f"invalid {name} {roi!r}: expected 4 values (x_min, y_min, x_max, y_max)"
         )
     x_min, y_min, x_max, y_max = roi
     if not all(0.0 <= c <= 1.0 for c in roi) or x_min >= x_max or y_min >= y_max:
         raise ValueError(
-            f"invalid roi {roi!r}: expected normalized "
+            f"invalid {name} {roi!r}: expected normalized "
             "(x_min, y_min, x_max, y_max) with x_min < x_max and y_min < y_max"
         )
 

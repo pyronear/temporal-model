@@ -24,6 +24,7 @@ from .stabilize import tube_window
 from .tubes import (
     build_tubes,
     merge_colocated_tubes,
+    validate_roi,
 )
 from .tubes import (
     interpolate_gaps as _interpolate_gaps,
@@ -34,6 +35,7 @@ __all__ = [
     "pad_frames_symmetrically",
     "pad_frames_uniform",
     "run_yolo_on_frames",
+    "make_forced_detections",
     "filter_and_interpolate_tubes",
     "crop_tube_patches",
     "score_tubes",
@@ -179,6 +181,47 @@ def run_yolo_on_frames(
             )
         )
     return out
+
+
+def make_forced_detections(
+    frames: list[Frame],
+    *,
+    bbox_xyxyn: tuple[float, float, float, float],
+    confidence: float = 1.0,
+) -> dict[str, FrameDetections]:
+    """Build single-detection :class:`FrameDetections` from one fixed bbox.
+
+    Serving-side alternative to :func:`run_yolo_on_frames` for callers that
+    already localized the smoke upstream: the supplied normalized
+    ``(x_min, y_min, x_max, y_max)`` box becomes the only detection on every
+    frame, so tube building yields exactly one full-length tube and the YOLO
+    detector never runs. Returned keyed by ``frame_id`` to plug into
+    ``BboxTubeTemporalModel.predict(frame_detections=...)``, which re-stamps
+    each entry's ``frame_idx``.
+
+    ``confidence`` gates nothing downstream but feeds the calibrator's
+    mean-confidence feature, so it shifts the calibrated probability.
+    """
+    validate_roi(bbox_xyxyn, name="bbox")
+    x_min, y_min, x_max, y_max = bbox_xyxyn
+    return {
+        f.frame_id: FrameDetections(
+            frame_idx=idx,
+            frame_id=f.frame_id,
+            timestamp=f.timestamp,
+            detections=[
+                Detection(
+                    class_id=0,
+                    cx=(x_min + x_max) / 2.0,
+                    cy=(y_min + y_max) / 2.0,
+                    w=x_max - x_min,
+                    h=y_max - y_min,
+                    confidence=confidence,
+                )
+            ],
+        )
+        for idx, f in enumerate(frames)
+    }
 
 
 def filter_and_interpolate_tubes(
