@@ -103,7 +103,9 @@ def test_negative_uses_max_kept_probability():
         trigger_frame_index=None,
         details=_details([_tube(1, 0.1), _tube(2, 0.41)]),
     )
-    resp = to_response(out, api_version=None, model_version="1.2.0", calibrated=True, verbose=False)
+    resp = to_response(
+        out, api_version=None, model_version="1.2.0", calibrated=True, verbose=False
+    )
     assert resp.probability == 0.41
     assert resp.is_smoke is False
 
@@ -112,7 +114,9 @@ def test_negative_no_tubes_is_zero_when_calibrated():
     out = SimpleNamespace(
         is_positive=False, trigger_frame_index=None, details=_details([])
     )
-    resp = to_response(out, api_version=None, model_version="1.2.0", calibrated=True, verbose=False)
+    resp = to_response(
+        out, api_version=None, model_version="1.2.0", calibrated=True, verbose=False
+    )
     assert resp.probability == 0.0
 
 
@@ -120,7 +124,9 @@ def test_uncalibrated_probability_is_null():
     out = SimpleNamespace(
         is_positive=False, trigger_frame_index=None, details=_details([_tube(1, None)])
     )
-    resp = to_response(out, api_version=None, model_version=None, calibrated=False, verbose=False)
+    resp = to_response(
+        out, api_version=None, model_version=None, calibrated=False, verbose=False
+    )
     assert resp.probability is None
 
 
@@ -128,7 +134,9 @@ def test_verbose_adds_details_block():
     out = SimpleNamespace(
         is_positive=True, trigger_frame_index=3, details=_details([_tube(7, 0.98)])
     )
-    resp = to_response(out, api_version=None, model_version="1.2.0", calibrated=True, verbose=True)
+    resp = to_response(
+        out, api_version=None, model_version="1.2.0", calibrated=True, verbose=True
+    )
     dumped = resp.model_dump(exclude_unset=True)
     assert dumped["details"]["decision"] == {
         "aggregation": "max_logit",
@@ -183,17 +191,32 @@ def test_to_response_includes_profiling_when_verbose():
     }
 
     resp = to_response(
-        out, api_version=None, model_version="1", calibrated=False, verbose=True, profiling=profiling
+        out,
+        api_version=None,
+        model_version="1",
+        calibrated=False,
+        verbose=True,
+        profiling=profiling,
     )
     assert resp.details.profiling == profiling
 
     # Omitted when not verbose, and harmless when profiling is None.
     resp2 = to_response(
-        out, api_version=None, model_version="1", calibrated=False, verbose=False, profiling=profiling
+        out,
+        api_version=None,
+        model_version="1",
+        calibrated=False,
+        verbose=False,
+        profiling=profiling,
     )
     assert resp2.details is None
     resp3 = to_response(
-        out, api_version=None, model_version="1", calibrated=False, verbose=True, profiling=None
+        out,
+        api_version=None,
+        model_version="1",
+        calibrated=False,
+        verbose=True,
+        profiling=None,
     )
     assert resp3.details.profiling is None
 
@@ -233,7 +256,9 @@ def test_verbose_details_map_num_tubes_outside_roi():
     details = _details([_tube(1, 0.9)])
     details["tubes"]["num_outside_roi"] = 3
     out = SimpleNamespace(is_positive=True, trigger_frame_index=3, details=details)
-    resp = to_response(out, api_version=None, model_version="1", calibrated=True, verbose=True)
+    resp = to_response(
+        out, api_version=None, model_version="1", calibrated=True, verbose=True
+    )
     assert resp.details.preprocessing.num_tubes_outside_roi == 3
 
 
@@ -274,4 +299,6 @@ def test_verbose_details_num_tubes_outside_roi_is_strict():
     del details["tubes"]["num_outside_roi"]
     out = SimpleNamespace(is_positive=True, trigger_frame_index=3, details=details)
     with pytest.raises(KeyError):
-        to_response(out, api_version=None, model_version="1", calibrated=True, verbose=True)
+        to_response(
+            out, api_version=None, model_version="1", calibrated=True, verbose=True
+        )
