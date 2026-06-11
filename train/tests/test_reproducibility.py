@@ -72,7 +72,7 @@ def _make_split(
 
 
 def _fit_once_transformer(
-    seed: int, train_dir: Path, val_dir: Path, log_dir: Path, accelerator: str = "cpu"
+    seed: int, train_dir: Path, val_dir: Path, log_dir: Path, accelerator: str
 ) -> dict:
     L.seed_everything(seed, workers=True)
 
@@ -122,7 +122,9 @@ def _fit_once_transformer(
     return {k: v.detach().clone() for k, v in lit.state_dict().items()}
 
 
-def _assert_bitwise_reproducible(tmp_path: Path, accelerator: str) -> None:
+def _assert_bitwise_reproducible(
+    tmp_path: Path, accelerator: str, *, negative_control: bool = True
+) -> None:
     train_dir = _make_split(
         tmp_path,
         "train",
@@ -136,17 +138,22 @@ def _assert_bitwise_reproducible(tmp_path: Path, accelerator: str) -> None:
     run2 = _fit_once_transformer(
         SEED, train_dir, val_dir, tmp_path / "run2", accelerator
     )
-    run_other = _fit_once_transformer(
-        OTHER_SEED, train_dir, val_dir, tmp_path / "run_other", accelerator
-    )
 
-    assert run1.keys() == run2.keys() == run_other.keys()
+    assert run1.keys() == run2.keys()
     for key in run1:
         assert torch.equal(run1[key], run2[key]), (
             f"Same-seed transformer runs diverged at {key!r}"
         )
-    differing = [key for key in run1 if not torch.equal(run1[key], run_other[key])]
-    assert differing, "Different-seed run produced identical transformer weights"
+
+    if negative_control:
+        run_other = _fit_once_transformer(
+            OTHER_SEED, train_dir, val_dir, tmp_path / "run_other", accelerator
+        )
+        assert run_other.keys() == run1.keys()
+        differing = [
+            key for key in run1 if not torch.equal(run1[key], run_other[key])
+        ]
+        assert differing, "Different-seed run produced identical transformer weights"
 
 
 def test_transformer_training_is_bitwise_reproducible_with_fixed_seed(
@@ -164,5 +171,9 @@ def test_transformer_training_is_bitwise_reproducible_on_gpu(tmp_path: Path) -> 
     ``CUBLAS_WORKSPACE_CONFIG``, so CUDA kernels must be deterministic too.
     Guards against changes (e.g. mixed precision, attention backends) that
     would silently break GPU run-to-run reproducibility.
+
+    Skips the different-seed negative control: seeds diverge the model at
+    init on the CPU before the GPU is involved, so the control proves
+    nothing GPU-specific — and the CPU test always runs it.
     """
-    _assert_bitwise_reproducible(tmp_path, accelerator="gpu")
+    _assert_bitwise_reproducible(tmp_path, accelerator="gpu", negative_control=False)

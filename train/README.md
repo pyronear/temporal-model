@@ -35,12 +35,12 @@ Training is fully deterministic: `train.py` seeds Python/NumPy/torch and the
 DataLoader workers (`L.seed_everything(seed, workers=True)`) and runs with
 `Trainer(deterministic=True)`, which also enables strict
 `torch.use_deterministic_algorithms` and sets `CUBLAS_WORKSPACE_CONFIG` on
-CUDA. Same seed + same device type + same torch/CUDA versions produce a
-bitwise-identical checkpoint, including optimizer state and best-epoch
-selection.
+CUDA. Same seed + same hardware (same CPU or same GPU model) + same
+torch/CUDA versions produce a bitwise-identical checkpoint (verified
+end-to-end on real data, including optimizer state and best-epoch selection).
 
 Scope: a CPU run and a GPU run with the same seed do **not** match each
 other, and neither do different GPU models — different kernels round
 floating-point sums differently. That is inherent to floating point, not a
-bug. `tests/test_reproducibility.py` guards the guarantee (the GPU variant
-skips when CUDA is unavailable, e.g. in CI).
+bug. `tests/test_reproducibility.py` guards same-seed weight reproducibility
+on CPU and GPU (the GPU variant skips when CUDA is unavailable, e.g. in CI).
