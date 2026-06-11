@@ -8,16 +8,18 @@ Import as `temporal_model.api`. Depends on `temporal-model-core`.
 ## Endpoints
 
 - `GET /health` — readiness + loaded model name/version.
-- `POST /predict` — body `{ "frames": ["<s3-key>", ...], "bucket": "<name>",
-  "roi_xyxyn": [x_min, y_min, x_max, y_max] }`
-  (ordered S3 keys; `bucket` optional, falls back to `S3_BUCKET`;
-  `roi_xyxyn` optional normalized region of interest — tubes with no real
-  detection intersecting it are dropped before scoring);
+- `POST /predict` — body `{ "frames": [...], "source": "s3" | "local",
+  "bucket": "<name>", "roi_xyxyn": [x_min, y_min, x_max, y_max] }`
+  (ordered frames; `source` optional, falls back to `FRAME_SOURCE` — with
+  `s3`, frames are S3 keys and `bucket` optionally overrides `S3_BUCKET`;
+  with `local`, frames are relative paths under `FRAMES_ROOT` and `bucket`
+  is invalid; `roi_xyxyn` optional normalized region of interest — tubes
+  with no real detection intersecting it are dropped before scoring);
   returns `{ is_smoke, probability, model }` (`probability` = max kept-tube
   calibrated probability, `null` if uncalibrated).
   `POST /predict?verbose=true` adds a `details` block (decision, preprocessing,
-  per-tube tracks). See `docs/specs/2026-06-02-api-service-design.md` for the
-  full contract.
+  per-tube tracks). See `docs/specs/2026-06-02-api-service-design.md` and
+  `docs/specs/2026-06-11-api-local-frames-design.md` for the full contract.
 
 ## Run
 
@@ -34,12 +36,22 @@ refuses to start if the file is missing. (`docker compose up --build` directly
 will fail at the `COPY` step without it.)
 
 Configuration via env vars (prefix `TEMPORAL_API_`): `MODEL_PATH`, `DEVICE`,
-`CALIBRATOR_THRESHOLD`, `TOKEN`, `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT_URL`
-(empty = real AWS; set for OVH or MinIO), `HOST`, `PORT`. AWS/OVH/MinIO credentials come from
-the standard boto3 chain (env vars / IAM role). `S3_BUCKET` is an optional
-default; a request may override it per call with its `bucket` field (needed for
-alert-api stacks whose per-org bucket names are not known ahead of time). A
-request with neither is rejected with `400 invalid_request`.
+`CALIBRATOR_THRESHOLD`, `TOKEN`, `FRAME_SOURCE`, `FRAMES_ROOT`, `S3_BUCKET`,
+`S3_REGION`, `S3_ENDPOINT_URL` (empty = real AWS; set for OVH or MinIO),
+`HOST`, `PORT`. AWS/OVH/MinIO credentials come from the standard boto3 chain
+(env vars / IAM role). `S3_BUCKET` is an optional default; a request may
+override it per call with its `bucket` field (needed for alert-api stacks
+whose per-org bucket names are not known ahead of time). A request with
+neither is rejected with `400 invalid_request`.
+
+`FRAME_SOURCE` (default `s3`) selects where `/predict` frames come from when
+a request omits its optional `source` field. With `local` (an edge box whose
+frames sit on a shared volume), `frames` are relative paths resolved under
+`FRAMES_ROOT`; `FRAMES_ROOT` is settings-only by design — a request-supplied
+root would let callers probe arbitrary server paths — and absolute paths or
+`..` segments are rejected with `400 invalid_request`. A missing file is the
+same `404 frame_not_found` as a missing S3 key, and local requests skip the
+S3 download entirely (frames are read in place).
 
 `CALIBRATOR_THRESHOLD` (a probability in `[0, 1]`) overrides the packaged
 calibrator decision threshold for every prediction; out-of-range values fail
