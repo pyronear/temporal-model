@@ -42,10 +42,14 @@ filters appear only for sources that carry that metadata.
 
 A polished React/Next.js + Tailwind port of the same viewer lives in
 [`viewer/`](../viewer) and reads the identical reporting tree (it never runs the
-model). It needs Node 22+ and a populated reporting tree (run `uv run dvc repro`
-or `dvc pull` first, same as the Streamlit app):
+model). It needs Node 22+ and a populated reporting tree — pull the packaged
+model and artifacts first (same as the Streamlit app):
 
 ```bash
+# from eval/: fetch model.zip + raw sequences + reporting tree from the DVC remote
+uv run dvc pull
+# (or rebuild the reporting tree locally: uv run dvc repro)
+
 cd ../viewer
 cp .env.local.example .env.local   # DATA_ROOT — defaults to ../eval
 npm install
