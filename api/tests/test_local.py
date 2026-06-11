@@ -71,6 +71,32 @@ def test_symlink_escaping_root_raises_invalid_request(tmp_path):
         resolve_frames(root, ["link.jpg"])
 
 
+def test_empty_frame_raises_invalid_request(tmp_path):
+    # Path("").parts == () slips past the absolute/".." guards and would
+    # resolve to the root itself — a malformed request, not a missing frame.
+    with pytest.raises(InvalidRequest):
+        resolve_frames(tmp_path, [""])
+
+
+def test_dot_frame_raises_invalid_request(tmp_path):
+    with pytest.raises(InvalidRequest):
+        resolve_frames(tmp_path, ["."])
+
+
+def test_missing_root_raises_invalid_request(tmp_path):
+    # A typo'd/unmounted frames root must be a distinct config error, not a
+    # per-frame 404 indistinguishable from genuinely missing frames.
+    with pytest.raises(InvalidRequest):
+        resolve_frames(tmp_path / "nope", FRAMES)
+
+
+def test_file_root_raises_invalid_request(tmp_path):
+    f = tmp_path / "root.txt"
+    f.write_bytes(b"x")
+    with pytest.raises(InvalidRequest):
+        resolve_frames(f, FRAMES)
+
+
 def test_error_message_echoes_request_string_not_server_path(tmp_path):
     with pytest.raises(FrameNotFound) as exc_info:
         resolve_frames(tmp_path, ["cam12/missing.jpg"])

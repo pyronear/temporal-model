@@ -22,12 +22,20 @@ def resolve_frames(root: Path, frames: list[str]) -> list[Path]:
     Error messages echo the request string, never the resolved server path.
     """
     root = root.resolve()
+    if not root.is_dir():
+        # A typo'd or unmounted root would otherwise surface as a 404 per
+        # frame, indistinguishable from genuinely missing frames (the local
+        # analog of fetch_frames mapping NoSuchBucket to a distinct error).
+        raise InvalidRequest(
+            "frames root is not a directory: check TEMPORAL_API_FRAMES_ROOT"
+        )
     paths: list[Path] = []
     for frame in frames:
         rel = Path(frame)
-        if rel.is_absolute() or ".." in rel.parts:
+        # Empty/"." have no parts and would resolve to the root itself.
+        if not rel.parts or rel.is_absolute() or ".." in rel.parts:
             raise InvalidRequest(
-                f"frame must be a relative path without '..': {frame!r}"
+                f"frame must be a non-empty relative path without '..': {frame!r}"
             )
         resolved = (root / rel).resolve()
         if not resolved.is_relative_to(root):
