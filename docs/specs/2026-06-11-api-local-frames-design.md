@@ -31,8 +31,17 @@ that requirement is still open.
 2. **No absolute paths from the network.** Request frames in local mode are
    relative identifiers resolved under a server-configured root
    (`TEMPORAL_API_FRAMES_ROOT`), with a post-resolution containment check.
-   A request-supplied filesystem root would be an arbitrary-file-read
-   primitive.
+   Challenged during brainstorming ("is the root really needed?") and kept,
+   for two reasons. (a) Layout decoupling: relative frames keep the contract
+   symmetric with s3 (`bucket` + keys ↔ `root` + paths) and keep the server's
+   filesystem layout out of request bodies — ops can remount the data by
+   changing one env var on the API instead of redeploying the engine.
+   (b) Guardrail: the API never returns file bytes, so absolute paths are not
+   an exfiltration primitive, but they would make the API a file-probing
+   oracle (404/500/200 reveals existence and image-ness of any readable
+   path) and feed arbitrary server files to the image parser — and auth is
+   optional in this API, so the exposed-by-misconfiguration case is real.
+   Cost: one env var and a resolve-and-check.
 3. **`bucket` and `frames_root` stay separate concepts.** Both are "the
    container frames are relative to", but they differ in who may choose them:
    `bucket` is safely request-suppliable because the server's IAM credentials
