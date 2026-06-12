@@ -14,6 +14,7 @@ export interface Filters {
   label: "all" | Label;
   verdict: "all" | Decision;
   camera: "all" | string;
+  organization: "all" | string;
 }
 
 export const defaultFilters = (): Filters => ({
@@ -21,6 +22,7 @@ export const defaultFilters = (): Filters => ({
   label: "all",
   verdict: "all",
   camera: "all",
+  organization: "all",
 });
 
 export function applyFilters(rows: ResultRow[], f: Filters): ResultRow[] {
@@ -29,7 +31,8 @@ export function applyFilters(rows: ResultRow[], f: Filters): ResultRow[] {
       f.outcomes.includes(r.outcome) &&
       (f.label === "all" || r.label === f.label) &&
       (f.verdict === "all" || r.decision === f.verdict) &&
-      (f.camera === "all" || r.camera_name === f.camera),
+      (f.camera === "all" || r.camera_name === f.camera) &&
+      (f.organization === "all" || r.organization_name === f.organization),
   );
 }
 
@@ -38,6 +41,17 @@ export function cameraOptions(rows: ResultRow[]): string[] {
   return [
     ...new Set(
       rows.map((r) => r.camera_name).filter((c): c is string => c != null),
+    ),
+  ].sort();
+}
+
+/** Sorted distinct non-null organization names present in the rows. */
+export function organizationOptions(rows: ResultRow[]): string[] {
+  return [
+    ...new Set(
+      rows
+        .map((r) => r.organization_name)
+        .filter((o): o is string => o != null),
     ),
   ].sort();
 }

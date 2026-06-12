@@ -14,6 +14,7 @@ import {
   applyFilters,
   cameraOptions,
   defaultFilters,
+  organizationOptions,
   type Filters,
 } from "@/lib/filters";
 import { applyThreshold } from "@/lib/outcomes";
@@ -94,6 +95,10 @@ export default function Page() {
     setFilters(defaultFilters());
   }
   const cameras = useMemo(() => cameraOptions(sourceRows), [sourceRows]);
+  const organizations = useMemo(
+    () => organizationOptions(sourceRows),
+    [sourceRows],
+  );
   const [sort, setSort] = useState<Sort | null>(null);
   const tableRows = useMemo(
     () => sortRows(applyFilters(rows, filters), sort),
@@ -133,6 +138,7 @@ export default function Page() {
         <FilterBar
           filters={filters}
           cameras={cameras}
+          organizations={organizations}
           onChange={setFilters}
           shownCount={tableRows.length}
           totalCount={rows.length}

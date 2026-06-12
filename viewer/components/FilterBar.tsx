@@ -17,17 +17,22 @@ function Select<T extends string>({
   return (
     <label className="flex items-center gap-1.5 text-xs text-slate-500">
       {label}
-      <select
-        className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800"
-        value={value}
-        onChange={(e) => onChange(e.target.value as T)}
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+      <span className="relative">
+        <select
+          className="cursor-pointer appearance-none rounded-lg border border-slate-200 bg-white py-1 pl-2.5 pr-7 text-sm text-slate-800 shadow-sm transition-colors hover:border-slate-300 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+          value={value}
+          onChange={(e) => onChange(e.target.value as T)}
+        >
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-slate-400">
+          ▾
+        </span>
+      </span>
     </label>
   );
 }
@@ -35,6 +40,7 @@ function Select<T extends string>({
 export function FilterBar({
   filters,
   cameras,
+  organizations = [],
   onChange,
   shownCount,
   totalCount,
@@ -42,6 +48,7 @@ export function FilterBar({
 }: {
   filters: Filters;
   cameras: string[];
+  organizations?: string[];
   onChange: (f: Filters) => void;
   shownCount: number;
   totalCount: number;
@@ -97,6 +104,17 @@ export function FilterBar({
             { value: "smoke", label: "smoke" },
             { value: "fp", label: "fp" },
             { value: "unknown", label: "unknown" },
+          ]}
+        />
+      )}
+      {monitorMode && organizations.length > 0 && (
+        <Select<string>
+          label="organization"
+          value={filters.organization}
+          onChange={(v) => onChange({ ...filters, organization: v })}
+          options={[
+            { value: "all", label: "all" },
+            ...organizations.map((o) => ({ value: o, label: o })),
           ]}
         />
       )}
