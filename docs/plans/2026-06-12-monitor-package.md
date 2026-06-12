@@ -2,6 +2,14 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Historical note (post-execution):** this plan was executed, then the
+> design evolved during live production use. The shipped code supersedes
+> the plan where they differ: one `alert-api` reporting tree instead of
+> per-org sources, `alert-api_<id>` keys and `source: "alert-api"`
+> (never "platform"), `import_alert_api.py` module name, rows carrying
+> production's verdict, plus `--all-orgs` / `--exclude-org` /
+> `--trigger-image` features. See the amended spec for the final design.
+
 **Goal:** Build the `monitor/` package per `docs/specs/2026-06-12-monitor-design.md`: import production sequences from alert-api, replay them through the exact pinned api+model Docker release with verbose tube details, and write the eval-viewer reporting contract, all DVC-tracked.
 
 **Architecture:** A sixth uv package `temporal_model.monitor` (no `core`/torch dependency) with a `temporal-monitor` CLI. `import` fetches scored sequences + frames from alert-api into a `dvc add`-tracked store; `replay` (a `dvc.yaml` stage) groups sequences by recorded `temporal_api_version`, runs the matching `pyronear/temporal-model-api:<tag>` image + MinIO via docker compose, reconstructs the exact production call, and writes `data/08_reporting/<org>/vit_dinov2_finetune/` in the eval-viewer contract. The existing `viewer/` reads it via `DATA_ROOT=../monitor`.

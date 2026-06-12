@@ -112,7 +112,7 @@ monitor/
 └── data/                   # DVC-managed (gitignored content)
     ├── 01_raw/sequences/<org>/<camera>/seq_<id>/{meta.json, images/}
     ├── 01_raw/sequences.dvc
-    └── 08_reporting/<org>/vit_dinov2_finetune/...
+    └── 08_reporting/alert-api/vit_dinov2_finetune/...
 ```
 
 The replay stage in `dvc.yaml`, in the house style (explicit code deps,
@@ -125,6 +125,7 @@ stages:
       uv run python -m temporal_model.monitor.cli replay
       --store data/01_raw/sequences
       --output-dir data/08_reporting
+      --trigger-image temporal-model-api:dev
     deps:
       - src/temporal_model/monitor/cli.py
       - src/temporal_model/monitor/store.py
@@ -146,7 +147,7 @@ Modeled on vision-rd's `temporal-model-explorer` import, modernized:
 - Login: `POST /api/v1/login/creds` → bearer token.
 - Sequences: `GET /api/v1/sequences/all/fromdate?from_date=...&limit=100&offset=...`
   for each day in `--date-from/--date-to` (default: yesterday..today).
-- Per sequence: `GET /api/v1/sequences/{id}/detections?limit=30&desc=false`,
+- Per sequence: `GET /api/v1/sequences/{id}/detections?limit=100&desc=false (paginated until a short page)`,
   download each detection's full frame via its presigned `url`, write
   `images/detection_<id>.jpg`.
 - **Incremental:** a sequence already present in the store is skipped
@@ -160,9 +161,9 @@ Modeled on vision-rd's `temporal-model-explorer` import, modernized:
 
 ```json
 {
-  "key": "platform_42307",
+  "key": "alert-api_42307",
   "sequence_id": 42307,
-  "source": "platform",
+  "source": "alert-api",
   "label": "smoke" | "fp" | "unknown",
   "label_detail": "wildfire_smoke" | "other_smoke" | "other" | null,
   "camera_id": 122, "camera_name": "...", "organization_id": 11,
@@ -214,7 +215,7 @@ store change (new import) makes the stage stale, `dvc repro` re-runs it,
 6. **Call** `POST /predict?verbose=true&compute_trigger=true` with
    `{bucket, frames, roi_xyxyn}`.
 7. **Consistency check:** replayed `probability` vs recorded
-   `temporal_model_score` (tolerance 1e-6). Recorded per sequence as
+   `temporal_model_score` (tolerance 1e-5: cross-hardware float noise). Recorded per sequence as
    `replay_matches`; mismatches are summarized at the end of the run.
    Known, accepted limitation: the detection set may have grown after the
    last production scoring, so reconstruction can legitimately differ —
@@ -225,8 +226,11 @@ store change (new import) makes the stage stale, `dvc repro` re-runs it,
    - `results.json` — eval columns (`key`, `source`, `label`, `decision`,
      `outcome`, `score`, `probability`, `num_tubes_kept`,
      `trigger_frame_index`, `organization_name`, `camera_name`,
-     `started_at`) plus monitor extras: `recorded_probability`,
-     `replay_matches`, `temporal_model_version`, `temporal_api_version`.
+     `started_at`) carrying production's verdict (`decision`,
+     `probability` = recorded score) plus monitor extras:
+     `replayed_probability`, `replayed_decision`, `replay_matches`,
+     `matched_window_frames`, `temporal_model_version`,
+     `temporal_api_version`.
      `source` is always the fixed slug `"alert-api"`; `organization_name`
      carries the raw org name and is shown as a table column in the viewer.
    - `details/<key>.json` — verbose `details` reshaped to the eval
@@ -276,8 +280,9 @@ untouched.
 ## Error handling
 
 - Every skipped sequence lands in `dropped.json` with a machine-readable
-  reason: `no_temporal_version`, `image_pull_failed`, `stack_unhealthy`,
-  `model_version_mismatch`, `too_few_frames`, `no_images`.
+  reason: `no_temporal_version`, `no_recorded_score`, `invalid_api_version`,
+  `image_pull_failed`, `stack_unhealthy`, `model_version_mismatch`,
+  `too_few_frames`, `no_images`, `predict_failed`.
 - Import is resumable: a partially-downloaded sequence (images missing vs
   meta) is re-fetched on the next run.
 - Replay failures on one sequence (HTTP error, timeout) are logged, the

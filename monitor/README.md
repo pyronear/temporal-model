@@ -28,7 +28,8 @@ make import ARGS="--all-orgs --exclude-org pyroadmins"  # admin token: every org
 
 The alert-api listing (`/sequences/all/fromdate`) is limited to the authenticated account's own
 organization; `--all-orgs` scans the global sequence-id space instead (admin token required), so
-every organization (sdis-07, sdis-77, ...) lands in its own viewer source.
+every organization (sdis-07, sdis-77, ...) lands in the single `alert-api`
+source, distinguishable via the organization column/filter in the viewer.
 `--exclude-org` skips an organization (accepts a slug or raw name, e.g. `--exclude-org pyroadmins`
 for the CI camera org); pass it multiple times to exclude several. Exclusion affects future imports
 only — already-imported directories must be removed manually.
@@ -51,8 +52,9 @@ Docker must be running; each version group costs one image pull.
 
 All organizations land in one reporting tree; organizations are a table column in the viewer.
 
-- `results.json` — eval columns + monitor extras: `recorded_probability`
-  (what production stored), `replay_matches` (|Δ| ≤ 1e-5),
+- `results.json` — eval columns carrying PRODUCTION's verdict (`decision`,
+  `probability` = the recorded score) + monitor extras: `replayed_probability`
+  / `replayed_decision` (the local re-run), `replay_matches` (|Δ| ≤ 1e-5),
   `matched_window_frames` (when a mismatch is window drift: the sequence
   length at which production's recorded score is reproduced; null = no window
   matched, genuine drift), `temporal_model_version`, `temporal_api_version`.
