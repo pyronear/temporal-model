@@ -83,6 +83,7 @@ def result_row(
     response: dict[str, Any],
     details: dict[str, Any],
     replay_matches: bool | None,
+    matched_window_frames: int | None = None,
 ) -> dict[str, Any]:
     """One results.json row: eval columns + monitor provenance extras."""
     kept = details["tubes"]["kept"]
@@ -104,6 +105,7 @@ def result_row(
         "started_at": meta.started_at,
         "recorded_probability": meta.temporal_model_score,
         "replay_matches": replay_matches,
+        "matched_window_frames": matched_window_frames,
         "temporal_model_version": meta.temporal_model_version,
         "temporal_api_version": meta.temporal_api_version,
     }

@@ -224,10 +224,12 @@ def test_score_mismatch_flagged(tmp_path):
     store_sequence(store, 1, score=0.5)  # recorded 0.5, replay says 0.93
     summary = run(store, out)
     assert summary["mismatched"] == 1
+    assert summary["window_drift"] == 0
     rows = json.loads(
         (out / "sis-67" / "vit_dinov2_finetune" / "results.json").read_text()
     )
     assert rows[0]["replay_matches"] is False
+    assert rows[0]["matched_window_frames"] is None
     assert SCORE_TOLERANCE == 1e-6
 
 
@@ -265,3 +267,32 @@ def test_unhealthy_stack_drops_group_and_continues(tmp_path):
     # the sick stack was still torn down
     sick = next(s for s in FakeStack.instances if s.version == "0.0.8")
     assert sick.down_called
+
+
+def test_window_drift_found_by_probing(tmp_path):
+    store, out = tmp_path / "store", tmp_path / "out"
+    # 12 distinct frames; production scored at the first-5 window (recorded 0.5)
+    store_sequence(store, 1, score=0.5, n_frames=12)
+
+    def window_predict(frames, roi_xyxyn):
+        resp = json.loads(json.dumps(fake_predict_ok(frames, roi_xyxyn)))
+        # full final window (last 10 of 12) -> 0.93; the first-5 window -> 0.5
+        if frames == [f"cam/seq1-f{i}.jpg" for i in range(5)]:
+            resp["probability"] = 0.5
+        return resp
+
+    summary = run(store, out, predict=window_predict)
+    assert summary == {
+        "replayed": 1,
+        "mismatched": 1,
+        "window_drift": 1,
+        "dropped": 0,
+    }
+    rows = json.loads(
+        (out / "sis-67" / "vit_dinov2_finetune" / "results.json").read_text()
+    )
+    assert rows[0]["replay_matches"] is False
+    assert rows[0]["matched_window_frames"] == 5
+
+    # probing stopped at n=5: 1 main replay upload + 2 probe uploads (n=4, n=5)
+    assert len(FakeStack.instances[0].uploaded) == 3

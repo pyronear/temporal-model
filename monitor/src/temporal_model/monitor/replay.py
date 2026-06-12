@@ -82,7 +82,7 @@ def run_replay(
 ) -> dict[str, int]:
     reports: dict[str, OrgReport] = {}
     groups: dict[str, list[tuple[Path, SequenceMeta]]] = {}
-    replayed = mismatched = dropped = 0
+    replayed = mismatched = window_drift = dropped = 0
 
     for seq_dir, meta in iter_metas(store_dir):
         if not meta.temporal_api_version:
@@ -121,6 +121,10 @@ def run_replay(
                 elif outcome == "mismatch":
                     replayed += 1
                     mismatched += 1
+                elif outcome == "window_drift":
+                    replayed += 1
+                    mismatched += 1
+                    window_drift += 1
                 else:
                     dropped += 1
         finally:
@@ -128,13 +132,51 @@ def run_replay(
 
     for report in reports.values():
         write_report(output_dir, report)
-    summary = {"replayed": replayed, "mismatched": mismatched, "dropped": dropped}
+    summary = {
+        "replayed": replayed,
+        "mismatched": mismatched,
+        "window_drift": window_drift,
+        "dropped": dropped,
+    }
     logger.info(
-        "replay done: %(replayed)d replayed (%(mismatched)d score mismatches), "
-        "%(dropped)d dropped",
+        "replay done: %(replayed)d replayed (%(mismatched)d score mismatches, "
+        "%(window_drift)d window drift), %(dropped)d dropped",
         summary,
     )
     return summary
+
+
+def _find_matching_window(
+    stack: Any,
+    seq_dir: Path,
+    meta: SequenceMeta,
+    recorded: float,
+    predict: Callable[[list[str], list[float] | None], dict],
+) -> int | None:
+    """Distinct-frame count n whose window reproduces the recorded score.
+
+    Production scored "the last <=10 of the first n distinct frames" for some
+    unknown n (it stops scoring once a sequence validates, while detections
+    keep arriving). Probe candidates ascending and stop at the first match;
+    None when no window matches (genuine drift, not window drift). The ROI is
+    recomputed per candidate from that window's detections, mirroring the
+    production call.
+    """
+    _, all_keys, _ = reconstruct.frames_and_roi(meta.frames, last_n=None)
+    for n in range(reconstruct.MIN_FRAMES, len(all_keys) + 1):
+        first_n = set(all_keys[:n])
+        subset = [f for f in meta.frames if f.bucket_key in first_n]
+        _, kept, roi = reconstruct.frames_and_roi(subset)
+        files = _files_by_key(seq_dir, meta, kept)
+        try:
+            stack.upload_frames(files)
+            probability = predict(kept, roi).get("probability")
+        except Exception:  # noqa: BLE001 — a failed probe ends the search, not the run
+            logger.exception("window probe failed for %s at n=%d", meta.key, n)
+            return None
+        if probability is not None and abs(recorded - probability) <= SCORE_TOLERANCE:
+            return n
+    return None
 
 
 def _replay_one(
@@ -167,6 +209,18 @@ def _replay_one(
 
     details = reshape_details(response["details"])
     matches = _score_matches(meta.temporal_model_score, response.get("probability"))
+    matched_window_frames = None
+    if matches is False:
+        matched_window_frames = _find_matching_window(
+            stack, seq_dir, meta, meta.temporal_model_score, predict
+        )
+        if matched_window_frames is not None:
+            logger.info(
+                "%s: recorded score reproduced at the first-%d-frame window "
+                "(window drift, not model drift)",
+                meta.key,
+                matched_window_frames,
+            )
     org = slugify(meta.organization_name)
     cam = slugify(meta.camera_name)
     # The frames the model actually saw, in request order, as paths relative
@@ -189,7 +243,11 @@ def _replay_one(
     }
     report.add(
         row=result_row(
-            meta=meta, response=response, details=details, replay_matches=matches
+            meta=meta,
+            response=response,
+            details=details,
+            replay_matches=matches,
+            matched_window_frames=matched_window_frames,
         ),
         details=details,
         view=view,
@@ -200,7 +258,9 @@ def _replay_one(
             "api_version": health.get("api_version"),
         },
     )
-    return "ok" if (matches is None or matches) else "mismatch"
+    if matches is None or matches:
+        return "ok"
+    return "window_drift" if matched_window_frames is not None else "mismatch"
 
 
 def _score_matches(recorded: float | None, replayed: float | None) -> bool | None:

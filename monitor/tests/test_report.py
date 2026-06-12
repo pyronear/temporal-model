@@ -148,6 +148,7 @@ def test_result_row():
         "started_at": "2026-05-15T13:08:18",
         "recorded_probability": 0.93,
         "replay_matches": True,
+        "matched_window_frames": None,
         "temporal_model_version": "0.1.0",
         "temporal_api_version": "0.3.1",
     }

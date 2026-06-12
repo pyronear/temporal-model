@@ -40,7 +40,9 @@ Docker must be running; each version group costs one image pull.
 
 - `results.json` — eval columns + monitor extras: `recorded_probability`
   (what production stored), `replay_matches` (|Δ| ≤ 1e-6),
-  `temporal_model_version`, `temporal_api_version`.
+  `matched_window_frames` (when a mismatch is window drift: the sequence
+  length at which production's recorded score is reproduced; null = no window
+  matched, genuine drift), `temporal_model_version`, `temporal_api_version`.
 - `details/<key>.json` — tubes in the eval shape; `stabilized_window` is
   recomputed client-side; trigger fields appear for releases shipping
   `compute_trigger` (older images ignore the flag → "no trigger" in the
@@ -50,8 +52,13 @@ Docker must be running; each version group costs one image pull.
   `model_version_mismatch`, `too_few_frames`, `no_images`, `predict_failed`).
 
 A `replay_matches: false` row means the reconstruction diverged from the
-recorded score — usually detections that arrived after the last production
-scoring (known limitation; see the spec).
+recorded score. When this happens, the replay automatically probes candidate
+windows (ascending distinct-frame counts from MIN_FRAMES) to check whether
+the mismatch is window drift — production scores a sequence early and stops
+once it validates, while detections keep arriving. If a shorter prefix of the
+sequence reproduces the recorded score, `matched_window_frames` is set to
+that count (window drift, not model drift); if no prefix matches, it remains
+null (genuine drift — see the spec).
 
 ## Tests
 
