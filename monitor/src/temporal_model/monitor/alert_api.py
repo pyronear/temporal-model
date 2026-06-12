@@ -1,10 +1,12 @@
 """Thin alert-api HTTP client: login, sequences, detections, cameras, orgs.
 
-Pagination: list endpoints are server-capped at 100 rows; helpers loop with
-``offset`` until a short page. Detections are fetched COMPLETELY and oldest
-first — production ROI reconstruction uses every detection of a sequence
-(pyro-api ``validation._sequence_frames_and_roi`` runs an unbounded
-``fetch_all``), so a truncated import would change the replayed call.
+Pagination: the sequences/detections list endpoints page at 100 rows; helpers
+loop with ``offset`` until a short page. ``/cameras/`` and ``/organizations/``
+return everything in one response (no limit param server-side). Detections are
+fetched COMPLETELY and oldest first — production ROI reconstruction uses every
+detection of a sequence (pyro-api ``validation._sequence_frames_and_roi`` runs
+an unbounded ``fetch_all``), so a truncated import would change the replayed
+call.
 """
 
 from __future__ import annotations

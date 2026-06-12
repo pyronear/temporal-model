@@ -86,6 +86,23 @@ def test_import_is_incremental(tmp_path):
     assert client.detection_calls == 1  # second run never re-fetched detections
 
 
+def test_import_force_redownloads(tmp_path):
+    client = FakeClient()
+    import_platform(
+        client, tmp_path, "2026-05-15", "2026-05-16", download=fake_download
+    )
+    stats = import_platform(
+        client,
+        tmp_path,
+        "2026-05-15",
+        "2026-05-16",
+        force=True,
+        download=fake_download,
+    )
+    assert stats == {"imported": 1, "skipped": 0}
+    assert client.detection_calls == 2
+
+
 def test_import_handles_missing_org_names(tmp_path):
     class NoOrgClient(FakeClient):
         def list_organizations(self):
