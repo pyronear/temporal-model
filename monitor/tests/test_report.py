@@ -153,6 +153,17 @@ def test_result_row():
     }
 
 
+def test_result_row_source_is_slugified_to_match_tree_dir():
+    meta = make_meta().model_copy(update={"organization_name": "SIS 67"})
+    details = reshape_details(VERBOSE_RESPONSE["details"])
+    row = result_row(
+        meta=meta, response=VERBOSE_RESPONSE, details=details, replay_matches=True
+    )
+    # the viewer joins rows to the source directory by string equality
+    assert row["source"] == "sis-67"
+    assert row["organization_name"] == "SIS 67"
+
+
 def test_write_report_tree(tmp_path):
     meta = make_meta()
     details = reshape_details(VERBOSE_RESPONSE["details"])
