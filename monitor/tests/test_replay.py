@@ -4,6 +4,7 @@ from pathlib import Path
 
 from temporal_model.monitor.cli import _parse_args
 from temporal_model.monitor.replay import SCORE_TOLERANCE, run_replay
+from temporal_model.monitor.stack import StackError
 from temporal_model.monitor.store import (
     FrameMeta,
     SequenceMeta,
@@ -235,3 +236,32 @@ def test_cli_replay_defaults_point_at_package_compose_file():
     assert args.compose_file.name == "docker-compose.yml"
     assert args.compose_file.parent.name == "monitor"
     assert args.compose_file.is_file()
+
+
+def test_unhealthy_stack_drops_group_and_continues(tmp_path):
+    store, out = tmp_path / "store", tmp_path / "out"
+    store_sequence(store, 1, api_version="0.0.8")
+    store_sequence(store, 2, api_version="0.3.1")
+
+    class SickStack(FakeStack):
+        def wait_healthy(self, **kwargs):
+            if self.version == "0.0.8":
+                raise StackError("api never became healthy")
+            return super().wait_healthy(**kwargs)
+
+    FakeStack.instances = []
+    summary = run_replay(
+        store_dir=store,
+        output_dir=out,
+        compose_file=Path("dc.yml"),
+        stack_factory=SickStack,
+        predict=fake_predict_ok,
+    )
+    assert summary["replayed"] == 1  # the 0.3.1 group still ran
+    dropped = json.loads(
+        (out / "sis-67" / "vit_dinov2_finetune" / "dropped.json").read_text()
+    )
+    assert {d["reason"] for d in dropped} == {"stack_unhealthy"}
+    # the sick stack was still torn down
+    sick = next(s for s in FakeStack.instances if s.version == "0.0.8")
+    assert sick.down_called

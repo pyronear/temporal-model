@@ -27,7 +27,7 @@ from temporal_model.monitor.report import (
     result_row,
     write_report,
 )
-from temporal_model.monitor.stack import API_URL, BUCKET, ReplayStack
+from temporal_model.monitor.stack import API_URL, BUCKET, ReplayStack, StackError
 from temporal_model.monitor.store import SequenceMeta, iter_metas, slugify
 
 logger = logging.getLogger(__name__)
@@ -93,6 +93,9 @@ def run_replay(
 
     for version in sorted(groups):
         items = groups[version]
+        logger.info(
+            "replaying %d sequence(s) against api version %s", len(items), version
+        )
         stack = stack_factory(compose_file, version)
         try:
             stack.up()
@@ -103,7 +106,14 @@ def run_replay(
                 dropped += 1
             continue
         try:
-            health = stack.wait_healthy()
+            try:
+                health = stack.wait_healthy()
+            except StackError:
+                logger.exception("api for version %s never became healthy", version)
+                for _, meta in items:
+                    _org_report(reports, meta).drop(meta.key, "stack_unhealthy")
+                    dropped += 1
+                continue
             for seq_dir, meta in items:
                 outcome = _replay_one(stack, health, seq_dir, meta, reports, predict)
                 if outcome == "ok":
