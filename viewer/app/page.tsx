@@ -14,6 +14,7 @@ import {
   applyFilters,
   cameraOptions,
   defaultFilters,
+  organizationOptions,
   type Filters,
 } from "@/lib/filters";
 import { applyThreshold } from "@/lib/outcomes";
@@ -71,7 +72,14 @@ export default function Page() {
     () => allRows.filter((r) => r.source === source),
     [allRows, source],
   );
+  const monitorMode = useMemo(
+    () => sourceRows.some((r) => r.replayed_probability !== undefined),
+    [sourceRows],
+  );
+  // Monitor rows carry production's verdict — never re-decided locally, so
+  // the threshold slider is eval-only.
   const showSlider =
+    !monitorMode &&
     cfg.decision?.aggregation === "logistic" &&
     sourceRows.some((r) => r.probability != null);
   const rows = useMemo(
@@ -86,7 +94,21 @@ export default function Page() {
     setPrevFilterSource(source);
     setFilters(defaultFilters());
   }
-  const cameras = useMemo(() => cameraOptions(sourceRows), [sourceRows]);
+  const cameras = useMemo(
+    () =>
+      cameraOptions(
+        filters.organization === "all"
+          ? sourceRows
+          : sourceRows.filter(
+              (r) => r.organization_name === filters.organization,
+            ),
+      ),
+    [sourceRows, filters.organization],
+  );
+  const organizations = useMemo(
+    () => organizationOptions(sourceRows),
+    [sourceRows],
+  );
   const [sort, setSort] = useState<Sort | null>(null);
   const tableRows = useMemo(
     () => sortRows(applyFilters(rows, filters), sort),
@@ -121,14 +143,22 @@ export default function Page() {
         defaultThreshold={defaultThr}
         onThreshold={setThreshold}
         onReset={() => setThreshold(defaultThr)}
+        monitorMode={monitorMode}
+        selectedOrganization={filters.organization}
+        onSelectOrganization={(org) =>
+          // mirror the FilterBar's org change: camera resets with the org
+          setFilters({ ...filters, organization: org, camera: "all" })
+        }
       />
       <div className="flex min-w-0 flex-1 flex-col p-4">
         <FilterBar
           filters={filters}
           cameras={cameras}
+          organizations={organizations}
           onChange={setFilters}
           shownCount={tableRows.length}
           totalCount={rows.length}
+          monitorMode={monitorMode}
         />
         <div className="min-h-0 flex-1">
           <SequenceTable
@@ -137,6 +167,7 @@ export default function Page() {
             onSelect={setSelectedKey}
             sort={sort}
             onSort={(col) => setSort((cur) => nextSort(cur, col))}
+            monitorMode={monitorMode}
           />
         </div>
       </div>

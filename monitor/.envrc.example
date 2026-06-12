@@ -1,0 +1,5 @@
+# Copy to monitor/.envrc (untracked) and fill in; direnv loads it automatically.
+# Credentials for the alert-api (the platform that calls /predict in production).
+export ALERT_API_URL=https://alertapi.pyronear.org
+export ALERT_API_LOGIN=changeme
+export ALERT_API_PASSWORD=changeme

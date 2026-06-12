@@ -13,7 +13,7 @@ through the full pipeline, with figures generated from real sequences.
 
 ## Packages
 
-Five independent packages, each with its own `pyproject.toml` and `tests/`.
+Six independent packages, each with its own `pyproject.toml` and `tests/`.
 
 | Path | Import | Purpose |
 |------|--------|---------|
@@ -22,6 +22,7 @@ Five independent packages, each with its own `pyproject.toml` and `tests/`.
 | `eval/`  | `temporal_model.eval`  | DVC evaluation pipeline (packaged-model protocol metrics). Depends on `core`. |
 | `api/`   | `temporal_model.api`   | FastAPI serving layer, shipped as a Docker service. Depends on `core`. |
 | `benchmark/` | `temporal_model.benchmark` | Latency/throughput/resource benchmark with a per-stage `predict()` breakdown, runnable across VMs. Depends on `core`. |
+| `monitor/` | `temporal_model.monitor` | Production decision replay: import scored sequences from alert-api, re-run them through the pinned api+model release, view tubes in the eval viewer. |
 
 `train`/`eval`/`api`/`benchmark` depend on `core` via a `uv` path source
 (`temporal-model-core = { path = "../core", editable = true }`). `core` and
@@ -31,9 +32,9 @@ Five independent packages, each with its own `pyproject.toml` and `tests/`.
 
 ```bash
 make                # list all available targets (same as `make help`)
-make install        # uv sync across all five packages
-make test           # pytest across all five packages
-make lint           # ruff check across all five packages + docs/assets/scripts
+make install        # uv sync across all six packages
+make test           # pytest across all six packages
+make lint           # ruff check across all six packages + docs/assets/scripts
 ```
 
 Per package, `cd <pkg> && make install|lint|format|test`.
