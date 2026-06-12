@@ -137,7 +137,7 @@ def test_happy_path_writes_org_tree(tmp_path):
         (out / "sis-67" / "vit_dinov2_finetune" / "results.json").read_text()
     )
     assert rows[0]["replay_matches"] is True
-    assert rows[0]["recorded_probability"] == 0.93
+    assert rows[0]["probability"] == 0.93
     stack = FakeStack.instances[0]
     assert stack.up_called and stack.down_called
     # 4 distinct keys uploaded once

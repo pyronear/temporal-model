@@ -133,6 +133,7 @@ def test_result_row():
         details=details,
         replay_matches=True,
     )
+    # decision and probability come from production's recorded score (0.93 > 0.52)
     assert row == {
         "key": "alert-api_42307",
         "source": "sis-67",
@@ -146,7 +147,8 @@ def test_result_row():
         "organization_name": "sis-67",
         "camera_name": "donon-sarrebourg-01",
         "started_at": "2026-05-15T13:08:18",
-        "recorded_probability": 0.93,
+        "replayed_probability": 0.93,
+        "replayed_decision": "keep",
         "replay_matches": True,
         "matched_window_frames": None,
         "temporal_model_version": "0.1.0",

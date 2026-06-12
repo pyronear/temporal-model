@@ -5,8 +5,8 @@ Layout (read by viewer/ with DATA_ROOT=../monitor — see viewer/lib/paths.ts):
 sequences/, model_config.json, dropped.json}``. Shapes mirror
 ``eval/src/temporal_model/eval/evaluate.py`` rows and
 ``core/src/temporal_model/core/details_schema.py`` details; results rows add
-the monitor-only provenance columns (recorded_probability, replay_matches,
-temporal_*_version), which the viewer treats as optional.
+the monitor-only provenance columns (replayed_probability, replayed_decision,
+replay_matches, temporal_*_version), which the viewer treats as optional.
 """
 
 from __future__ import annotations
@@ -85,9 +85,20 @@ def result_row(
     replay_matches: bool | None,
     matched_window_frames: int | None = None,
 ) -> dict[str, Any]:
-    """One results.json row: eval columns + monitor provenance extras."""
+    """One results.json row: eval columns + monitor provenance extras.
+
+    Philosophy: the row verdict is production's — ``decision`` and
+    ``probability`` reflect what the alert-api recorded (``meta.temporal_model_score``
+    compared against the packaged threshold in ``details``).  The local replay's
+    probability and decision are diagnostic only and live in the ``replayed_*``
+    extras, visible in the viewer's detail pane.
+    """
     kept = details["tubes"]["kept"]
-    decision = decision_from_output(response["is_smoke"])
+    decision = (
+        "keep"
+        if meta.temporal_model_score > details["decision"]["threshold"]
+        else "discard"
+    )
     return {
         "key": meta.key,
         # must equal the reporting tree's <org_slug> dir — the viewer filters
@@ -97,13 +108,14 @@ def result_row(
         "decision": decision,
         "outcome": compute_outcome(decision, meta.label),
         "score": max(t["logit"] for t in kept) if kept else None,
-        "probability": response.get("probability"),
+        "probability": meta.temporal_model_score,
         "num_tubes_kept": len(kept),
         "trigger_frame_index": response.get("trigger_frame_index"),
         "organization_name": meta.organization_name,
         "camera_name": meta.camera_name,
         "started_at": meta.started_at,
-        "recorded_probability": meta.temporal_model_score,
+        "replayed_probability": response.get("probability"),
+        "replayed_decision": decision_from_output(response["is_smoke"]),
         "replay_matches": replay_matches,
         "matched_window_frames": matched_window_frames,
         "temporal_model_version": meta.temporal_model_version,
