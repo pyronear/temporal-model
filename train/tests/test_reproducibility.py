@@ -150,9 +150,7 @@ def _assert_bitwise_reproducible(
             OTHER_SEED, train_dir, val_dir, tmp_path / "run_other", accelerator
         )
         assert run_other.keys() == run1.keys()
-        differing = [
-            key for key in run1 if not torch.equal(run1[key], run_other[key])
-        ]
+        differing = [key for key in run1 if not torch.equal(run1[key], run_other[key])]
         assert differing, "Different-seed run produced identical transformer weights"
 
 
