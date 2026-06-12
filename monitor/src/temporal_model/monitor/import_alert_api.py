@@ -25,6 +25,7 @@ from temporal_model.monitor.store import (
     label_from_is_wildfire,
     sequence_dir,
     sequence_exists,
+    slugify,
     write_meta,
 )
 
@@ -58,6 +59,15 @@ def _org_names(client) -> dict[int, str]:
         return {}
 
 
+def _org_name(
+    seq: dict, cameras: dict[int, dict], org_names: dict[int, str]
+) -> str | None:
+    """Resolve the org name for a sequence (same logic used by _import_one)."""
+    camera = cameras.get(seq.get("camera_id")) or {}
+    org_id = camera.get("organization_id")
+    return org_names.get(org_id) or (f"org-{org_id}" if org_id is not None else None)
+
+
 def import_alert_api(
     client,
     store_dir: Path,
@@ -66,21 +76,28 @@ def import_alert_api(
     *,
     force: bool = False,
     download: Callable[[str], bytes] = _default_download,
+    exclude_orgs: set[str] | None = None,
 ) -> dict[str, int]:
     """Import all sequences in [day_from, day_to] (inclusive). Returns counts."""
     store_dir.mkdir(parents=True, exist_ok=True)
     cameras = _camera_index(client)
     org_names = _org_names(client)
-    imported = skipped = 0
+    imported = skipped = excluded = 0
     for day in _date_range(day_from, day_to):
         for seq in client.list_sequences_for_date(day):
+            org_slug = slugify(_org_name(seq, cameras, org_names))
+            if exclude_orgs and org_slug in exclude_orgs:
+                excluded += 1
+                continue
             if not force and sequence_exists(store_dir, seq["id"]):
                 skipped += 1
                 continue
             _import_one(client, store_dir, seq, cameras, org_names, download)
             imported += 1
-    logger.info("import done: %d imported, %d skipped", imported, skipped)
-    return {"imported": imported, "skipped": skipped}
+    logger.info(
+        "import done: %d imported, %d skipped, %d excluded", imported, skipped, excluded
+    )
+    return {"imported": imported, "skipped": skipped, "excluded": excluded}
 
 
 def _import_one(
@@ -104,8 +121,7 @@ def _import_one(
         camera_id=seq.get("camera_id"),
         camera_name=camera.get("name"),
         organization_id=org_id,
-        organization_name=org_names.get(org_id)
-        or (f"org-{org_id}" if org_id is not None else None),
+        organization_name=_org_name(seq, cameras, org_names),
         started_at=seq.get("started_at"),
         temporal_model_score=seq.get("temporal_model_score"),
         temporal_model_version=seq.get("temporal_model_version"),
@@ -148,6 +164,7 @@ def import_all_orgs(
     force: bool = False,
     seed_id: int | None = None,
     download: Callable[[str], bytes] = _default_download,
+    exclude_orgs: set[str] | None = None,
 ) -> dict[str, int]:
     """Import sequences of EVERY organization by scanning the global ID space.
 
@@ -172,7 +189,7 @@ def import_all_orgs(
     head = _find_head(client, seed)
     cameras = _camera_index(client)
     org_names = _org_names(client)
-    imported = skipped = 0
+    imported = skipped = excluded = 0
     misses = older = 0
     sid = head
     while sid > 0 and misses < HEAD_GAP and older < OLDER_STOP:
@@ -189,13 +206,21 @@ def import_all_orgs(
             older += 1
             continue
         older = 0
+        if exclude_orgs and slugify(_org_name(seq, cameras, org_names)) in exclude_orgs:
+            excluded += 1
+            continue
         if not force and sequence_exists(store_dir, seq["id"]):
             skipped += 1
             continue
         _import_one(client, store_dir, seq, cameras, org_names, download)
         imported += 1
-    logger.info("scan import done: %d imported, %d skipped", imported, skipped)
-    return {"imported": imported, "skipped": skipped}
+    logger.info(
+        "scan import done: %d imported, %d skipped, %d excluded",
+        imported,
+        skipped,
+        excluded,
+    )
+    return {"imported": imported, "skipped": skipped, "excluded": excluded}
 
 
 def _max_store_id(store_dir: Path) -> int | None:

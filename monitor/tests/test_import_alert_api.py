@@ -2,7 +2,12 @@ import pytest
 
 import temporal_model.monitor.import_alert_api as _imp_mod
 from temporal_model.monitor.import_alert_api import import_alert_api, import_all_orgs
-from temporal_model.monitor.store import find_sequence_dirs, read_meta, sequence_exists
+from temporal_model.monitor.store import (
+    find_sequence_dirs,
+    read_meta,
+    sequence_exists,
+    slugify,
+)
 
 SEQ = {
     "id": 42307,
@@ -63,7 +68,7 @@ def test_import_writes_store(tmp_path):
     stats = import_alert_api(
         client, tmp_path, "2026-05-15", "2026-05-16", download=fake_download
     )
-    assert stats == {"imported": 1, "skipped": 0}
+    assert stats == {"imported": 1, "skipped": 0, "excluded": 0}
     assert sequence_exists(tmp_path, 42307)
     seq_dir = tmp_path / "sis-67" / "donon-sarrebourg-01" / "seq_42307"
     meta = read_meta(seq_dir)
@@ -89,7 +94,7 @@ def test_import_is_incremental(tmp_path):
     stats = import_alert_api(
         client, tmp_path, "2026-05-15", "2026-05-16", download=fake_download
     )
-    assert stats == {"imported": 0, "skipped": 1}
+    assert stats == {"imported": 0, "skipped": 1, "excluded": 0}
     assert client.detection_calls == 1  # second run never re-fetched detections
 
 
@@ -106,7 +111,7 @@ def test_import_force_redownloads(tmp_path):
         force=True,
         download=fake_download,
     )
-    assert stats == {"imported": 1, "skipped": 0}
+    assert stats == {"imported": 1, "skipped": 0, "excluded": 0}
     assert client.detection_calls == 2
 
 
@@ -130,7 +135,7 @@ def test_import_creates_store_dir_even_when_empty(tmp_path):
     stats = import_alert_api(
         EmptyClient(), store, "2026-01-01", "2026-01-01", download=fake_download
     )
-    assert stats == {"imported": 0, "skipped": 0}
+    assert stats == {"imported": 0, "skipped": 0, "excluded": 0}
     assert store.is_dir()
 
 
@@ -222,8 +227,7 @@ def test_scan_imports_all_orgs(tmp_path, monkeypatch):
         client, tmp_path, "2026-06-01", "2026-06-01", download=fake_download
     )
     # IDs 97, 99, 101, 103 are in range across two orgs
-    assert stats["imported"] == 4
-    assert stats["skipped"] == 0
+    assert stats == {"imported": 4, "skipped": 0, "excluded": 0}
     # Both orgs' dirs exist
     assert (tmp_path / "sdis-07").is_dir()
     assert (tmp_path / "sdis-77").is_dir()
@@ -247,7 +251,7 @@ def test_scan_is_idempotent(tmp_path, monkeypatch):
     stats = import_all_orgs(
         client, tmp_path, "2026-06-01", "2026-06-01", download=fake_download
     )
-    assert stats == {"imported": 0, "skipped": 4}
+    assert stats == {"imported": 0, "skipped": 4, "excluded": 0}
     # No duplicate directories per sequence
     for sid in (97, 99, 101, 103):
         assert len(find_sequence_dirs(tmp_path, sid)) == 1
@@ -307,3 +311,63 @@ def test_scan_seed_error(tmp_path, monkeypatch):
         import_all_orgs(
             client, tmp_path, "2026-06-01", "2026-06-01", download=fake_download
         )
+
+
+# ---------------------------------------------------------------------------
+# exclude_orgs tests
+# ---------------------------------------------------------------------------
+
+
+def test_listing_exclude_org_skips_sequence_and_no_detections(tmp_path):
+    """Listing mode: excluding sis-67 skips its sequence; detections never fetched."""
+    client = FakeClient()
+    stats = import_alert_api(
+        client,
+        tmp_path,
+        "2026-05-15",
+        "2026-05-16",
+        download=fake_download,
+        exclude_orgs={"sis-67"},
+    )
+    assert stats == {"imported": 0, "skipped": 0, "excluded": 1}
+    assert not sequence_exists(tmp_path, 42307)
+    assert client.detection_calls == 0
+
+
+def test_listing_exclude_accepts_raw_name_via_slugify(tmp_path):
+    """Exclusion should work when exclude_orgs contains the slugified raw name."""
+    client = FakeClient()
+    stats = import_alert_api(
+        client,
+        tmp_path,
+        "2026-05-15",
+        "2026-05-16",
+        download=fake_download,
+        exclude_orgs={slugify("SIS 67")},
+    )
+    assert stats == {"imported": 0, "skipped": 0, "excluded": 1}
+    assert client.detection_calls == 0
+
+
+def test_scan_exclude_org_skips_one_org(tmp_path, monkeypatch):
+    """Scan mode: excluding sdis-77 (ids 99, 103) keeps only sdis-07's dirs."""
+    monkeypatch.setattr(_imp_mod, "HEAD_GAP", 3)
+    monkeypatch.setattr(_imp_mod, "OLDER_STOP", 3)
+
+    client = ScanFakeClient()
+    stats = import_all_orgs(
+        client,
+        tmp_path,
+        "2026-06-01",
+        "2026-06-01",
+        download=fake_download,
+        exclude_orgs={"sdis-77"},
+    )
+    # sdis-07 sequences (97, 101) imported; sdis-77 sequences (99, 103) excluded
+    assert stats == {"imported": 2, "skipped": 0, "excluded": 2}
+    assert (tmp_path / "sdis-07").is_dir()
+    assert not (tmp_path / "sdis-77").is_dir()
+    assert sequence_exists(tmp_path, 97)
+    assert sequence_exists(tmp_path, 101)
+    assert not sequence_exists(tmp_path, 99)
+    assert not sequence_exists(tmp_path, 103)

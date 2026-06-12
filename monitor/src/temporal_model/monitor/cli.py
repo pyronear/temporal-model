@@ -37,6 +37,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="recent sequence id to seed the --all-orgs scan (only needed on "
         "an empty store when the own-org listing is empty)",
     )
+    imp.add_argument(
+        "--exclude-org",
+        action="append",
+        metavar="ORG",
+        default=None,
+        help="organization to skip (slug or name); repeatable",
+    )
 
     rep = sub.add_parser(
         "replay", help="re-run stored sequences through their pinned api release"
@@ -65,7 +72,11 @@ def main(argv: list[str] | None = None) -> None:
             import_alert_api,
             import_all_orgs,
         )
+        from temporal_model.monitor.store import slugify  # noqa: PLC0415
 
+        exclude_orgs = (
+            {slugify(o) for o in args.exclude_org} if args.exclude_org else None
+        )
         client = AlertApiClient(AlertApiConfig.from_env())
         client.login()
         if args.all_orgs:
@@ -76,10 +87,16 @@ def main(argv: list[str] | None = None) -> None:
                 args.date_to,
                 force=args.force,
                 seed_id=args.seed_id,
+                exclude_orgs=exclude_orgs,
             )
         else:
             import_alert_api(
-                client, args.store, args.date_from, args.date_to, force=args.force
+                client,
+                args.store,
+                args.date_from,
+                args.date_to,
+                force=args.force,
+                exclude_orgs=exclude_orgs,
             )
     elif args.command == "replay":
         from temporal_model.monitor.replay import run_replay  # noqa: PLC0415

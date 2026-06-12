@@ -23,12 +23,15 @@ dvc pull                     # optional: fetch the shared store + reports
 make import                                  # 1. fetch new sequences (incremental),
                                              #    dvc add + push the store
 make import ARGS="--date-from 2026-06-01 --date-to 2026-06-10"  # backfill a range
-make import ARGS="--all-orgs"                # admin token: every organization (id-space scan)
+make import ARGS="--all-orgs --exclude-org pyroadmins"  # admin token: every org, skipping CI org
 ```
 
 The alert-api listing (`/sequences/all/fromdate`) is limited to the authenticated account's own
 organization; `--all-orgs` scans the global sequence-id space instead (admin token required), so
 every organization (sdis-07, sdis-77, ...) lands in its own viewer source.
+`--exclude-org` skips an organization (accepts a slug or raw name, e.g. `--exclude-org pyroadmins`
+for the CI camera org); pass it multiple times to exclude several. Exclusion affects future imports
+only — already-imported directories must be removed manually.
 
 ```bash
 uv run dvc repro                             # 2. replay through pinned releases
