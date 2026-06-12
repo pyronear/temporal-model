@@ -144,6 +144,11 @@ export default function Page() {
         onThreshold={setThreshold}
         onReset={() => setThreshold(defaultThr)}
         monitorMode={monitorMode}
+        selectedOrganization={filters.organization}
+        onSelectOrganization={(org) =>
+          // mirror the FilterBar's org change: camera resets with the org
+          setFilters({ ...filters, organization: org, camera: "all" })
+        }
       />
       <div className="flex min-w-0 flex-1 flex-col p-4">
         <FilterBar

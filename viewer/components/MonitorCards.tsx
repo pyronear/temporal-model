@@ -11,7 +11,15 @@ function dayRange(rows: ResultRow[]): string | null {
   return first === last ? first : `${first} → ${last}`;
 }
 
-export function MonitorCards({ rows }: { rows: ResultRow[] }) {
+export function MonitorCards({
+  rows,
+  selectedOrganization = "all",
+  onSelectOrganization,
+}: {
+  rows: ResultRow[];
+  selectedOrganization?: string;
+  onSelectOrganization?: (org: string) => void;
+}) {
   const kept = rows.filter((r) => r.decision === "keep").length;
   const discarded = rows.filter((r) => r.decision === "discard").length;
   const span = dayRange(rows);
@@ -100,10 +108,19 @@ export function MonitorCards({ rows }: { rows: ResultRow[] }) {
           {orgs.map(([org, counts]) => {
             const total = counts.kept + counts.discarded;
             const pct = total ? Math.round((counts.kept / total) * 100) : 0;
+            const clickable = onSelectOrganization && org !== "—";
+            const active = org === selectedOrganization;
             return (
-              <div
+              <button
                 key={org}
-                className="flex items-center justify-between text-[11px]"
+                disabled={!clickable}
+                onClick={() =>
+                  // clicking the active org clears the filter back to "all"
+                  onSelectOrganization?.(active ? "all" : org)
+                }
+                className={`flex items-center justify-between rounded px-1 py-0.5 text-left text-[11px] ${
+                  active ? "bg-slate-100" : ""
+                } ${clickable ? "cursor-pointer hover:bg-slate-50" : ""}`}
               >
                 <span className="truncate text-slate-700">{org}</span>
                 <span className="ml-2 shrink-0 tabular-nums">
@@ -112,7 +129,7 @@ export function MonitorCards({ rows }: { rows: ResultRow[] }) {
                   <span className="text-slate-400">{counts.discarded}</span>
                   <span className="ml-1 text-slate-400">({pct}%)</span>
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>

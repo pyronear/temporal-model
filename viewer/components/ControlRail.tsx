@@ -17,6 +17,8 @@ export function ControlRail(props: {
   onThreshold: (v: number) => void;
   onReset: () => void;
   monitorMode?: boolean;
+  selectedOrganization?: string;
+  onSelectOrganization?: (org: string) => void;
 }) {
   return (
     <aside className="flex h-full w-72 shrink-0 flex-col gap-4 overflow-auto border-r border-slate-200 bg-slate-50 p-4">
@@ -29,7 +31,11 @@ export function ControlRail(props: {
         />
       )}
       {props.monitorMode ? (
-        <MonitorCards rows={props.rows} />
+        <MonitorCards
+          rows={props.rows}
+          selectedOrganization={props.selectedOrganization}
+          onSelectOrganization={props.onSelectOrganization}
+        />
       ) : (
         <PerfCards rows={props.rows} />
       )}
