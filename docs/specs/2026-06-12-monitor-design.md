@@ -60,8 +60,19 @@ details, and serves them to the existing `viewer/`.
    `ALERT_API_URL`, `ALERT_API_LOGIN`, `ALERT_API_PASSWORD` from the
    environment; a committed `.envrc.example` documents them and the real
    `.envrc` stays untracked.
-8. **No DVC.** Monitor data is operational and rolling, not a versioned
-   dataset. DVC can be added later if stores need sharing.
+8. **DVC tracks both the store and the replay artifacts**, following the
+   `train/`/`eval/` setup exactly: a per-package DVC repo (`.dvc/config`
+   with `analytics = false` and an `s3remote` at
+   `s3://pyro-vision-rd/dvc/temporal-model/monitor/`) and Kedro-style
+   layer dirs. The sequence store is `dvc add`-tracked as
+   `data/01_raw/sequences.dvc` (imports extend it, then `dvc add` +
+   `dvc push`, like eval's `data/01_raw/pyro-annotator.dvc`); the replay
+   inference is a `dvc.yaml` stage whose outputs are **cached and
+   pushed** — a deliberate divergence from eval's `cache: false`
+   reporting outs, because sharing is the point: a teammate runs
+   `dvc pull` and opens the viewer with no alert-api credentials and no
+   Docker. Import itself stays a CLI command outside the pipeline (it
+   talks to a live API and is append-only, not reproducible).
 9. **No `core` dependency.** Monitor talks HTTP and JSON and does small
    geometry; pulling torch/ultralytics for that would be waste.
 
@@ -71,8 +82,9 @@ A sixth uv package, `temporal_model.monitor`, exposing a `temporal-monitor`
 CLI with two commands forming a pipeline, plus the existing viewer:
 
 ```
-alert-api ──import──▶ monitor/data/sequences/   ──replay──▶ monitor/data/08_reporting/
-                      (frames + meta.json)                  (eval-viewer contract)
+alert-api ──import──▶ data/01_raw/sequences/  ──dvc repro──▶ data/08_reporting/
+                      (frames + meta.json,      (replay      (eval-viewer contract,
+                       dvc add + push)           stage)       cached outs, dvc push)
                                                                     │
                                               viewer/ (DATA_ROOT=../monitor)
 ```
@@ -83,6 +95,9 @@ monitor/
 ├── Makefile                # install | lint | format | test (mirrors siblings)
 ├── README.md
 ├── .envrc.example          # ALERT_API_URL / ALERT_API_LOGIN / ALERT_API_PASSWORD
+├── .dvc/config             # s3remote, like train/ and eval/
+├── .dvcignore
+├── dvc.yaml                # replay stage (see below)
 ├── docker-compose.yml      # pinned api image + MinIO (no build:)
 ├── src/temporal_model/monitor/
 │   ├── cli.py              # temporal-monitor import|replay
@@ -94,9 +109,34 @@ monitor/
 │   ├── geometry.py         # stabilized_window recompute
 │   └── report.py           # eval-viewer contract writers
 ├── tests/
-└── data/                   # gitignored
-    ├── sequences/<org>/<camera>/seq_<id>/{meta.json, images/}
+└── data/                   # DVC-managed (gitignored content)
+    ├── 01_raw/sequences/<org>/<camera>/seq_<id>/{meta.json, images/}
+    ├── 01_raw/sequences.dvc
     └── 08_reporting/<org>/vit_dinov2_finetune/...
+```
+
+The replay stage in `dvc.yaml`, in the house style (explicit code deps,
+`uv run python -m` cmd):
+
+```yaml
+stages:
+  replay:
+    cmd: >-
+      uv run python -m temporal_model.monitor.cli replay
+      --store data/01_raw/sequences
+      --output-dir data/08_reporting
+    deps:
+      - src/temporal_model/monitor/cli.py
+      - src/temporal_model/monitor/store.py
+      - src/temporal_model/monitor/reconstruct.py
+      - src/temporal_model/monitor/stack.py
+      - src/temporal_model/monitor/replay.py
+      - src/temporal_model/monitor/geometry.py
+      - src/temporal_model/monitor/report.py
+      - docker-compose.yml
+      - data/01_raw/sequences
+    outs:
+      - data/08_reporting        # cached → dvc push shares it
 ```
 
 ## `temporal-monitor import`
@@ -112,6 +152,9 @@ Modeled on vision-rd's `temporal-model-explorer` import, modernized:
 - **Incremental:** a sequence already present in the store is skipped
   (`--force` re-downloads). The explorer re-downloaded everything; monitor
   runs recurringly.
+- After an import, the store is synced with
+  `dvc add data/01_raw/sequences && dvc push` (a `make import` convenience
+  target wraps import + add + push).
 
 `meta.json` extends the explorer's schema with everything replay needs:
 
@@ -144,6 +187,10 @@ Label mapping is fixed (no config): `is_wildfire` ∈
 `unknown`.
 
 ## `temporal-monitor replay`
+
+Runs as the `replay` stage via `dvc repro` (directly invocable too); a
+store change (new import) makes the stage stale, `dvc repro` re-runs it,
+`dvc push` shares the artifacts.
 
 1. **Group** stored sequences by `temporal_api_version`. Sequences with a
    null version (never scored, or pre-provenance) go to `dropped.json` with
@@ -184,7 +231,8 @@ Label mapping is fixed (no config): `is_wildfire` ∈
      with `stabilized_window` recomputed and trigger fields when the
      pinned version returns them.
    - `sequences/<key>.json` — `SequenceView` with frame paths relative to
-     `monitor/` (e.g. `data/sequences/<org>/<camera>/seq_<id>/images/...`).
+     `monitor/` (e.g.
+     `data/01_raw/sequences/<org>/<camera>/seq_<id>/images/...`).
    - `model_config.json` — versions from `/health` + the decision block
      from a verbose response (the full training config is not available
      over HTTP; the viewer tolerates missing keys).
@@ -219,8 +267,9 @@ rendered; eval flows are untouched).
   3.11+), `Makefile` with `install|lint|format|test`, `tests/`, README.
 - Added to the root `Makefile` `PACKAGES` list and to the CI matrix in
   `.github/workflows/ci.yml`.
-- Dependencies: `requests`, `pydantic` (schemas), `docker` via subprocess
-  (no docker SDK). No torch, no `core`.
+- Dependencies: `requests`, `pydantic` (schemas), `dvc[s3]>=3.56` (same
+  pin as train/eval), `docker` via subprocess (no docker SDK). No torch,
+  no `core`.
 
 ## Testing
 
@@ -244,7 +293,6 @@ the README (import one day, replay, open viewer), not CI.
 
 - Local-frames fast path (`source: "local"`) for ≥ PR #49 releases.
 - Any api/ or core/ changes (e.g. adding `stabilized_window` to verbose).
-- DVC tracking of the store.
 - Aggregate monitoring dashboards (alerting, drift charts over time) — the
   viewer's per-source performance cards are the v1 summary.
 - pyro-annotator imports (eval already covers labeled offline data).
