@@ -50,7 +50,7 @@ Docker must be running; each version group costs one image pull.
 ## Outputs (`data/08_reporting/<org>/vit_dinov2_finetune/`)
 
 - `results.json` — eval columns + monitor extras: `recorded_probability`
-  (what production stored), `replay_matches` (|Δ| ≤ 1e-6),
+  (what production stored), `replay_matches` (|Δ| ≤ 1e-5),
   `matched_window_frames` (when a mismatch is window drift: the sequence
   length at which production's recorded score is reproduced; null = no window
   matched, genuine drift), `temporal_model_version`, `temporal_api_version`.

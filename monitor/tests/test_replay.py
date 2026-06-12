@@ -230,7 +230,7 @@ def test_score_mismatch_flagged(tmp_path):
     )
     assert rows[0]["replay_matches"] is False
     assert rows[0]["matched_window_frames"] is None
-    assert SCORE_TOLERANCE == 1e-6
+    assert SCORE_TOLERANCE == 1e-5
 
 
 def test_cli_replay_defaults_point_at_package_compose_file():

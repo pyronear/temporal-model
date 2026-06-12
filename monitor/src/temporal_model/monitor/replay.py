@@ -32,7 +32,10 @@ from temporal_model.monitor.store import SequenceMeta, iter_metas, slugify
 
 logger = logging.getLogger(__name__)
 
-SCORE_TOLERANCE = 1e-6
+# Production and replay run on different hardware; identical inputs reproduce
+# to ~1e-6 (observed cross-CPU float noise), while any behavioral difference
+# (other frames, other tubes) moves the probability by >=1e-2.
+SCORE_TOLERANCE = 1e-5
 STORE_REL = "data/01_raw/sequences"  # viewer frame paths are relative to monitor/
 
 

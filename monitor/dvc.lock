@@ -6,17 +6,17 @@ stages:
     deps:
     - path: data/01_raw/sequences
       hash: md5
-      md5: 2a122491abe869eeba50d1a887780691.dir
-      size: 22700237
-      nfiles: 185
+      md5: 7875492f8e90c5690385cae79ebe3db4.dir
+      size: 420253102
+      nfiles: 3028
     - path: docker-compose.yml
       hash: md5
       md5: 985531d975ed5a5d3f2daf2ea5083d4a
       size: 1403
     - path: src/temporal_model/monitor/cli.py
       hash: md5
-      md5: c6fabb767a47029cce0ded2736b75342
-      size: 2577
+      md5: 8626ff96d62d5676b810bc9c551a1a15
+      size: 3880
     - path: src/temporal_model/monitor/geometry.py
       hash: md5
       md5: 7f811828367c67fd9115ad5e6b69956d
@@ -39,11 +39,11 @@ stages:
       size: 2874
     - path: src/temporal_model/monitor/store.py
       hash: md5
-      md5: 5a16cf6a0b82aea8a35dadf567a78d9e
-      size: 3108
+      md5: 8ebb0731d13c1b9903e80b3cfb08b546
+      size: 3363
     outs:
     - path: data/08_reporting
       hash: md5
-      md5: 71d3a9f62b9b781f28ccee725eff51d5.dir
-      size: 11650
-      nfiles: 7
+      md5: 1aaf123ac855feb0dd07aceb59b7c367.dir
+      size: 286291
+      nfiles: 174
