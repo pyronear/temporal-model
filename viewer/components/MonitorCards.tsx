@@ -1,8 +1,20 @@
 import type { ResultRow } from "@/lib/types";
 
+/** "2026-06-12" or "2026-06-10 → 2026-06-12"; null without any started_at. */
+function dayRange(rows: ResultRow[]): string | null {
+  const days = rows
+    .map((r) => r.started_at?.slice(0, 10))
+    .filter((d): d is string => d != null)
+    .sort();
+  if (!days.length) return null;
+  const [first, last] = [days[0], days[days.length - 1]];
+  return first === last ? first : `${first} → ${last}`;
+}
+
 export function MonitorCards({ rows }: { rows: ResultRow[] }) {
   const kept = rows.filter((r) => r.decision === "keep").length;
   const discarded = rows.filter((r) => r.decision === "discard").length;
+  const span = dayRange(rows);
 
   // Per-org breakdown, sorted by total desc.
   const orgMap = new Map<string, { kept: number; discarded: number }>();
@@ -19,6 +31,16 @@ export function MonitorCards({ rows }: { rows: ResultRow[] }) {
 
   return (
     <div className="flex flex-col gap-3">
+      {span && (
+        <div className="rounded-xl border border-slate-200 bg-white p-2.5">
+          <div className="text-[9px] font-medium uppercase tracking-tight text-slate-500">
+            Monitoring span
+          </div>
+          <div className="text-sm font-medium tabular-nums text-slate-700">
+            {span}
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <div className="flex flex-col rounded-xl border border-slate-200 bg-white p-2.5">
           <div className="flex h-4 items-center whitespace-nowrap text-[9px] font-medium uppercase tracking-tight text-slate-500">
@@ -29,6 +51,11 @@ export function MonitorCards({ rows }: { rows: ResultRow[] }) {
             style={{ color: "#047857" }}
           >
             {kept}
+            {rows.length > 0 && (
+              <span className="ml-1 text-[11px] font-normal text-slate-400">
+                {Math.round((kept / rows.length) * 100)}%
+              </span>
+            )}
           </div>
           <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-100">
             <div
@@ -46,6 +73,11 @@ export function MonitorCards({ rows }: { rows: ResultRow[] }) {
           </div>
           <div className="text-base font-semibold tabular-nums text-slate-500">
             {discarded}
+            {rows.length > 0 && (
+              <span className="ml-1 text-[11px] font-normal text-slate-400">
+                {Math.round((discarded / rows.length) * 100)}%
+              </span>
+            )}
           </div>
           <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-100">
             <div
