@@ -163,7 +163,8 @@ def _find_matching_window(
     production call.
     """
     _, all_keys, _ = reconstruct.frames_and_roi(meta.frames, last_n=None)
-    for n in range(reconstruct.MIN_FRAMES, len(all_keys) + 1):
+    # n == len(all_keys) is the main replay's window, already known mismatched.
+    for n in range(reconstruct.MIN_FRAMES, len(all_keys)):
         first_n = set(all_keys[:n])
         subset = [f for f in meta.frames if f.bucket_key in first_n]
         _, kept, roi = reconstruct.frames_and_roi(subset)
