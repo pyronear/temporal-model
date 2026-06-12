@@ -112,3 +112,16 @@ def test_import_handles_missing_org_names(tmp_path):
         NoOrgClient(), tmp_path, "2026-05-15", "2026-05-16", download=fake_download
     )
     assert (tmp_path / "org-11").is_dir()  # falls back to org-<id>
+
+
+def test_import_creates_store_dir_even_when_empty(tmp_path):
+    class EmptyClient(FakeClient):
+        def list_sequences_for_date(self, day):
+            return []
+
+    store = tmp_path / "store"
+    stats = import_platform(
+        EmptyClient(), store, "2026-01-01", "2026-01-01", download=fake_download
+    )
+    assert stats == {"imported": 0, "skipped": 0}
+    assert store.is_dir()

@@ -65,6 +65,7 @@ def import_platform(
     download: Callable[[str], bytes] = _default_download,
 ) -> dict[str, int]:
     """Import all sequences in [day_from, day_to] (inclusive). Returns counts."""
+    store_dir.mkdir(parents=True, exist_ok=True)
     cameras = _camera_index(client)
     org_names = _org_names(client)
     imported = skipped = 0
