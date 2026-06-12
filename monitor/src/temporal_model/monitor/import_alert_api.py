@@ -153,6 +153,10 @@ def _import_one(
 
 HEAD_GAP = 25  # consecutive missing IDs that mean "past the newest sequence"
 OLDER_STOP = 25  # consecutive too-old sequences that mean "past the date range"
+# Mid-walk 404 holes (deleted sequences) are a different concern from head
+# detection: a bulk deletion can leave a far wider gap than HEAD_GAP without
+# meaning the scan is done — only the date rule ends the downward walk.
+WALK_GAP = 500
 
 
 def import_all_orgs(
@@ -192,7 +196,7 @@ def import_all_orgs(
     imported = skipped = excluded = 0
     misses = older = 0
     sid = head
-    while sid > 0 and misses < HEAD_GAP and older < OLDER_STOP:
+    while sid > 0 and misses < WALK_GAP and older < OLDER_STOP:
         seq = client.get_sequence(sid)
         sid -= 1
         if seq is None:
@@ -201,6 +205,9 @@ def import_all_orgs(
         misses = 0
         day = (seq.get("started_at") or "")[:10]
         if day > day_to:
+            # ids are only roughly monotone with started_at: a newer-than-range
+            # sequence here breaks the "consecutive older" streak too
+            older = 0
             continue
         if day < day_from:
             older += 1

@@ -61,8 +61,9 @@ All organizations land in one reporting tree; organizations are a table column i
   `compute_trigger` (older images ignore the flag → "no trigger" in the
   viewer).
 - `sequences/<key>.json`, `model_config.json`, `dropped.json` (skip reasons:
-  `no_temporal_version`, `image_pull_failed`, `stack_unhealthy`,
-  `model_version_mismatch`, `too_few_frames`, `no_images`, `predict_failed`).
+  `no_temporal_version`, `no_recorded_score`, `invalid_api_version`,
+  `image_pull_failed`, `stack_unhealthy`, `model_version_mismatch`,
+  `too_few_frames`, `no_images`, `predict_failed`).
 
 A `replay_matches: false` row means the reconstruction diverged from the
 recorded score. When this happens, the replay automatically probes candidate

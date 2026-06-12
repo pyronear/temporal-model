@@ -191,6 +191,8 @@ def test_drop_reasons(tmp_path):
     store_sequence(store, 3, with_images=False)  # no_images
     store_sequence(store, 4, model_version="9.9.9")  # model_version_mismatch
     store_sequence(store, 5)  # ok
+    store_sequence(store, 6, score=None)  # no_recorded_score (version set, score null)
+    store_sequence(store, 7, api_version="evil/img@sha256:0")  # invalid_api_version
     summary = run(store, out)
     assert summary["replayed"] == 1
     dropped = json.loads(
@@ -202,6 +204,8 @@ def test_drop_reasons(tmp_path):
         "alert-api_2": "too_few_frames",
         "alert-api_3": "no_images",
         "alert-api_4": "model_version_mismatch",
+        "alert-api_6": "no_recorded_score",
+        "alert-api_7": "invalid_api_version",
     }
 
 

@@ -94,9 +94,11 @@ def result_row(
     extras, visible in the viewer's detail pane.
     """
     kept = details["tubes"]["kept"]
+    # >= mirrors core's decision rule (inference.py: predict_proba >= threshold);
+    # replay drops unscored sequences before this point, so the score is a float.
     decision = (
         "keep"
-        if meta.temporal_model_score > details["decision"]["threshold"]
+        if meta.temporal_model_score >= details["decision"]["threshold"]
         else "discard"
     )
     return {

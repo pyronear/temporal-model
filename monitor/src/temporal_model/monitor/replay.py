@@ -12,6 +12,7 @@ recorded score -> write one eval-viewer tree per organization.
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -37,6 +38,8 @@ logger = logging.getLogger(__name__)
 # (other frames, other tubes) moves the probability by >=1e-2.
 SCORE_TOLERANCE = 1e-5
 STORE_REL = "data/01_raw/sequences"  # viewer frame paths are relative to monitor/
+# Docker image tag charset (no slashes, colons or @ — see run_replay's guard).
+_TAG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
 
 class _StackFactory(Protocol):
@@ -95,6 +98,15 @@ def run_replay(
     for seq_dir, meta in iter_metas(store_dir):
         if not meta.temporal_api_version:
             _org_report(reports, meta).drop(meta.key, "no_temporal_version")
+            dropped += 1
+            continue
+        # The version becomes a Docker image tag; a malformed value (slashes,
+        # "@sha256:", registry prefixes) must never redirect the pull.
+        if not _TAG_RE.match(meta.temporal_api_version):
+            logger.warning(
+                "%s: %r is not a valid image tag", meta.key, meta.temporal_api_version
+            )
+            _org_report(reports, meta).drop(meta.key, "invalid_api_version")
             dropped += 1
             continue
         groups.setdefault(meta.temporal_api_version, []).append((seq_dir, meta))
@@ -309,6 +321,12 @@ def _replay_one(
     predict: Callable[[list[str], list[float] | None], dict],
 ) -> str:
     report = _org_report(reports, meta)
+    # version and score are written by the same alert-api UPDATE, but import
+    # copies them independently — guard against a version without a score,
+    # which result_row could not compare against the threshold.
+    if meta.temporal_model_score is None:
+        report.drop(meta.key, "no_recorded_score")
+        return "no_recorded_score"
     if health.get("model_version") != meta.temporal_model_version:
         report.drop(meta.key, "model_version_mismatch")
         return "model_version_mismatch"
