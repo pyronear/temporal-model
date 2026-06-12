@@ -47,7 +47,9 @@ production call (last ≤10 distinct frames oldest-first, ROI = envelope of
 the detections' primary bboxes — mirrors pyro-api's validation worker).
 Docker must be running; each version group costs one image pull.
 
-## Outputs (`data/08_reporting/<org>/vit_dinov2_finetune/`)
+## Outputs (`data/08_reporting/alert-api/vit_dinov2_finetune/`)
+
+All organizations land in one reporting tree; organizations are a table column in the viewer.
 
 - `results.json` — eval columns + monitor extras: `recorded_probability`
   (what production stored), `replay_matches` (|Δ| ≤ 1e-5),

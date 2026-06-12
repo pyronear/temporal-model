@@ -57,11 +57,13 @@ def _default_predict(frames: list[str], roi_xyxyn: list[float] | None) -> dict:
     return resp.json()
 
 
-def _org_report(reports: dict[str, OrgReport], meta: SequenceMeta) -> OrgReport:
-    org = slugify(meta.organization_name)
-    if org not in reports:
-        reports[org] = OrgReport(org_slug=org)
-    return reports[org]
+SOURCE_SLUG = "alert-api"
+
+
+def _org_report(reports: dict[str, OrgReport], _meta: SequenceMeta) -> OrgReport:
+    if SOURCE_SLUG not in reports:
+        reports[SOURCE_SLUG] = OrgReport(org_slug=SOURCE_SLUG)
+    return reports[SOURCE_SLUG]
 
 
 def _files_by_key(
@@ -237,8 +239,8 @@ def _replay_one(
         )
     view = {
         "key": meta.key,
-        # like result_row's source: must equal the reporting tree's <org_slug>
-        "source": org,
+        # source matches the single reporting tree under "alert-api"
+        "source": SOURCE_SLUG,
         "label": meta.label,
         "organization_name": meta.organization_name,
         "camera_name": meta.camera_name,

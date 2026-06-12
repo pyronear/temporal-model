@@ -219,13 +219,16 @@ store change (new import) makes the stage stale, `dvc repro` re-runs it,
    Known, accepted limitation: the detection set may have grown after the
    last production scoring, so reconstruction can legitimately differ —
    `replay_matches` makes that visible instead of silent.
-8. **Write the reporting tree**, one viewer "source" per organization
-   (the viewer's source selector doubles as an org selector):
+8. **Write the reporting tree** — a single source named `alert-api`
+   containing all organizations' rows (superseded per-org design after live
+   use; see "Source naming in the viewer" below):
    - `results.json` — eval columns (`key`, `source`, `label`, `decision`,
      `outcome`, `score`, `probability`, `num_tubes_kept`,
      `trigger_frame_index`, `organization_name`, `camera_name`,
      `started_at`) plus monitor extras: `recorded_probability`,
      `replay_matches`, `temporal_model_version`, `temporal_api_version`.
+     `source` is always the fixed slug `"alert-api"`; `organization_name`
+     carries the raw org name and is shown as a table column in the viewer.
    - `details/<key>.json` — verbose `details` reshaped to the eval
      `BboxTubeDetails` shape (`tubes.kept`, `decision`, `preprocessing`),
      with `stabilized_window` recomputed and trigger fields when the
@@ -233,6 +236,8 @@ store change (new import) makes the stage stale, `dvc repro` re-runs it,
    - `sequences/<key>.json` — `SequenceView` with frame paths relative to
      `monitor/` (e.g.
      `data/01_raw/sequences/<org>/<camera>/seq_<id>/images/...`).
+     The store layout (per-org dirs) is unchanged; only the reporting
+     tree root changes.
    - `model_config.json` — versions from `/health` + the decision block
      from a verbose response (the full training config is not available
      over HTTP; the viewer tolerates missing keys).
@@ -240,16 +245,33 @@ store change (new import) makes the stage stale, `dvc repro` re-runs it,
 Outcome mapping reuses eval's semantics: `smoke`+keep → kept-smoke,
 `fp`+keep → kept-fp, etc.; `unknown` → n/a.
 
+## Source naming in the viewer
+
+*This section supersedes the per-org design originally sketched here.*
+
+All replayed sequences land in a single reporting tree at
+`data/08_reporting/alert-api/vit_dinov2_finetune/`. The viewer's source
+selector shows one entry ("alert-api") for monitor data instead of one
+entry per organization. The `organization_name` field on each row carries
+the raw org name and is rendered as a dedicated "organization" column in
+the sequence table (shown only when the viewer is in monitor mode, detected
+by the presence of `replayed_probability` on the rows). This design was
+adopted after live use revealed that per-org sources added friction when
+comparing sequences across organizations.
+
+Frame paths inside `sequences/<key>.json` still point into the per-org
+store dirs (`data/01_raw/sequences/<org>/<camera>/...`); the store layout
+is unchanged.
+
 ## Viewing
 
 ```bash
 cd viewer && DATA_ROOT=../monitor npm run dev
 ```
 
-No structural viewer changes. One small additive change: when a results row
-carries `recorded_probability` / `replay_matches` / version fields, show
-them in the sequence table and detail pane (absent in eval data → nothing
-rendered; eval flows are untouched).
+No structural viewer changes beyond the organization column and slim filter
+bar (outcome chips and GT dropdown hidden in monitor mode). Eval flows are
+untouched.
 
 ## Error handling
 

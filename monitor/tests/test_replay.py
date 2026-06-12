@@ -50,6 +50,7 @@ def store_sequence(
     score: float | None = 0.93,
     n_frames: int = 4,
     with_images: bool = True,
+    organization_name: str = "sis-67",
 ) -> SequenceMeta:
     meta = SequenceMeta(
         key=f"alert-api_{sequence_id}",
@@ -57,7 +58,7 @@ def store_sequence(
         label="smoke",
         label_detail="wildfire_smoke",
         camera_name="cam-01",
-        organization_name="sis-67",
+        organization_name=organization_name,
         started_at="2026-05-15T13:08:18",
         temporal_model_score=score,
         temporal_model_version=model_version,
@@ -134,7 +135,7 @@ def test_happy_path_writes_org_tree(tmp_path):
     assert summary["replayed"] == 1
     assert summary["mismatched"] == 0
     rows = json.loads(
-        (out / "sis-67" / "vit_dinov2_finetune" / "results.json").read_text()
+        (out / "alert-api" / "vit_dinov2_finetune" / "results.json").read_text()
     )
     assert rows[0]["replay_matches"] is True
     assert rows[0]["probability"] == 0.93
@@ -144,7 +145,7 @@ def test_happy_path_writes_org_tree(tmp_path):
     assert len(stack.uploaded[0]) == 4
     view = json.loads(
         (
-            out / "sis-67" / "vit_dinov2_finetune" / "sequences" / "alert-api_1.json"
+            out / "alert-api" / "vit_dinov2_finetune" / "sequences" / "alert-api_1.json"
         ).read_text()
     )
     # viewer frames = the kept (replayed) frames, relative to monitor/
@@ -163,6 +164,25 @@ def test_groups_by_api_version_one_stack_each(tmp_path):
     assert sorted(s.version for s in FakeStack.instances) == ["0.3.0", "0.3.1"]
 
 
+def test_multi_org_sequences_land_in_single_tree(tmp_path):
+    store, out = tmp_path / "store", tmp_path / "out"
+    store_sequence(store, 1, organization_name="sis-67")
+    store_sequence(store, 2, organization_name="sdis-77")
+    summary = run(store, out)
+    assert summary["replayed"] == 2
+    # Single reporting tree under "alert-api", not per-org dirs
+    assert not (out / "sis-67").exists()
+    assert not (out / "sdis-77").exists()
+    rows = json.loads(
+        (out / "alert-api" / "vit_dinov2_finetune" / "results.json").read_text()
+    )
+    assert len(rows) == 2
+    org_names = {r["organization_name"] for r in rows}
+    assert org_names == {"sis-67", "sdis-77"}
+    # All rows carry the unified source slug
+    assert all(r["source"] == "alert-api" for r in rows)
+
+
 def test_drop_reasons(tmp_path):
     store, out = tmp_path / "store", tmp_path / "out"
     store_sequence(store, 1, api_version=None)  # no_temporal_version
@@ -173,7 +193,7 @@ def test_drop_reasons(tmp_path):
     summary = run(store, out)
     assert summary["replayed"] == 1
     dropped = json.loads(
-        (out / "sis-67" / "vit_dinov2_finetune" / "dropped.json").read_text()
+        (out / "alert-api" / "vit_dinov2_finetune" / "dropped.json").read_text()
     )
     reasons = {d["sequence_id"]: d["reason"] for d in dropped}
     assert reasons == {
@@ -194,7 +214,7 @@ def test_image_pull_failure_drops_whole_group(tmp_path):
         FakeStack.fail_versions = set()
     assert summary["replayed"] == 0
     dropped = json.loads(
-        (out / "sis-67" / "vit_dinov2_finetune" / "dropped.json").read_text()
+        (out / "alert-api" / "vit_dinov2_finetune" / "dropped.json").read_text()
     )
     assert dropped[0]["reason"] == "image_pull_failed"
 
@@ -214,7 +234,7 @@ def test_predict_failure_drops_sequence_and_continues(tmp_path):
     summary = run(store, out, predict=flaky_predict)
     assert summary["replayed"] == 1
     dropped = json.loads(
-        (out / "sis-67" / "vit_dinov2_finetune" / "dropped.json").read_text()
+        (out / "alert-api" / "vit_dinov2_finetune" / "dropped.json").read_text()
     )
     assert dropped[0]["reason"] == "predict_failed"
 
@@ -226,7 +246,7 @@ def test_score_mismatch_flagged(tmp_path):
     assert summary["mismatched"] == 1
     assert summary["window_drift"] == 0
     rows = json.loads(
-        (out / "sis-67" / "vit_dinov2_finetune" / "results.json").read_text()
+        (out / "alert-api" / "vit_dinov2_finetune" / "results.json").read_text()
     )
     assert rows[0]["replay_matches"] is False
     assert rows[0]["matched_window_frames"] is None
@@ -261,7 +281,7 @@ def test_unhealthy_stack_drops_group_and_continues(tmp_path):
     )
     assert summary["replayed"] == 1  # the 0.3.1 group still ran
     dropped = json.loads(
-        (out / "sis-67" / "vit_dinov2_finetune" / "dropped.json").read_text()
+        (out / "alert-api" / "vit_dinov2_finetune" / "dropped.json").read_text()
     )
     assert {d["reason"] for d in dropped} == {"stack_unhealthy"}
     # the sick stack was still torn down
@@ -289,7 +309,7 @@ def test_window_drift_found_by_probing(tmp_path):
         "dropped": 0,
     }
     rows = json.loads(
-        (out / "sis-67" / "vit_dinov2_finetune" / "results.json").read_text()
+        (out / "alert-api" / "vit_dinov2_finetune" / "results.json").read_text()
     )
     assert rows[0]["replay_matches"] is False
     assert rows[0]["matched_window_frames"] == 5

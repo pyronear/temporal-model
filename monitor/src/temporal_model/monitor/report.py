@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from temporal_model.monitor.geometry import tube_stabilized_window
-from temporal_model.monitor.store import SequenceMeta, slugify
+from temporal_model.monitor.store import SequenceMeta
 
 MODEL_DIR = "vit_dinov2_finetune"  # viewer/lib/paths.ts MODEL_NAME
 
@@ -101,9 +101,8 @@ def result_row(
     )
     return {
         "key": meta.key,
-        # must equal the reporting tree's <org_slug> dir — the viewer filters
-        # rows by string equality with the directory-derived source name
-        "source": slugify(meta.organization_name),
+        # fixed source slug — all orgs land in one "alert-api" reporting tree
+        "source": "alert-api",
         "label": meta.label,
         "decision": decision,
         "outcome": compute_outcome(decision, meta.label),

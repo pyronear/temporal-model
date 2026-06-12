@@ -136,7 +136,7 @@ def test_result_row():
     # decision and probability come from production's recorded score (0.93 > 0.52)
     assert row == {
         "key": "alert-api_42307",
-        "source": "sis-67",
+        "source": "alert-api",
         "label": "smoke",
         "decision": "keep",
         "outcome": "kept-smoke",
@@ -156,14 +156,14 @@ def test_result_row():
     }
 
 
-def test_result_row_source_is_slugified_to_match_tree_dir():
+def test_result_row_source_is_fixed_alert_api():
     meta = make_meta().model_copy(update={"organization_name": "SIS 67"})
     details = reshape_details(VERBOSE_RESPONSE["details"])
     row = result_row(
         meta=meta, response=VERBOSE_RESPONSE, details=details, replay_matches=True
     )
-    # the viewer joins rows to the source directory by string equality
-    assert row["source"] == "sis-67"
+    # source is always the fixed slug; organization_name carries the raw name
+    assert row["source"] == "alert-api"
     assert row["organization_name"] == "SIS 67"
 
 
