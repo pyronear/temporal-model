@@ -111,7 +111,9 @@ export function FilterBar({
         <Select<string>
           label="organization"
           value={filters.organization}
-          onChange={(v) => onChange({ ...filters, organization: v })}
+          onChange={(v) =>
+            onChange({ ...filters, organization: v, camera: "all" })
+          }
           options={[
             { value: "all", label: "all" },
             ...organizations.map((o) => ({ value: o, label: o })),

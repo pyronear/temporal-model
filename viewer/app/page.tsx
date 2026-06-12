@@ -94,7 +94,17 @@ export default function Page() {
     setPrevFilterSource(source);
     setFilters(defaultFilters());
   }
-  const cameras = useMemo(() => cameraOptions(sourceRows), [sourceRows]);
+  const cameras = useMemo(
+    () =>
+      cameraOptions(
+        filters.organization === "all"
+          ? sourceRows
+          : sourceRows.filter(
+              (r) => r.organization_name === filters.organization,
+            ),
+      ),
+    [sourceRows, filters.organization],
+  );
   const organizations = useMemo(
     () => organizationOptions(sourceRows),
     [sourceRows],
@@ -133,6 +143,7 @@ export default function Page() {
         defaultThreshold={defaultThr}
         onThreshold={setThreshold}
         onReset={() => setThreshold(defaultThr)}
+        monitorMode={monitorMode}
       />
       <div className="flex min-w-0 flex-1 flex-col p-4">
         <FilterBar
