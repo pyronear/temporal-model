@@ -1492,7 +1492,7 @@ from pathlib import Path
 from typing import Any
 
 from temporal_model.monitor.geometry import tube_stabilized_window
-from temporal_model.monitor.store import SequenceMeta
+from temporal_model.monitor.store import SequenceMeta, slugify
 
 MODEL_DIR = "vit_dinov2_finetune"  # viewer/lib/paths.ts MODEL_NAME
 
@@ -1564,7 +1564,9 @@ def result_row(
     decision = decision_from_output(response["is_smoke"])
     return {
         "key": meta.key,
-        "source": meta.organization_name or "unknown",
+        # must equal the reporting tree's <org_slug> dir — the viewer filters
+        # rows by string equality with the directory-derived source name
+        "source": slugify(meta.organization_name),
         "label": meta.label,
         "decision": decision,
         "outcome": compute_outcome(decision, meta.label),
@@ -2315,7 +2317,8 @@ def _replay_one(
         )
     view = {
         "key": meta.key,
-        "source": meta.organization_name or "unknown",
+        # like result_row's source: must equal the reporting tree's <org_slug>
+        "source": org,
         "label": meta.label,
         "organization_name": meta.organization_name,
         "camera_name": meta.camera_name,
