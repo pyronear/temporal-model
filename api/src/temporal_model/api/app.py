@@ -127,7 +127,10 @@ def health(request: Request) -> HealthResponse:
     dependencies=[Depends(require_token)],
 )
 async def predict(
-    body: PredictRequest, request: Request, verbose: bool = False
+    body: PredictRequest,
+    request: Request,
+    verbose: bool = False,
+    compute_trigger: bool = False,
 ) -> PredictResponse:
     bucket = body.bucket or settings.s3_bucket
     if not bucket:
@@ -154,7 +157,11 @@ async def predict(
                 )
 
             out = await runner.predict(
-                paths, roi=body.roi_xyxyn, timer=timer, profile=profile
+                paths,
+                roi=body.roi_xyxyn,
+                timer=timer,
+                profile=profile,
+                compute_trigger=compute_trigger,
             )
 
             profiling = None
@@ -173,6 +180,7 @@ async def predict(
                 model_version=runner.version,
                 calibrated=runner.calibrated,
                 verbose=verbose,
+                compute_trigger=compute_trigger,
                 threshold_overridden=runner.threshold_overridden,
                 packaged_threshold=runner.packaged_threshold,
                 profiling=profiling,

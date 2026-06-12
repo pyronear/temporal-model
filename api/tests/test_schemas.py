@@ -302,3 +302,78 @@ def test_verbose_details_num_tubes_outside_roi_is_strict():
         to_response(
             out, api_version=None, model_version="1", calibrated=True, verbose=True
         )
+
+
+def test_compute_trigger_sets_top_level_trigger_frame_index():
+    out = SimpleNamespace(
+        is_positive=True, trigger_frame_index=3, details=_details([_tube(7, 0.98)])
+    )
+    resp = to_response(
+        out,
+        api_version=None,
+        model_version="1.2.0",
+        calibrated=True,
+        verbose=False,
+        compute_trigger=True,
+    )
+    dumped = resp.model_dump(exclude_unset=True)
+    assert dumped["trigger_frame_index"] == 3
+    assert "details" not in dumped
+
+
+def test_compute_trigger_no_crossing_is_explicit_null():
+    # Searched but nothing crossed: the key is present with an explicit null.
+    out = SimpleNamespace(
+        is_positive=False, trigger_frame_index=None, details=_details([])
+    )
+    resp = to_response(
+        out,
+        api_version=None,
+        model_version="1.2.0",
+        calibrated=True,
+        verbose=False,
+        compute_trigger=True,
+    )
+    dumped = resp.model_dump(exclude_unset=True)
+    assert "trigger_frame_index" in dumped
+    assert dumped["trigger_frame_index"] is None
+
+
+def test_default_omits_trigger_frame_index():
+    # Even when the core output carries a trigger, the flag gates exposure.
+    out = SimpleNamespace(
+        is_positive=True, trigger_frame_index=3, details=_details([_tube(7, 0.98)])
+    )
+    resp = to_response(
+        out, api_version=None, model_version="1.2.0", calibrated=True, verbose=False
+    )
+    assert "trigger_frame_index" not in resp.model_dump(exclude_unset=True)
+
+
+def test_compute_trigger_verbose_adds_trigger_details():
+    out = SimpleNamespace(
+        is_positive=True, trigger_frame_index=3, details=_details([_tube(7, 0.98)])
+    )
+    resp = to_response(
+        out,
+        api_version=None,
+        model_version="1.2.0",
+        calibrated=True,
+        verbose=True,
+        compute_trigger=True,
+    )
+    details = resp.model_dump(exclude_unset=True)["details"]
+    assert details["decision"]["trigger_tube_id"] == 7
+    assert details["tubes"][0]["first_crossing_frame"] == 3
+
+
+def test_verbose_without_compute_trigger_omits_trigger_details():
+    out = SimpleNamespace(
+        is_positive=True, trigger_frame_index=3, details=_details([_tube(7, 0.98)])
+    )
+    resp = to_response(
+        out, api_version=None, model_version="1.2.0", calibrated=True, verbose=True
+    )
+    details = resp.model_dump(exclude_unset=True)["details"]
+    assert "trigger_tube_id" not in details["decision"]
+    assert "first_crossing_frame" not in details["tubes"][0]

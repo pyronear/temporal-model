@@ -18,8 +18,12 @@ Import as `temporal_model.api`. Depends on `temporal-model-core`.
   `version` is `{api, model}` — the code release (== the Docker image tag,
   `null` on non-release builds) and the packaged model release.
   `POST /predict?verbose=true` adds a `details` block (decision, preprocessing,
-  per-tube tracks). See `docs/specs/2026-06-02-api-service-design.md` for the
-  full contract.
+  per-tube tracks). `POST /predict?compute_trigger=true` runs the
+  first-crossing search (extra classifier work, off by default) and adds a
+  top-level `trigger_frame_index` (`null` if nothing crossed) — with
+  `verbose=true` it also fills `details.decision.trigger_tube_id` and
+  per-tube `details.tubes[].first_crossing_frame`. See
+  `docs/specs/2026-06-02-api-service-design.md` for the full contract.
 
 ## Run
 
