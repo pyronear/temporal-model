@@ -15,7 +15,10 @@ services:
       - AWS_ACCESS_KEY_ID=minioadmin
       - AWS_SECRET_ACCESS_KEY=minioadmin
     depends_on:
-      - minio
+      minio:
+        condition: service_started
+      createbuckets:
+        condition: service_completed_successfully
 
   minio:
     image: minio/minio:latest
