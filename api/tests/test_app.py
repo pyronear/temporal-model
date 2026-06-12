@@ -67,10 +67,14 @@ class FakeRunner:
         self._error = error
         self.roi = None
         self.paths = None
+        self.compute_trigger = None
 
-    async def predict(self, paths, *, roi=None, timer=None, profile=None):
+    async def predict(
+        self, paths, *, roi=None, timer=None, profile=None, compute_trigger=False
+    ):
         self.roi = roi
         self.paths = paths
+        self.compute_trigger = compute_trigger
         if self._error:
             raise self._error
         if timer is not None:
@@ -212,6 +216,34 @@ def test_predict_verbose_surfaces_override(client):
     decision = r.json()["details"]["decision"]
     assert decision["threshold_overridden"] is True
     assert decision["packaged_threshold"] == 0.5
+
+
+def test_predict_compute_trigger_returns_trigger_frame_index(client):
+    r = client.post("/predict?compute_trigger=true", json={"frames": KEYS})
+    assert r.status_code == 200
+    assert r.json() == {
+        "is_smoke": True,
+        "probability": 0.98,
+        "trigger_frame_index": 3,
+        "version": {"api": None, "model": "1.2.0"},
+    }
+    assert client.app.state.runner.compute_trigger is True
+
+
+def test_predict_default_runs_fast_path(client):
+    r = client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 200
+    assert "trigger_frame_index" not in r.json()
+    assert client.app.state.runner.compute_trigger is False
+
+
+def test_predict_compute_trigger_verbose_adds_trigger_details(client):
+    r = client.post("/predict?compute_trigger=true&verbose=true", json={"frames": KEYS})
+    body = r.json()
+    assert r.status_code == 200
+    assert body["trigger_frame_index"] == 3
+    assert body["details"]["decision"]["trigger_tube_id"] == 7
+    assert body["details"]["tubes"][0]["first_crossing_frame"] == 3
 
 
 def test_predict_reports_api_version(client, monkeypatch):

@@ -18,11 +18,15 @@ help: ## Show this help
 install: ## uv sync every package
 	@for pkg in $(PACKAGES); do echo "==> $$pkg"; $(MAKE) -C $$pkg install; done
 
-lint: ## ruff check every package
+lint: ## ruff check every package + docs scripts
 	@for pkg in $(PACKAGES); do echo "==> $$pkg"; $(MAKE) -C $$pkg lint; done
+	@echo "==> docs/assets/scripts"
+	uv run --project core ruff check docs/assets/scripts
 
-format: ## ruff format every package
+format: ## ruff format every package + docs scripts
 	@for pkg in $(PACKAGES); do echo "==> $$pkg"; $(MAKE) -C $$pkg format; done
+	@echo "==> docs/assets/scripts"
+	uv run --project core ruff format docs/assets/scripts
 
 test: ## pytest every package
 	@for pkg in $(PACKAGES); do echo "==> $$pkg"; $(MAKE) -C $$pkg test; done

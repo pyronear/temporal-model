@@ -1,0 +1,14 @@
+# Authoritative ruff config for scripts living outside the packages
+# (e.g. docs/assets/scripts/). Mirrors the [tool.ruff] config that every
+# package declares in its own pyproject.toml — keep them in sync.
+target-version = "py311"
+line-length = 88
+
+[lint]
+select = ["E", "F", "I", "W", "UP", "B", "SIM", "PLC0415"]
+
+[lint.isort]
+known-first-party = ["temporal_model"]
+
+[format]
+quote-style = "double"
