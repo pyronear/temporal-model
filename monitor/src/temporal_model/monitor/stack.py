@@ -33,9 +33,12 @@ class StackError(RuntimeError):
 
 
 class ReplayStack:
-    def __init__(self, compose_file: Path, version: str) -> None:
+    def __init__(
+        self, compose_file: Path, version: str, image: str | None = None
+    ) -> None:
         self.compose_file = compose_file
         self.version = version
+        self.image = image or f"{IMAGE_REPO}:{self.version}"
 
     def _compose(self, *args: str) -> None:
         subprocess.run(
@@ -48,7 +51,7 @@ class ReplayStack:
                 COMPOSE_PROJECT,
                 *args,
             ],
-            env={**os.environ, "MONITOR_API_IMAGE": f"{IMAGE_REPO}:{self.version}"},
+            env={**os.environ, "MONITOR_API_IMAGE": self.image},
             check=True,
         )
 

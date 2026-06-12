@@ -78,5 +78,18 @@ def test_upload_frames_puts_each_key_once(tmp_path):
     assert all(u[1] == BUCKET for u in uploaded)
 
 
+def test_custom_image_overrides_default():
+    stack = ReplayStack(Path("dc.yml"), version="0.3.1", image="temporal-model-api:dev")
+    assert stack.image == "temporal-model-api:dev"
+    with patch("temporal_model.monitor.stack.subprocess.run") as run:
+        stack.up()
+    assert run.call_args.kwargs["env"]["MONITOR_API_IMAGE"] == "temporal-model-api:dev"
+
+
+def test_default_image_uses_image_repo_and_version():
+    stack = ReplayStack(Path("dc.yml"), version="0.3.1")
+    assert stack.image == "pyronear/temporal-model-api:0.3.1"
+
+
 def test_api_url_uses_offset_port():
     assert API_URL == "http://localhost:18000"

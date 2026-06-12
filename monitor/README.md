@@ -73,6 +73,29 @@ sequence reproduces the recorded score, `matched_window_frames` is set to
 that count (window drift, not model drift); if no prefix matches, it remains
 null (genuine drift — see the spec).
 
+## Trigger frames
+
+Sequences scored by api v0.3.1 and earlier predate the `compute_trigger`
+feature, so their replays produce no `trigger_frame_index` or
+`first_crossing_frame` data. The enrichment pass fills these fields using a
+newer serving image (the same `model.zip` baked in) while keeping the pinned
+replay authoritative for tubes and probability.
+
+Pass `--trigger-image <image>` to `replay` (or leave the default in dvc.yaml).
+The enrichment probability must reproduce the pinned replay's within
+`SCORE_TOLERANCE` (1e-5) — a disagreement means the scoring path changed and
+the trigger fields are left empty for that sequence.
+
+Build the dev image from the repo root:
+
+```bash
+make fetch-model MODEL_VERSION=0.2.0   # repo root: same model production runs
+docker build -f api/Dockerfile --build-arg VERSION=dev -t temporal-model-api:dev .
+```
+
+Teammates who only need the artifacts can skip the build and use `dvc pull`
+instead of `dvc repro`.
+
 ## Tests
 
 ```bash

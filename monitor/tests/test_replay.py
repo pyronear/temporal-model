@@ -87,8 +87,9 @@ class FakeStack:
     instances: list["FakeStack"] = []
     fail_versions: set[str] = set()
 
-    def __init__(self, compose_file, version):
+    def __init__(self, compose_file, version, image=None):
         self.version = version
+        self.image = image
         self.uploaded: list[dict] = []
         self.up_called = self.down_called = False
         FakeStack.instances.append(self)
@@ -307,6 +308,7 @@ def test_window_drift_found_by_probing(tmp_path):
         "mismatched": 1,
         "window_drift": 1,
         "dropped": 0,
+        "trigger_enriched": 0,
     }
     rows = json.loads(
         (out / "alert-api" / "vit_dinov2_finetune" / "results.json").read_text()
@@ -316,3 +318,130 @@ def test_window_drift_found_by_probing(tmp_path):
 
     # probing stopped at n=5: 1 main replay upload + 2 probe uploads (n=4, n=5)
     assert len(FakeStack.instances[0].uploaded) == 3
+
+
+TRIGGER_DETAILS = {
+    "decision": {"aggregation": "logistic", "threshold": 0.52, "trigger_tube_id": 0},
+    "preprocessing": {
+        "num_frames_input": 4,
+        "num_truncated": 0,
+        "padded_frame_indices": [],
+        "num_tube_candidates": 1,
+        "num_tubes_outside_roi": 0,
+    },
+    "tubes": [
+        {
+            "tube_id": 0,
+            "start_frame": 0,
+            "end_frame": 3,
+            "logit": 3.41,
+            "probability": 0.93,
+            "first_crossing_frame": 1,
+            "entries": [
+                {
+                    "frame_idx": 0,
+                    "bbox": [0.2, 0.2, 0.2, 0.2],
+                    "is_gap": False,
+                    "confidence": 0.8,
+                }
+            ],
+        }
+    ],
+}
+
+
+def test_trigger_enrichment_merges_when_probability_agrees(tmp_path):
+    store, out = tmp_path / "store", tmp_path / "out"
+    store_sequence(store, 1)  # score 0.93, matches fake_predict_ok
+
+    call_count = [0]
+
+    def predict_with_triggers(frames, roi_xyxyn):
+        call_count[0] += 1
+        resp = {
+            "is_smoke": True,
+            "probability": 0.93,
+            "version": {"api": "0.3.1", "model": "0.1.0"},
+            "details": TRIGGER_DETAILS,
+            "trigger_frame_index": 2,
+        }
+        return resp
+
+    FakeStack.instances = []
+    summary = run_replay(
+        store_dir=store,
+        output_dir=out,
+        compose_file=Path("dc.yml"),
+        stack_factory=FakeStack,
+        predict=predict_with_triggers,
+        trigger_image="temporal-model-api:dev",
+    )
+
+    assert summary["trigger_enriched"] == 1
+
+    rows = json.loads(
+        (out / "alert-api" / "vit_dinov2_finetune" / "results.json").read_text()
+    )
+    assert rows[0]["trigger_frame_index"] == 2
+
+    details = json.loads(
+        (
+            out / "alert-api" / "vit_dinov2_finetune" / "details" / "alert-api_1.json"
+        ).read_text()
+    )
+    assert details["decision"]["trigger_tube_id"] == 0
+    tube = next(t for t in details["tubes"]["kept"] if t["tube_id"] == 0)
+    assert tube["first_crossing_frame"] == 1
+
+    # Two stacks created: main pass and enrichment pass
+    assert len(FakeStack.instances) == 2
+    assert FakeStack.instances[1].image == "temporal-model-api:dev"
+    assert FakeStack.instances[0].down_called
+    assert FakeStack.instances[1].down_called
+
+
+def test_trigger_enrichment_skipped_on_probability_disagreement(tmp_path):
+    store, out = tmp_path / "store", tmp_path / "out"
+    store_sequence(store, 1)  # score 0.93
+
+    # First call (main pass): 0.93, no trigger fields (simulates old v0.3.1).
+    # Second call (enrichment): 0.5 — probability disagreement → skip.
+    call_count = [0]
+
+    def predict_disagreeing(frames, roi_xyxyn):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            # Main pass: old image, no trigger fields
+            return {
+                "is_smoke": True,
+                "probability": 0.93,
+                "version": {"api": "0.3.1", "model": "0.1.0"},
+                "details": VERBOSE_DETAILS,
+            }
+        # Enrichment pass: returns different probability -> guard triggers skip
+        return {
+            "is_smoke": True,
+            "probability": 0.5,
+            "version": {"api": "dev", "model": "0.1.0"},
+            "details": TRIGGER_DETAILS,
+            "trigger_frame_index": 2,
+        }
+
+    FakeStack.instances = []
+    summary = run_replay(
+        store_dir=store,
+        output_dir=out,
+        compose_file=Path("dc.yml"),
+        stack_factory=FakeStack,
+        predict=predict_disagreeing,
+        trigger_image="temporal-model-api:dev",
+    )
+
+    assert summary["trigger_enriched"] == 0
+
+    rows = json.loads(
+        (out / "alert-api" / "vit_dinov2_finetune" / "results.json").read_text()
+    )
+    assert rows[0]["trigger_frame_index"] is None
+    # Main pass result is untouched
+    assert rows[0]["replay_matches"] is True

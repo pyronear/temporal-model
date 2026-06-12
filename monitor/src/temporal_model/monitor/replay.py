@@ -40,7 +40,9 @@ STORE_REL = "data/01_raw/sequences"  # viewer frame paths are relative to monito
 
 
 class _StackFactory(Protocol):
-    def __call__(self, compose_file: Path, version: str) -> Any: ...
+    def __call__(
+        self, compose_file: Path, version: str, image: str | None = None
+    ) -> Any: ...
 
 
 def _default_predict(frames: list[str], roi_xyxyn: list[float] | None) -> dict:
@@ -84,6 +86,7 @@ def run_replay(
     compose_file: Path,
     stack_factory: _StackFactory = ReplayStack,
     predict: Callable[[list[str], list[float] | None], dict] = _default_predict,
+    trigger_image: str | None = None,
 ) -> dict[str, int]:
     reports: dict[str, OrgReport] = {}
     groups: dict[str, list[tuple[Path, SequenceMeta]]] = {}
@@ -135,6 +138,12 @@ def run_replay(
         finally:
             stack.down()
 
+    trigger_enriched = 0
+    if trigger_image is not None and any(r.rows for r in reports.values()):
+        trigger_enriched, _ = _enrich_triggers(
+            reports, store_dir, compose_file, stack_factory, predict, trigger_image
+        )
+
     for report in reports.values():
         write_report(output_dir, report)
     summary = {
@@ -142,13 +151,119 @@ def run_replay(
         "mismatched": mismatched,
         "window_drift": window_drift,
         "dropped": dropped,
+        "trigger_enriched": trigger_enriched,
     }
     logger.info(
         "replay done: %(replayed)d replayed (%(mismatched)d score mismatches, "
-        "%(window_drift)d window drift), %(dropped)d dropped",
+        "%(window_drift)d window drift), %(dropped)d dropped, "
+        "%(trigger_enriched)d trigger-enriched",
         summary,
     )
     return summary
+
+
+def _enrich_triggers(
+    reports: dict[str, OrgReport],
+    store_dir: Path,
+    compose_file: Path,
+    stack_factory: _StackFactory,
+    predict: Callable[[list[str], list[float] | None], dict],
+    trigger_image: str,
+) -> tuple[int, int]:
+    """Second pass with a newer serving build: fill the trigger fields.
+
+    The pinned replay stays authoritative for tubes/probability; the trigger
+    search just needs serving code >= the compute_trigger feature. Fields are
+    merged ONLY when the enrichment probability reproduces the pinned replay's
+    (same window, same model.zip) — otherwise the sequence keeps no trigger.
+    Returns (enriched, skipped).
+    """
+    # Build a lookup from meta.key -> (seq_dir, meta) for all sequences in the store.
+    meta_by_key: dict[str, tuple[Path, SequenceMeta]] = {
+        meta.key: (seq_dir, meta) for seq_dir, meta in iter_metas(store_dir)
+    }
+
+    # There is only one report (alert-api).
+    report = next(iter(reports.values()))
+    rows = report.rows
+    if not rows:
+        return 0, 0
+
+    enriched = skipped = 0
+    # Use a placeholder version for labeling; image is what matters.
+    stack = stack_factory(compose_file, "trigger-enrichment", image=trigger_image)
+    try:
+        stack.up()
+        try:
+            stack.wait_healthy()
+        except StackError:
+            logger.exception("trigger-enrichment stack never became healthy")
+            return 0, len(rows)
+        for row in rows:
+            key = row["key"]
+            entry = meta_by_key.get(key)
+            if entry is None:
+                logger.warning(
+                    "trigger enrichment: meta not found for %s, skipping", key
+                )
+                skipped += 1
+                continue
+            seq_dir, meta = entry
+            _, kept, roi = reconstruct.frames_and_roi(meta.frames)
+            files = _files_by_key(seq_dir, meta, kept)
+            try:
+                stack.upload_frames(files)
+                resp = predict(kept, roi)
+            except Exception:  # noqa: BLE001
+                logger.warning(
+                    "trigger enrichment: predict failed for %s, skipping", key
+                )
+                skipped += 1
+                continue
+            enr_prob = resp.get("probability")
+            pinned_prob = row.get("replayed_probability")
+            if (
+                enr_prob is None
+                or pinned_prob is None
+                or abs(enr_prob - pinned_prob) > SCORE_TOLERANCE
+            ):
+                logger.warning(
+                    "trigger enrichment: probability mismatch for %s "
+                    "(pinned=%.6f, enrichment=%.6f), skipping trigger fields",
+                    key,
+                    pinned_prob if pinned_prob is not None else float("nan"),
+                    enr_prob if enr_prob is not None else float("nan"),
+                )
+                skipped += 1
+                continue
+            # Merge trigger fields into the row and its details.
+            row["trigger_frame_index"] = resp.get("trigger_frame_index")
+            enr = reshape_details(resp["details"])
+            details = report.details_by_key[key]
+            details["decision"]["trigger_tube_id"] = enr["decision"]["trigger_tube_id"]
+            # Build tube_id -> first_crossing_frame from enrichment kept tubes.
+            fcf_by_id = {
+                t["tube_id"]: t.get("first_crossing_frame")
+                for t in enr["tubes"]["kept"]
+            }
+            for tube in details["tubes"]["kept"]:
+                if tube["tube_id"] in fcf_by_id:
+                    tube["first_crossing_frame"] = fcf_by_id[tube["tube_id"]]
+            # Record which image was used for enrichment (once per report).
+            if (
+                report.model_config is not None
+                and "trigger_image" not in report.model_config
+            ):  # noqa: E501
+                report.model_config["trigger_image"] = trigger_image
+            enriched += 1
+    except subprocess.CalledProcessError:
+        logger.error("could not start trigger-enrichment stack (%s)", trigger_image)
+        return 0, len(rows)
+    finally:
+        stack.down()
+
+    logger.info("trigger enrichment: %d enriched, %d skipped", enriched, skipped)
+    return enriched, skipped
 
 
 def _find_matching_window(

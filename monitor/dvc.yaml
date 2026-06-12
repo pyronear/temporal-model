@@ -4,6 +4,7 @@ stages:
       uv run python -m temporal_model.monitor.cli replay
       --store data/01_raw/sequences
       --output-dir data/08_reporting
+      --trigger-image temporal-model-api:dev
     deps:
       - src/temporal_model/monitor/cli.py
       - src/temporal_model/monitor/store.py

@@ -56,6 +56,14 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         # cli.py -> monitor(pkg) -> temporal_model -> src -> monitor/ root
         default=Path(__file__).resolve().parents[3] / "docker-compose.yml",
     )
+    rep.add_argument(
+        "--trigger-image",
+        default=None,
+        help=(
+            "newer serving image used ONLY to compute trigger fields (same model.zip); "
+            "merged only when its probability reproduces the pinned replay's"
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -105,6 +113,7 @@ def main(argv: list[str] | None = None) -> None:
             store_dir=args.store,
             output_dir=args.output_dir,
             compose_file=args.compose_file,
+            trigger_image=args.trigger_image,
         )
 
 
