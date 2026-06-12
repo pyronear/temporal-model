@@ -9,6 +9,7 @@ by ``reconstruct``).
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -48,8 +49,11 @@ class SequenceMeta(BaseModel):
 
 
 def slugify(value: str | None) -> str:
-    """Filesystem-safe lowercase slug; 'unknown' when there is nothing to slug."""
-    slug = re.sub(r"[^a-z0-9]+", "-", (value or "").lower()).strip("-")
+    """Filesystem-safe lowercase ASCII slug; 'unknown' when nothing remains."""
+    ascii_value = (
+        unicodedata.normalize("NFKD", value or "").encode("ascii", "ignore").decode()
+    )
+    slug = re.sub(r"[^a-z0-9]+", "-", ascii_value.lower()).strip("-")
     return slug or "unknown"
 
 

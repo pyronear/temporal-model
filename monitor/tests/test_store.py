@@ -42,6 +42,7 @@ def test_slugify():
     assert slugify("Donon/Sarrebourg_01") == "donon-sarrebourg-01"
     assert slugify("") == "unknown"
     assert slugify(None) == "unknown"
+    assert slugify("Forêt-d'Orient") == "foret-d-orient"
 
 
 def test_label_from_is_wildfire():
