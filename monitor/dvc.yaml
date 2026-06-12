@@ -1,0 +1,18 @@
+stages:
+  replay:
+    cmd: >-
+      uv run python -m temporal_model.monitor.cli replay
+      --store data/01_raw/sequences
+      --output-dir data/08_reporting
+    deps:
+      - src/temporal_model/monitor/cli.py
+      - src/temporal_model/monitor/store.py
+      - src/temporal_model/monitor/reconstruct.py
+      - src/temporal_model/monitor/stack.py
+      - src/temporal_model/monitor/replay.py
+      - src/temporal_model/monitor/geometry.py
+      - src/temporal_model/monitor/report.py
+      - docker-compose.yml
+      - data/01_raw/sequences
+    outs:
+      - data/08_reporting        # cached → dvc push shares it
