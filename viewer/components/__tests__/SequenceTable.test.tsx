@@ -3,7 +3,11 @@ import { expect, it, vi } from "vitest";
 import { SequenceTable } from "@/components/SequenceTable";
 import type { ResultRow } from "@/lib/types";
 
-const r = (key: string, outcome: ResultRow["outcome"]): ResultRow => ({
+const r = (
+  key: string,
+  outcome: ResultRow["outcome"],
+  organization_name: string | null = null,
+): ResultRow => ({
   key,
   source: "s",
   label: "smoke",
@@ -13,7 +17,7 @@ const r = (key: string, outcome: ResultRow["outcome"]): ResultRow => ({
   probability: 0.9,
   num_tubes_kept: 1,
   trigger_frame_index: 0,
-  organization_name: null,
+  organization_name,
   camera_name: "cam-1",
   started_at: null,
 });
@@ -56,4 +60,43 @@ it("never shows prod prob column (match signal lives in detail pane)", () => {
     />,
   );
   expect(screen.queryByText("prod prob")).toBeNull();
+});
+
+it("shows organization column only in monitorMode", () => {
+  const monitorRows = [r("a", "kept-smoke", "sis-67")];
+  // eval mode: no organization column
+  render(
+    <SequenceTable rows={monitorRows} selectedKey={null} onSelect={() => {}} />,
+  );
+  expect(screen.queryByText("organization")).toBeNull();
+  expect(screen.queryByText("sis-67")).toBeNull();
+  cleanup();
+  // monitor mode: organization column present with value
+  render(
+    <SequenceTable
+      rows={monitorRows}
+      selectedKey={null}
+      onSelect={() => {}}
+      monitorMode
+    />,
+  );
+  expect(screen.getByText("organization")).toBeInTheDocument();
+  expect(screen.getByText("sis-67")).toBeInTheDocument();
+});
+
+it("hides correctness column in monitorMode, shows it otherwise", () => {
+  // eval mode: correctness column header present
+  render(<SequenceTable rows={rows} selectedKey={null} onSelect={() => {}} />);
+  expect(screen.getByText("correctness")).toBeInTheDocument();
+  cleanup();
+  // monitor mode: correctness column absent
+  render(
+    <SequenceTable
+      rows={rows}
+      selectedKey={null}
+      onSelect={() => {}}
+      monitorMode
+    />,
+  );
+  expect(screen.queryByText("correctness")).toBeNull();
 });

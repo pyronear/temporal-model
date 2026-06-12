@@ -13,7 +13,7 @@ interface Column {
   cellStyle?: (r: ResultRow) => React.CSSProperties;
 }
 
-const COLUMNS: Column[] = [
+const EVAL_COLUMNS: Column[] = [
   { header: "camera", sortCol: "camera", render: (r) => r.camera_name ?? "—" },
   { header: "ground truth", sortCol: "label", render: (r) => r.label },
   { header: "verdict", sortCol: "decision", render: (r) => r.decision },
@@ -35,22 +35,37 @@ const COLUMNS: Column[] = [
   { header: "prob", sortCol: "probability", render: (r) => num(r.probability) },
 ];
 
+const MONITOR_COLUMNS: Column[] = [
+  {
+    header: "organization",
+    sortCol: "organization",
+    render: (r) => r.organization_name ?? "—",
+  },
+  { header: "camera", sortCol: "camera", render: (r) => r.camera_name ?? "—" },
+  { header: "ground truth", sortCol: "label", render: (r) => r.label },
+  { header: "verdict", sortCol: "decision", render: (r) => r.decision },
+  { header: "tubes", sortCol: "tubes", render: (r) => r.num_tubes_kept },
+  { header: "prob", sortCol: "probability", render: (r) => num(r.probability) },
+];
+
 export function SequenceTable({
   rows,
   selectedKey,
   onSelect,
   sort = null,
   onSort,
+  monitorMode = false,
 }: {
   rows: ResultRow[];
   selectedKey: string | null;
   onSelect: (key: string) => void;
   sort?: Sort | null;
   onSort?: (col: SortCol) => void;
+  monitorMode?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const order = useMemo(() => rows.map((r) => r.key), [rows]);
-  const columns = COLUMNS;
+  const columns = monitorMode ? MONITOR_COLUMNS : EVAL_COLUMNS;
 
   function move(delta: number) {
     if (!order.length) return;

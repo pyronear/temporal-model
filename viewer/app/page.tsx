@@ -71,6 +71,10 @@ export default function Page() {
     () => allRows.filter((r) => r.source === source),
     [allRows, source],
   );
+  const monitorMode = useMemo(
+    () => sourceRows.some((r) => r.replayed_probability !== undefined),
+    [sourceRows],
+  );
   const showSlider =
     cfg.decision?.aggregation === "logistic" &&
     sourceRows.some((r) => r.probability != null);
@@ -129,6 +133,7 @@ export default function Page() {
           onChange={setFilters}
           shownCount={tableRows.length}
           totalCount={rows.length}
+          monitorMode={monitorMode}
         />
         <div className="min-h-0 flex-1">
           <SequenceTable
@@ -137,6 +142,7 @@ export default function Page() {
             onSelect={setSelectedKey}
             sort={sort}
             onSort={(col) => setSort((cur) => nextSort(cur, col))}
+            monitorMode={monitorMode}
           />
         </div>
       </div>
