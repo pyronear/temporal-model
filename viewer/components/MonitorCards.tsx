@@ -118,7 +118,7 @@ export function MonitorCards({
                   // clicking the active org clears the filter back to "all"
                   onSelectOrganization?.(active ? "all" : org)
                 }
-                className={`flex items-center justify-between rounded px-1 py-0.5 text-left text-[11px] ${
+                className={`-mx-2.5 flex items-center justify-between px-2.5 py-0.5 text-left text-[11px] ${
                   active ? "bg-slate-100" : ""
                 } ${clickable ? "cursor-pointer hover:bg-slate-50" : ""}`}
               >
