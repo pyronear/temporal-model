@@ -75,7 +75,10 @@ export default function Page() {
     () => sourceRows.some((r) => r.replayed_probability !== undefined),
     [sourceRows],
   );
+  // Monitor rows carry production's verdict — never re-decided locally, so
+  // the threshold slider is eval-only.
   const showSlider =
+    !monitorMode &&
     cfg.decision?.aggregation === "logistic" &&
     sourceRows.some((r) => r.probability != null);
   const rows = useMemo(

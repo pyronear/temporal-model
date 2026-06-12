@@ -37,12 +37,17 @@ const EVAL_COLUMNS: Column[] = [
 
 const MONITOR_COLUMNS: Column[] = [
   {
+    header: "started",
+    sortCol: "started",
+    render: (r) =>
+      r.started_at ? r.started_at.slice(0, 16).replace("T", " ") : "—",
+  },
+  {
     header: "organization",
     sortCol: "organization",
     render: (r) => r.organization_name ?? "—",
   },
   { header: "camera", sortCol: "camera", render: (r) => r.camera_name ?? "—" },
-  { header: "ground truth", sortCol: "label", render: (r) => r.label },
   { header: "verdict", sortCol: "decision", render: (r) => r.decision },
   { header: "tubes", sortCol: "tubes", render: (r) => r.num_tubes_kept },
   { header: "prob", sortCol: "probability", render: (r) => num(r.probability) },
