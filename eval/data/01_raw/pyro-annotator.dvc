@@ -1,0 +1,6 @@
+outs:
+- md5: b1ff41224c407344f0a57ec8ca5663e1.dir
+  size: 575544716
+  nfiles: 5083
+  hash: md5
+  path: pyro-annotator

@@ -344,6 +344,7 @@ class TestDeviceSelection:
             "probability",
             "first_crossing_frame",
             "entries",
+            "stabilized_window",
         }
         assert out.details["decision"]["trigger_tube_id"] == tube["tube_id"]
         assert isinstance(tube["entries"], list)

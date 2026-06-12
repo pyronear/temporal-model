@@ -8,7 +8,7 @@ it. No context margin here: the crop step adds context via ``context_factor``.
 
 from __future__ import annotations
 
-__all__ = ["union_window", "tube_window"]
+__all__ = ["union_window", "tube_window", "tube_stabilized_window"]
 
 
 def union_window(
@@ -47,3 +47,26 @@ def tube_window(
     available = [b for b, _ in boxes if b is not None]
     observed = [b for b, is_gap in boxes if b is not None and not is_gap]
     return union_window(observed or available)
+
+
+def tube_stabilized_window(entries):
+    """Fixed crop window (union of a tube's observed boxes), or None.
+
+    Mirrors the window ``crop_tube_patches`` uses when ``stabilize=True``: the
+    union (enclosing) box of the tube's observed detections, applied to every
+    frame. ``entries`` are tube entries exposing ``.detection`` (with
+    ``cx/cy/w/h`` or ``None``) and ``.is_gap``. Returns ``None`` when the tube
+    has no usable detection (every entry is a gap).
+    """
+    boxes = [
+        (
+            (e.detection.cx, e.detection.cy, e.detection.w, e.detection.h)
+            if e.detection is not None
+            else None,
+            e.is_gap,
+        )
+        for e in entries
+    ]
+    if any(box is not None for box, _ in boxes):
+        return tube_window(boxes)
+    return None

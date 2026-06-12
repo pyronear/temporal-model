@@ -1,0 +1,93 @@
+"use client";
+import { useEffect, useState } from "react";
+import { frameUrl } from "@/lib/api";
+import { BboxOverlay, type OverlayBox } from "@/components/detail/BboxOverlay";
+import { FrameModal } from "@/components/detail/FrameModal";
+import {
+  TIMELINE_LEFT_PCT,
+  TIMELINE_RIGHT_PCT,
+} from "@/components/detail/TubeTimeline";
+
+export function FrameViewer({
+  frames,
+  boxesByFrame,
+  i,
+  setI,
+}: {
+  frames: string[];
+  boxesByFrame: (i: number) => OverlayBox[];
+  i: number;
+  setI: (updater: (prev: number) => number) => void;
+}) {
+  const n = frames.length;
+  const [playing, setPlaying] = useState(true);
+  const [zoom, setZoom] = useState(false);
+
+  useEffect(() => {
+    // Autoplay keeps running even while the modal is open, so the enlarged view
+    // plays the sequence; the modal's zoom/pan is its own state and persists.
+    if (!playing || n === 0) return;
+    const t = setInterval(() => setI((p) => (p + 1) % n), 1000);
+    return () => clearInterval(t);
+  }, [playing, n, setI]);
+
+  if (n === 0) return null;
+  const cur = i % n;
+
+  return (
+    <div className="space-y-2">
+      <div
+        className="relative w-full cursor-zoom-in overflow-hidden bg-slate-100"
+        onClick={() => setZoom(true)}
+        title="click to enlarge"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={frameUrl(frames[cur])}
+          alt={`frame ${cur}`}
+          className="block w-full"
+        />
+        <BboxOverlay boxes={boxesByFrame(cur)} />
+      </div>
+      <div className="flex items-center">
+        <div
+          className="flex shrink-0 justify-start"
+          style={{ width: `${TIMELINE_LEFT_PCT}%` }}
+        >
+          <button
+            onClick={() => setPlaying((p) => !p)}
+            aria-label={playing ? "pause" : "play"}
+            title={playing ? "pause" : "play"}
+            className="inline-flex h-6 w-7 items-center justify-center rounded border border-slate-300 text-sm leading-none"
+          >
+            {playing ? "⏸" : "▶"}
+          </button>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={n - 1}
+          value={cur}
+          aria-label="frame"
+          onChange={(e) => setI(() => parseInt(e.target.value, 10))}
+          className="min-w-0 flex-1"
+        />
+        <span
+          className="shrink-0 text-right text-xs text-slate-500"
+          style={{ width: `${TIMELINE_RIGHT_PCT}%` }}
+        >
+          {cur + 1}/{n}
+        </span>
+      </div>
+
+      {zoom && (
+        <FrameModal
+          src={frameUrl(frames[cur])}
+          boxes={boxesByFrame(cur)}
+          label={`frame ${cur + 1}/${n}`}
+          onClose={() => setZoom(false)}
+        />
+      )}
+    </div>
+  );
+}

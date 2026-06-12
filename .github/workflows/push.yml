@@ -56,6 +56,20 @@ jobs:
           context: .
           file: api/Dockerfile
           push: true
+          build-args: |
+            VERSION=${{ env.VERSION }}
           tags: |
             ${{ env.BACKEND_IMAGE_NAME }}:${{ env.VERSION }}
             ${{ env.BACKEND_IMAGE_NAME }}:latest
+
+  release:
+    needs: docker
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/create-github-release.sh "$GITHUB_REF_NAME"

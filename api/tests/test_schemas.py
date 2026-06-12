@@ -86,12 +86,14 @@ def test_smoke_uses_max_kept_probability():
         trigger_frame_index=3,
         details=_details([_tube(7, 0.62), _tube(2, 0.91)]),
     )
-    resp = to_response(out, name="m", version="1.2.0", calibrated=True, verbose=False)
+    resp = to_response(
+        out, api_version="0.3.0", model_version="1.2.0", calibrated=True, verbose=False
+    )
     dumped = resp.model_dump(exclude_unset=True)
     assert dumped == {
         "is_smoke": True,
         "probability": 0.91,
-        "model": {"name": "m", "version": "1.2.0"},
+        "version": {"api": "0.3.0", "model": "1.2.0"},
     }
 
 
@@ -101,7 +103,9 @@ def test_negative_uses_max_kept_probability():
         trigger_frame_index=None,
         details=_details([_tube(1, 0.1), _tube(2, 0.41)]),
     )
-    resp = to_response(out, name="m", version="1.2.0", calibrated=True, verbose=False)
+    resp = to_response(
+        out, api_version=None, model_version="1.2.0", calibrated=True, verbose=False
+    )
     assert resp.probability == 0.41
     assert resp.is_smoke is False
 
@@ -110,7 +114,9 @@ def test_negative_no_tubes_is_zero_when_calibrated():
     out = SimpleNamespace(
         is_positive=False, trigger_frame_index=None, details=_details([])
     )
-    resp = to_response(out, name="m", version="1.2.0", calibrated=True, verbose=False)
+    resp = to_response(
+        out, api_version=None, model_version="1.2.0", calibrated=True, verbose=False
+    )
     assert resp.probability == 0.0
 
 
@@ -118,7 +124,9 @@ def test_uncalibrated_probability_is_null():
     out = SimpleNamespace(
         is_positive=False, trigger_frame_index=None, details=_details([_tube(1, None)])
     )
-    resp = to_response(out, name="m", version=None, calibrated=False, verbose=False)
+    resp = to_response(
+        out, api_version=None, model_version=None, calibrated=False, verbose=False
+    )
     assert resp.probability is None
 
 
@@ -126,7 +134,9 @@ def test_verbose_adds_details_block():
     out = SimpleNamespace(
         is_positive=True, trigger_frame_index=3, details=_details([_tube(7, 0.98)])
     )
-    resp = to_response(out, name="m", version="1.2.0", calibrated=True, verbose=True)
+    resp = to_response(
+        out, api_version=None, model_version="1.2.0", calibrated=True, verbose=True
+    )
     dumped = resp.model_dump(exclude_unset=True)
     assert dumped["details"]["decision"] == {
         "aggregation": "max_logit",
@@ -145,8 +155,8 @@ def test_verbose_surfaces_threshold_override():
     )
     resp = to_response(
         out,
-        name="m",
-        version="1.2.0",
+        api_version=None,
+        model_version="1.2.0",
         calibrated=True,
         verbose=True,
         threshold_overridden=True,
@@ -181,17 +191,32 @@ def test_to_response_includes_profiling_when_verbose():
     }
 
     resp = to_response(
-        out, name="m", version="1", calibrated=False, verbose=True, profiling=profiling
+        out,
+        api_version=None,
+        model_version="1",
+        calibrated=False,
+        verbose=True,
+        profiling=profiling,
     )
     assert resp.details.profiling == profiling
 
     # Omitted when not verbose, and harmless when profiling is None.
     resp2 = to_response(
-        out, name="m", version="1", calibrated=False, verbose=False, profiling=profiling
+        out,
+        api_version=None,
+        model_version="1",
+        calibrated=False,
+        verbose=False,
+        profiling=profiling,
     )
     assert resp2.details is None
     resp3 = to_response(
-        out, name="m", version="1", calibrated=False, verbose=True, profiling=None
+        out,
+        api_version=None,
+        model_version="1",
+        calibrated=False,
+        verbose=True,
+        profiling=None,
     )
     assert resp3.details.profiling is None
 
@@ -231,8 +256,54 @@ def test_verbose_details_map_num_tubes_outside_roi():
     details = _details([_tube(1, 0.9)])
     details["tubes"]["num_outside_roi"] = 3
     out = SimpleNamespace(is_positive=True, trigger_frame_index=3, details=details)
-    resp = to_response(out, name="m", version="1", calibrated=True, verbose=True)
+    resp = to_response(
+        out, api_version=None, model_version="1", calibrated=True, verbose=True
+    )
     assert resp.details.preprocessing.num_tubes_outside_roi == 3
+
+
+def test_request_source_defaults_to_none():
+    assert PredictRequest(frames=["a.jpg"]).source is None
+
+
+@pytest.mark.parametrize("source", ["s3", "local"])
+def test_request_accepts_source(source):
+    assert PredictRequest(frames=["a.jpg"], source=source).source == source
+
+
+def test_request_rejects_unknown_source():
+    with pytest.raises(ValidationError):
+        PredictRequest(frames=["a.jpg"], source="ftp")
+
+
+def test_version_block_carries_nulls_independently():
+    # Each identity is null on its own: api when not a release build, model
+    # when the package is a legacy unstamped one.
+    out = SimpleNamespace(
+        is_positive=False, trigger_frame_index=None, details=_details([])
+    )
+    resp = to_response(
+        out, api_version=None, model_version="1.2.0", calibrated=True, verbose=False
+    )
+    assert resp.version.api is None
+    assert resp.version.model == "1.2.0"
+    resp2 = to_response(
+        out, api_version="0.3.0", model_version=None, calibrated=True, verbose=False
+    )
+    assert resp2.version.api == "0.3.0"
+    assert resp2.version.model is None
+
+
+def test_response_has_no_top_level_model_key():
+    # The old model: {name, version} block is gone (breaking change, agreed
+    # in the spec) — its content lives at version.model.
+    out = SimpleNamespace(
+        is_positive=False, trigger_frame_index=None, details=_details([])
+    )
+    resp = to_response(
+        out, api_version="0.3.0", model_version="1.2.0", calibrated=True, verbose=False
+    )
+    assert "model" not in resp.model_dump(exclude_unset=True)
 
 
 def test_verbose_details_num_tubes_outside_roi_is_strict():
@@ -242,7 +313,84 @@ def test_verbose_details_num_tubes_outside_roi_is_strict():
     del details["tubes"]["num_outside_roi"]
     out = SimpleNamespace(is_positive=True, trigger_frame_index=3, details=details)
     with pytest.raises(KeyError):
-        to_response(out, name="m", version="1", calibrated=True, verbose=True)
+        to_response(
+            out, api_version=None, model_version="1", calibrated=True, verbose=True
+        )
+
+
+def test_compute_trigger_sets_top_level_trigger_frame_index():
+    out = SimpleNamespace(
+        is_positive=True, trigger_frame_index=3, details=_details([_tube(7, 0.98)])
+    )
+    resp = to_response(
+        out,
+        api_version=None,
+        model_version="1.2.0",
+        calibrated=True,
+        verbose=False,
+        compute_trigger=True,
+    )
+    dumped = resp.model_dump(exclude_unset=True)
+    assert dumped["trigger_frame_index"] == 3
+    assert "details" not in dumped
+
+
+def test_compute_trigger_no_crossing_is_explicit_null():
+    # Searched but nothing crossed: the key is present with an explicit null.
+    out = SimpleNamespace(
+        is_positive=False, trigger_frame_index=None, details=_details([])
+    )
+    resp = to_response(
+        out,
+        api_version=None,
+        model_version="1.2.0",
+        calibrated=True,
+        verbose=False,
+        compute_trigger=True,
+    )
+    dumped = resp.model_dump(exclude_unset=True)
+    assert "trigger_frame_index" in dumped
+    assert dumped["trigger_frame_index"] is None
+
+
+def test_default_omits_trigger_frame_index():
+    # Even when the core output carries a trigger, the flag gates exposure.
+    out = SimpleNamespace(
+        is_positive=True, trigger_frame_index=3, details=_details([_tube(7, 0.98)])
+    )
+    resp = to_response(
+        out, api_version=None, model_version="1.2.0", calibrated=True, verbose=False
+    )
+    assert "trigger_frame_index" not in resp.model_dump(exclude_unset=True)
+
+
+def test_compute_trigger_verbose_adds_trigger_details():
+    out = SimpleNamespace(
+        is_positive=True, trigger_frame_index=3, details=_details([_tube(7, 0.98)])
+    )
+    resp = to_response(
+        out,
+        api_version=None,
+        model_version="1.2.0",
+        calibrated=True,
+        verbose=True,
+        compute_trigger=True,
+    )
+    details = resp.model_dump(exclude_unset=True)["details"]
+    assert details["decision"]["trigger_tube_id"] == 7
+    assert details["tubes"][0]["first_crossing_frame"] == 3
+
+
+def test_verbose_without_compute_trigger_omits_trigger_details():
+    out = SimpleNamespace(
+        is_positive=True, trigger_frame_index=3, details=_details([_tube(7, 0.98)])
+    )
+    resp = to_response(
+        out, api_version=None, model_version="1.2.0", calibrated=True, verbose=True
+    )
+    details = resp.model_dump(exclude_unset=True)["details"]
+    assert "trigger_tube_id" not in details["decision"]
+    assert "first_crossing_frame" not in details["tubes"][0]
 
 
 def test_verbose_details_detections_source_request():
@@ -251,8 +399,8 @@ def test_verbose_details_detections_source_request():
     )
     resp = to_response(
         out,
-        name="m",
-        version="1",
+        api_version=None,
+        model_version="1",
         calibrated=True,
         verbose=True,
         detections_source="request",
@@ -264,7 +412,9 @@ def test_verbose_details_detections_source_defaults_to_detector():
     out = SimpleNamespace(
         is_positive=False, trigger_frame_index=None, details=_details([])
     )
-    resp = to_response(out, name="m", version="1", calibrated=True, verbose=True)
+    resp = to_response(
+        out, api_version=None, model_version="1", calibrated=True, verbose=True
+    )
     assert resp.details.preprocessing.detections_source == "detector"
 
 

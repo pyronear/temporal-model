@@ -18,8 +18,9 @@ retraining, so the two numbers move independently.
 | Where | Value |
 |---|---|
 | Git tag / Docker image tag | repo version — `vX.Y.Z` / `pyronear/temporal-model-api:X.Y.Z` |
+| `/predict` → `version.api` | repo version — `X.Y.Z`, baked into the image from the git tag (`null` on non-release builds) |
 | `api/MODEL_VERSION` | **model** version the repo ships — `X.Y.Z` |
-| `model.zip` manifest | `model_version: "X.Y.Z"` (matches `api/MODEL_VERSION`) |
+| `model.zip` manifest / `/predict` → `version.model` | `model_version: "X.Y.Z"` (matches `api/MODEL_VERSION`) |
 
 The link between the two is the **pin file `api/MODEL_VERSION`**: it names the
 model release bundled into the Docker image. Tagging the repo `vX.Y.Z` triggers
@@ -29,6 +30,10 @@ the release workflow, which fetches `model.zip` at HF revision
 `model.zip` to HuggingFace first). A repo/code release does **not** imply a
 model release. The model's own lineage stays fully recoverable from the
 manifest's `provenance` block (below).
+At runtime, every `/predict` response reports both identities in one block —
+`version: {api, model}` — so a stored result is traceable to the exact
+image and model that produced it (see
+[`docs/specs/2026-06-11-api-version-in-response-design.md`](specs/2026-06-11-api-version-in-response-design.md)).
 
 ## 2. What's inside `model.zip`
 

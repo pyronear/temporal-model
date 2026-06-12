@@ -124,6 +124,7 @@ class _OrchestrationModel:
         self.predict_calls: list[set[str]] = []
         self.roi_calls: list[tuple | None] = []
         self.frame_detections_calls: list[dict] = []
+        self.trigger_calls: list[bool] = []
 
     def load_sequence(self, paths):
         return [
@@ -145,10 +146,19 @@ class _OrchestrationModel:
             for i, f in enumerate(frames)
         ]
 
-    def predict(self, frames, *, frame_detections=None, roi=None, timer=None):
+    def predict(
+        self,
+        frames,
+        *,
+        frame_detections=None,
+        roi=None,
+        timer=None,
+        compute_trigger=False,
+    ):
         self.predict_calls.append(set(frame_detections or {}))
         self.roi_calls.append(roi)
         self.frame_detections_calls.append(frame_detections or {})
+        self.trigger_calls.append(compute_trigger)
         return SimpleNamespace(frame_ids=[f.frame_id for f in frames])
 
 
@@ -174,6 +184,20 @@ def test_predict_roi_defaults_to_none():
     runner = ModelRunner(model, name="m", version="1", calibrated=True)
     asyncio.run(runner.predict(["c/x_00.jpg"]))
     assert model.roi_calls[-1] is None
+
+
+def test_predict_threads_compute_trigger_to_model():
+    model = _OrchestrationModel()
+    runner = ModelRunner(model, name="m", version="1", calibrated=True)
+    asyncio.run(runner.predict(["c/x_00.jpg"], compute_trigger=True))
+    assert model.trigger_calls[-1] is True
+
+
+def test_predict_compute_trigger_defaults_to_false():
+    model = _OrchestrationModel()
+    runner = ModelRunner(model, name="m", version="1", calibrated=True)
+    asyncio.run(runner.predict(["c/x_00.jpg"]))
+    assert model.trigger_calls[-1] is False
 
 
 def test_predict_caches_and_reuses_detections():
@@ -318,7 +342,15 @@ class _StubModel:
     def detect(self, misses):
         return [SimpleNamespace(frame_id=f.frame_id) for f in misses]
 
-    def predict(self, frames, *, frame_detections=None, roi=None, timer=None):
+    def predict(
+        self,
+        frames,
+        *,
+        frame_detections=None,
+        roi=None,
+        timer=None,
+        compute_trigger=False,
+    ):
         self.predict_timer = timer
         if timer is not None:
             with timer.stage("classifier"):

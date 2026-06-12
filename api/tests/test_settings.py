@@ -59,3 +59,52 @@ def test_api_token_default_none():
 def test_api_token_env_override(monkeypatch):
     monkeypatch.setenv("TEMPORAL_API_TOKEN", "s3cr3t")
     assert Settings(_env_file=None).token == "s3cr3t"
+
+
+def test_frame_source_default_s3():
+    assert Settings(_env_file=None).frame_source == "s3"
+
+
+def test_frame_source_env_override(monkeypatch):
+    monkeypatch.setenv("TEMPORAL_API_FRAME_SOURCE", "local")
+    monkeypatch.setenv("TEMPORAL_API_FRAMES_ROOT", "/data/frames")
+    assert Settings(_env_file=None).frame_source == "local"
+
+
+def test_local_source_without_root_fails_at_startup(monkeypatch):
+    # A local-default server without a frames root is dead on every request;
+    # fail at boot like other server-level misconfig (model path, threshold).
+    monkeypatch.setenv("TEMPORAL_API_FRAME_SOURCE", "local")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
+def test_frame_source_rejects_unknown(monkeypatch):
+    monkeypatch.setenv("TEMPORAL_API_FRAME_SOURCE", "ftp")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
+def test_frames_root_default_empty():
+    assert Settings(_env_file=None).frames_root == ""
+
+
+def test_frames_root_env_override(monkeypatch):
+    monkeypatch.setenv("TEMPORAL_API_FRAMES_ROOT", "/data/frames")
+    assert Settings(_env_file=None).frames_root == "/data/frames"
+
+
+def test_api_version_default_none():
+    assert Settings(_env_file=None).api_version is None
+
+
+def test_api_version_env_override(monkeypatch):
+    monkeypatch.setenv("TEMPORAL_API_VERSION", "0.3.0")
+    assert Settings(_env_file=None).api_version == "0.3.0"
+
+
+def test_api_version_empty_env_is_none(monkeypatch):
+    # The Dockerfile always sets ENV TEMPORAL_API_VERSION=${VERSION}; a build
+    # without the arg yields "" — must normalize to None (not a release).
+    monkeypatch.setenv("TEMPORAL_API_VERSION", "")
+    assert Settings(_env_file=None).api_version is None

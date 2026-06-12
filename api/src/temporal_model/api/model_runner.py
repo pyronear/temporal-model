@@ -158,6 +158,7 @@ class ModelRunner:
         detections: list[list[SuppliedDetection]] | None = None,
         timer: StageTimer | None = None,
         profile: dict[str, Any] | None = None,
+        compute_trigger: bool = False,
     ) -> Any:
         """Resolve detections (cache + detect misses) then run the model.
 
@@ -172,7 +173,13 @@ class ModelRunner:
         """
         async with self._lock:
             return await run_in_threadpool(
-                self._predict_sync, frame_paths, roi, detections, timer, profile
+                self._predict_sync,
+                frame_paths,
+                roi,
+                detections,
+                timer,
+                profile,
+                compute_trigger,
             )
 
     def _predict_sync(
@@ -182,6 +189,7 @@ class ModelRunner:
         detections: list[list[SuppliedDetection]] | None = None,
         timer: StageTimer | None = None,
         profile: dict[str, Any] | None = None,
+        compute_trigger: bool = False,
     ) -> Any:
         started = time.perf_counter()
         frames = self._model.load_sequence(frame_paths)
@@ -215,7 +223,11 @@ class ModelRunner:
             self._cache.put(fd.frame_id, fd)
             resolved[fd.frame_id] = fd
         out = self._model.predict(
-            frames, frame_detections=resolved, roi=roi, timer=timer
+            frames,
+            frame_detections=resolved,
+            roi=roi,
+            timer=timer,
+            compute_trigger=compute_trigger,
         )
         if profile is not None:
             profile["n_frames"] = len(frames)

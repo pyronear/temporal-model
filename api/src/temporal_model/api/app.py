@@ -3,7 +3,7 @@
 import json
 import logging
 import tempfile
-from contextlib import asynccontextmanager
+from contextlib import ExitStack, asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Request
@@ -16,6 +16,7 @@ from temporal_model.core.stage_timer import StageTimer, stage_ctx
 
 from .auth import require_token
 from .errors import ApiError, InferenceError, InvalidRequest, ModelNotLoaded
+from .local import resolve_frames
 from .model_runner import ModelRunner
 from .s3 import fetch_frames, make_s3_client
 from .schemas import PredictRequest, PredictResponse, to_response
@@ -51,6 +52,7 @@ class HealthResponse(BaseModel):
     model_loaded: bool
     model_name: str | None = None
     model_version: str | None = None
+    api_version: str | None = None
 
 
 @asynccontextmanager
@@ -74,7 +76,11 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Temporal Model API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="Temporal Model API",
+    version=settings.api_version or "dev",
+    lifespan=lifespan,
+)
 
 
 @app.exception_handler(ApiError)
@@ -101,12 +107,17 @@ async def _validation_handler(
 def health(request: Request) -> HealthResponse:
     runner = getattr(request.app.state, "runner", None)
     if runner is None:
-        return HealthResponse(status="unavailable", model_loaded=False)
+        return HealthResponse(
+            status="unavailable",
+            model_loaded=False,
+            api_version=settings.api_version,
+        )
     return HealthResponse(
         status="ok",
         model_loaded=True,
         model_name=runner.name,
         model_version=runner.version,
+        api_version=settings.api_version,
     )
 
 
@@ -117,31 +128,60 @@ def health(request: Request) -> HealthResponse:
     dependencies=[Depends(require_token)],
 )
 async def predict(
-    body: PredictRequest, request: Request, verbose: bool = False
+    body: PredictRequest,
+    request: Request,
+    verbose: bool = False,
+    compute_trigger: bool = False,
 ) -> PredictResponse:
-    bucket = body.bucket or settings.s3_bucket
-    if not bucket:
-        raise InvalidRequest(
-            "no S3 bucket: set request 'bucket' or TEMPORAL_API_S3_BUCKET"
-        )
+    source = body.source or settings.frame_source
+    if source == "local":
+        if body.bucket is not None:
+            raise InvalidRequest("bucket is not valid with local frames")
+        if not settings.frames_root:
+            raise InvalidRequest(
+                "local frames not enabled: set TEMPORAL_API_FRAMES_ROOT"
+            )
+    else:
+        bucket = body.bucket or settings.s3_bucket
+        if not bucket:
+            raise InvalidRequest(
+                "no S3 bucket: set request 'bucket' or TEMPORAL_API_S3_BUCKET"
+            )
 
     runner = getattr(request.app.state, "runner", None)
     if runner is None:
         raise ModelNotLoaded("model is not loaded")
-    s3_client = request.app.state.s3_client
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with ExitStack() as stack:
         try:
             # Timer carries the model device so GPU/MPS stages are synced for
             # honest timing; on the CPU serving target this is a no-op.
             timer = StageTimer(settings.device) if settings.profile else None
             profile: dict | None = {} if settings.profile else None
 
-            with stage_ctx(timer, "s3_fetch"):
-                # fetch_frames is blocking boto3 I/O — run it off the event loop.
-                paths = await run_in_threadpool(
-                    fetch_frames, s3_client, bucket, body.frames, Path(tmp)
-                )
+            if source == "local":
+                # Local frames are read in place — no temp dir, no copy.
+                with stage_ctx(timer, "local_resolve"):
+                    # resolve_frames stats every frame — keep it off the event
+                    # loop like the S3 fetch (the root may be a slow shared
+                    # volume).
+                    paths = await run_in_threadpool(
+                        resolve_frames, Path(settings.frames_root), body.frames
+                    )
+            else:
+                # The temp dir must outlive runner.predict — frames are read
+                # during inference.
+                tmp = stack.enter_context(tempfile.TemporaryDirectory())
+                with stage_ctx(timer, "s3_fetch"):
+                    # fetch_frames is blocking boto3 I/O — run it off the
+                    # event loop.
+                    paths = await run_in_threadpool(
+                        fetch_frames,
+                        request.app.state.s3_client,
+                        bucket,
+                        body.frames,
+                        Path(tmp),
+                    )
 
             out = await runner.predict(
                 paths,
@@ -149,6 +189,7 @@ async def predict(
                 detections=body.detections,
                 timer=timer,
                 profile=profile,
+                compute_trigger=compute_trigger,
             )
 
             profiling = None
@@ -163,10 +204,11 @@ async def predict(
 
             return to_response(
                 out,
-                name=runner.name,
-                version=runner.version,
+                api_version=settings.api_version,
+                model_version=runner.version,
                 calibrated=runner.calibrated,
                 verbose=verbose,
+                compute_trigger=compute_trigger,
                 threshold_overridden=runner.threshold_overridden,
                 packaged_threshold=runner.packaged_threshold,
                 detections_source=(

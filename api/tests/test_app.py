@@ -67,12 +67,23 @@ class FakeRunner:
         self._error = error
         self.roi = None
         self.detections = None
+        self.paths = None
+        self.compute_trigger = None
 
     async def predict(
-        self, paths, *, roi=None, detections=None, timer=None, profile=None
+        self,
+        paths,
+        *,
+        roi=None,
+        detections=None,
+        timer=None,
+        profile=None,
+        compute_trigger=False,
     ):
         self.roi = roi
         self.detections = detections
+        self.paths = paths
+        self.compute_trigger = compute_trigger
         if self._error:
             raise self._error
         if timer is not None:
@@ -105,6 +116,7 @@ def test_health_loaded(client):
         "model_loaded": True,
         "model_name": "bbox-tube-vit-dinov2",
         "model_version": "1.2.0",
+        "api_version": None,
     }
 
 
@@ -184,7 +196,7 @@ def test_predict_default(client):
     assert r.json() == {
         "is_smoke": True,
         "probability": 0.98,
-        "model": {"name": "bbox-tube-vit-dinov2", "version": "1.2.0"},
+        "version": {"api": None, "model": "1.2.0"},
     }
 
 
@@ -196,7 +208,7 @@ def test_predict_verbose(client):
     assert body["details"]["tubes"][0]["tube_id"] == 7
     assert body["is_smoke"] is True
     assert body["probability"] == 0.98
-    assert body["model"] == {"name": "bbox-tube-vit-dinov2", "version": "1.2.0"}
+    assert body["version"] == {"api": None, "model": "1.2.0"}
     assert body["details"]["decision"] == {
         "aggregation": "max_logit",
         "threshold": 0.5,
@@ -215,6 +227,49 @@ def test_predict_verbose_surfaces_override(client):
     assert decision["packaged_threshold"] == 0.5
 
 
+def test_predict_compute_trigger_returns_trigger_frame_index(client):
+    r = client.post("/predict?compute_trigger=true", json={"frames": KEYS})
+    assert r.status_code == 200
+    assert r.json() == {
+        "is_smoke": True,
+        "probability": 0.98,
+        "trigger_frame_index": 3,
+        "version": {"api": None, "model": "1.2.0"},
+    }
+    assert client.app.state.runner.compute_trigger is True
+
+
+def test_predict_default_runs_fast_path(client):
+    r = client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 200
+    assert "trigger_frame_index" not in r.json()
+    assert client.app.state.runner.compute_trigger is False
+
+
+def test_predict_compute_trigger_verbose_adds_trigger_details(client):
+    r = client.post("/predict?compute_trigger=true&verbose=true", json={"frames": KEYS})
+    body = r.json()
+    assert r.status_code == 200
+    assert body["trigger_frame_index"] == 3
+    assert body["details"]["decision"]["trigger_tube_id"] == 7
+    assert body["details"]["tubes"][0]["first_crossing_frame"] == 3
+
+
+def test_predict_reports_api_version(client, monkeypatch):
+    # settings.api_version is read per request, so a monkeypatched value
+    # must show up as version.api.
+    monkeypatch.setattr(settings, "api_version", "0.3.0")
+    r = client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 200
+    assert r.json()["version"] == {"api": "0.3.0", "model": "1.2.0"}
+
+
+def test_health_reports_api_version(client, monkeypatch):
+    monkeypatch.setattr(settings, "api_version", "0.3.0")
+    r = client.get("/health")
+    assert r.json()["api_version"] == "0.3.0"
+
+
 def test_health_unavailable(client):
     client.app.state.runner = None
     r = client.get("/health")
@@ -224,6 +279,7 @@ def test_health_unavailable(client):
         "model_loaded": False,
         "model_name": None,
         "model_version": None,
+        "api_version": None,
     }
 
 
@@ -465,6 +521,63 @@ def test_predict_malformed_detection_is_400(client):
     assert r.json()["code"] == "invalid_request"
 
 
+@pytest.fixture
+def local_client(monkeypatch, tmp_path):
+    # An edge-box style deployment: frame_source=local, frames on a shared
+    # volume (tmp_path), no S3 involved.
+    monkeypatch.setattr(settings, "frame_source", "local")
+    monkeypatch.setattr(settings, "frames_root", str(tmp_path))
+    for key in KEYS:
+        p = tmp_path / key
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(b"\xff\xd8\xff\xe0jpeg")
+    with TestClient(app) as c:
+        c.app.state.runner = FakeRunner(output=_smoke_output())
+        yield c
+
+
+def test_predict_local_default_source(local_client, tmp_path):
+    # `source` omitted follows settings.frame_source="local"; the runner gets
+    # the real files under the root, in request order — no copy.
+    r = local_client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 200
+    assert r.json()["is_smoke"] is True
+    runner = local_client.app.state.runner
+    assert runner.paths == [(tmp_path / k).resolve() for k in KEYS]
+
+
+def test_predict_local_explicit_source(local_client):
+    r = local_client.post("/predict", json={"frames": KEYS, "source": "local"})
+    assert r.status_code == 200
+
+
+def test_predict_local_rejects_bucket(local_client):
+    r = local_client.post("/predict", json={"frames": KEYS, "bucket": "some-bucket"})
+    assert r.status_code == 400
+    assert r.json()["code"] == "invalid_request"
+    assert "bucket" in r.json()["detail"]
+
+
+def test_predict_local_without_root_400(local_client, monkeypatch):
+    monkeypatch.setattr(settings, "frames_root", "")
+    r = local_client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 400
+    assert r.json()["code"] == "invalid_request"
+    assert "TEMPORAL_API_FRAMES_ROOT" in r.json()["detail"]
+
+
+def test_predict_local_no_root_400_takes_precedence_over_model(
+    local_client, monkeypatch
+):
+    # Mirrors test_predict_no_bucket_400_takes_precedence_over_model: the
+    # prerequisite check runs before the model-loaded check.
+    monkeypatch.setattr(settings, "frames_root", "")
+    local_client.app.state.runner = None
+    r = local_client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 400
+    assert r.json()["code"] == "invalid_request"
+
+
 def test_predict_detections_compose_with_roi(client):
     r = client.post(
         "/predict",
@@ -491,3 +604,40 @@ def test_predict_verbose_detections_source_detector(client):
     r = client.post("/predict?verbose=true", json={"frames": KEYS})
     assert r.status_code == 200
     assert r.json()["details"]["preprocessing"]["detections_source"] == "detector"
+
+
+def test_predict_local_missing_frame_404(local_client):
+    r = local_client.post("/predict", json={"frames": ["cam12/missing.jpg"]})
+    assert r.status_code == 404
+    assert r.json()["code"] == "frame_not_found"
+
+
+def test_predict_local_traversal_400(local_client):
+    r = local_client.post("/predict", json={"frames": ["../etc/passwd"]})
+    assert r.status_code == 400
+    assert r.json()["code"] == "invalid_request"
+
+
+def test_predict_explicit_s3_same_as_omitted(client):
+    # On an s3-default server, explicit source="s3" behaves identically to
+    # omitting it.
+    r = client.post("/predict", json={"frames": KEYS, "source": "s3"})
+    assert r.status_code == 200
+    assert r.json()["is_smoke"] is True
+
+
+def test_predict_source_local_on_s3_server_needs_root(client):
+    # The s3-mode `client` fixture has no frames_root configured: an explicit
+    # local request is a clear 400, not a confusing fallback.
+    r = client.post("/predict", json={"frames": KEYS, "source": "local"})
+    assert r.status_code == 400
+    assert "TEMPORAL_API_FRAMES_ROOT" in r.json()["detail"]
+
+
+def test_predict_local_profiling_stage(local_client, monkeypatch):
+    monkeypatch.setattr(settings, "profile", True)
+    r = local_client.post("/predict?verbose=true", json={"frames": KEYS})
+    assert r.status_code == 200
+    prof = r.json()["details"]["profiling"]
+    assert "local_resolve" in prof["stages_ms"]
+    assert "s3_fetch" not in prof["stages_ms"]

@@ -1,20 +1,16 @@
 """Public request/response DTOs and the mapper from the core model output.
 
 The default response is the lean verdict; ``?verbose=true`` adds a ``details``
-block. ``details`` is only set when verbose, so the route serializes with
-``exclude_unset=True`` to omit it otherwise (while keeping explicit ``null``s).
+block and ``?compute_trigger=true`` adds the time-to-detection fields. Both
+are only set when requested, so the route serializes with
+``exclude_unset=True`` to omit them otherwise (while keeping explicit
+``null``s).
 """
 
 import re
 from typing import Any, Literal
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    field_validator,
-    model_validator,
-)
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from temporal_model.core.tubes import validate_roi
 
@@ -51,6 +47,10 @@ class SuppliedDetection(BaseModel):
 
 class PredictRequest(BaseModel):
     frames: list[str]
+    # Where `frames` live: "s3" (keys in a bucket) or "local" (relative paths
+    # under the server's frames_root). None → the server's configured default
+    # (settings.frame_source).
+    source: Literal["s3", "local"] | None = None
     # Optional per-request S3 bucket. Falls back to settings.s3_bucket when
     # omitted (alert-api stacks use per-org dynamic bucket names that no single
     # setting can cover).
@@ -72,10 +72,12 @@ class PredictRequest(BaseModel):
     @classmethod
     def _validate_frames(cls, v: list[str]) -> list[str]:
         if not v:
-            raise ValueError("frames must contain at least one S3 key")
+            raise ValueError("frames must contain at least one entry")
         for key in v:
             if "://" in key:
-                raise ValueError(f"frame key must be a bare S3 key, not a URL: {key!r}")
+                raise ValueError(
+                    f"frame must be a bare key or relative path, not a URL: {key!r}"
+                )
         return v
 
     @field_validator("bucket")
@@ -132,6 +134,7 @@ class Tube(BaseModel):
     end_frame: int
     logit: float
     probability: float | None
+    first_crossing_frame: int | None = None
     entries: list[FrameEntry]
 
 
@@ -140,6 +143,7 @@ class Decision(BaseModel):
     threshold: float
     threshold_overridden: bool = False
     packaged_threshold: float | None = None
+    trigger_tube_id: int | None = None
 
 
 class Preprocessing(BaseModel):
@@ -160,17 +164,23 @@ class Details(BaseModel):
     profiling: dict[str, Any] | None = None
 
 
-class ModelInfo(BaseModel):
-    name: str
-    version: str | None
+class Version(BaseModel):
+    """Provenance of a prediction: the code release + the model release.
+
+    ``api`` equals the Docker image tag (null on non-release builds);
+    ``model`` is the packaged ``manifest.model_version`` (null on legacy
+    unstamped packages). Together they fully identify what produced a result.
+    """
+
+    api: str | None
+    model: str | None
 
 
 class PredictResponse(BaseModel):
-    model_config = ConfigDict(protected_namespaces=())
-
     is_smoke: bool
     probability: float | None
-    model: ModelInfo
+    trigger_frame_index: int | None = None
+    version: Version
     details: Details | None = None
 
 
@@ -194,12 +204,23 @@ def _to_details(
     packaged_threshold: float | None,
     detections_source: Literal["request", "detector"],
     profiling: dict[str, Any] | None = None,
+    compute_trigger: bool = False,
 ) -> Details:
     tubes_block = details["tubes"]
     pre = details["preprocessing"]
+    decision = dict(details["decision"])
+    kept = tubes_block["kept"]
+    if not compute_trigger:
+        # Core emits these keys even on the fast path (always null there);
+        # dropping them keeps the DTO fields unset so exclude_unset omits
+        # them and the no-flag response is unchanged.
+        decision.pop("trigger_tube_id", None)
+        kept = [
+            {k: v for k, v in t.items() if k != "first_crossing_frame"} for t in kept
+        ]
     return Details(
         decision=Decision(
-            **details["decision"],
+            **decision,
             threshold_overridden=threshold_overridden,
             packaged_threshold=packaged_threshold,
         ),
@@ -213,7 +234,7 @@ def _to_details(
             num_tubes_outside_roi=tubes_block["num_outside_roi"],
             detections_source=detections_source,
         ),
-        tubes=[Tube(**t) for t in tubes_block["kept"]],
+        tubes=[Tube(**t) for t in kept],
         profiling=profiling,
     )
 
@@ -221,10 +242,11 @@ def _to_details(
 def to_response(
     out: Any,
     *,
-    name: str,
-    version: str | None,
+    api_version: str | None,
+    model_version: str | None,
     calibrated: bool,
     verbose: bool,
+    compute_trigger: bool = False,
     threshold_overridden: bool = False,
     packaged_threshold: float | None = None,
     detections_source: Literal["request", "detector"] = "detector",
@@ -234,8 +256,11 @@ def to_response(
     kwargs: dict[str, Any] = {
         "is_smoke": out.is_positive,
         "probability": _decision_probability(out.details, calibrated),
-        "model": ModelInfo(name=name, version=version),
+        "version": Version(api=api_version, model=model_version),
     }
+    if compute_trigger:
+        # Explicit null is meaningful here: searched, no crossing found.
+        kwargs["trigger_frame_index"] = out.trigger_frame_index
     if verbose:
         kwargs["details"] = _to_details(
             out.details,
@@ -243,5 +268,6 @@ def to_response(
             packaged_threshold=packaged_threshold,
             detections_source=detections_source,
             profiling=profiling,
+            compute_trigger=compute_trigger,
         )
     return PredictResponse(**kwargs)
