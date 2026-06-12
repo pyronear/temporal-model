@@ -21,6 +21,11 @@ export interface ResultRow {
   organization_name: string | null;
   camera_name: string | null;
   started_at: string | null;
+  // Monitor-only provenance (absent in eval reporting trees).
+  recorded_probability?: number | null;
+  replay_matches?: boolean | null;
+  temporal_model_version?: string | null;
+  temporal_api_version?: string | null;
 }
 
 export interface KeptTubeEntry {

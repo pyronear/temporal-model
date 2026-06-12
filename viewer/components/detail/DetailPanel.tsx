@@ -165,6 +165,30 @@ export function DetailPanel({
           value={row.probability == null ? "—" : row.probability.toFixed(3)}
           hint="max calibrated tube probability driving the decision"
         />
+        {row.recorded_probability !== undefined && (
+          <>
+            <Stat
+              label="prod prob"
+              value={
+                row.recorded_probability == null
+                  ? "—"
+                  : row.recorded_probability.toFixed(3)
+              }
+              hint="probability recorded by production (alert-api)"
+            />
+            <Stat
+              label="replay"
+              value={
+                row.replay_matches == null
+                  ? "—"
+                  : row.replay_matches
+                    ? "matches"
+                    : "MISMATCH"
+              }
+              hint={`api ${row.temporal_api_version ?? "?"} · model ${row.temporal_model_version ?? "?"}`}
+            />
+          </>
+        )}
       </div>
       {n > 0 && (
         <div className="grid grid-cols-[2fr_1fr] gap-3">

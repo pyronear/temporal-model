@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { SequenceTable } from "@/components/SequenceTable";
 import type { ResultRow } from "@/lib/types";
@@ -18,6 +18,8 @@ const r = (key: string, outcome: ResultRow["outcome"]): ResultRow => ({
   started_at: null,
 });
 
+const rows = [r("a", "kept-smoke"), r("b", "kept-fp")];
+
 it("renders rows and fires onSelect on click", () => {
   const onSelect = vi.fn();
   render(
@@ -31,4 +33,27 @@ it("renders rows and fires onSelect on click", () => {
   expect(screen.getByText("false alarm")).toBeInTheDocument();
   fireEvent.click(screen.getByText("false alarm"));
   expect(onSelect).toHaveBeenCalledWith("b");
+});
+
+it("shows provenance columns only for monitor rows", () => {
+  // eval rows: no prod prob column
+  render(<SequenceTable rows={rows} selectedKey={null} onSelect={() => {}} />);
+  expect(screen.queryByText("prod prob")).toBeNull();
+  cleanup();
+  const monitorRow = {
+    ...rows[0],
+    key: "platform_1",
+    recorded_probability: 0.931,
+    replay_matches: false,
+  };
+  render(
+    <SequenceTable
+      rows={[monitorRow]}
+      selectedKey={null}
+      onSelect={() => {}}
+    />,
+  );
+  expect(screen.getByText("prod prob")).toBeTruthy();
+  expect(screen.getByText("0.931")).toBeTruthy();
+  expect(screen.getByText("≠")).toBeTruthy(); // mismatch marker
 });

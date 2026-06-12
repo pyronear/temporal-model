@@ -35,6 +35,23 @@ const COLUMNS: Column[] = [
   { header: "prob", sortCol: "probability", render: (r) => num(r.probability) },
 ];
 
+const MONITOR_COLUMNS: Column[] = [
+  {
+    header: "prod prob",
+    sortCol: null,
+    render: (r) => num(r.recorded_probability ?? null),
+  },
+  {
+    header: "match",
+    sortCol: null,
+    render: (r) =>
+      r.replay_matches == null ? "—" : r.replay_matches ? "=" : "≠",
+    cellStyle: (r) => ({
+      color: r.replay_matches === false ? "#b91c1c" : undefined,
+    }),
+  },
+];
+
 export function SequenceTable({
   rows,
   selectedKey,
@@ -50,6 +67,8 @@ export function SequenceTable({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const order = useMemo(() => rows.map((r) => r.key), [rows]);
+  const hasProvenance = rows.some((r) => r.recorded_probability !== undefined);
+  const columns = hasProvenance ? [...COLUMNS, ...MONITOR_COLUMNS] : COLUMNS;
 
   function move(delta: number) {
     if (!order.length) return;
@@ -79,7 +98,7 @@ export function SequenceTable({
       <table className="w-full border-collapse text-sm">
         <thead className="sticky top-0 bg-white text-left text-xs uppercase tracking-wide text-slate-500">
           <tr>
-            {COLUMNS.map((c) => (
+            {columns.map((c) => (
               <th
                 key={c.header}
                 onClick={() => c.sortCol && onSort?.(c.sortCol)}
@@ -106,7 +125,7 @@ export function SequenceTable({
                 style={{ background: t.bg }}
                 className={`cursor-pointer ${sel ? "ring-2 ring-inset ring-slate-400" : ""}`}
               >
-                {COLUMNS.map((c) => (
+                {columns.map((c) => (
                   <td
                     key={c.header}
                     className="px-3 py-1.5 text-slate-700"
