@@ -58,7 +58,13 @@ def main(argv: list[str] | None = None) -> None:
             client, args.store, args.date_from, args.date_to, force=args.force
         )
     elif args.command == "replay":
-        raise SystemExit("replay is not implemented yet")
+        from temporal_model.monitor.replay import run_replay  # noqa: PLC0415
+
+        run_replay(
+            store_dir=args.store,
+            output_dir=args.output_dir,
+            compose_file=args.compose_file,
+        )
 
 
 if __name__ == "__main__":

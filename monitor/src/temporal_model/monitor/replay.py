@@ -1,0 +1,201 @@
+"""Replay stored sequences through their pinned api release, write reports.
+
+Flow: group sequences by recorded temporal_api_version -> one compose stack
+per group (image tag == version; model.zip is baked into the image) -> verify
+/health model_version matches each sequence's recorded one -> upload frames
+under their original bucket_keys -> POST /predict?verbose=true&
+compute_trigger=true (older releases ignore the unknown params; the trigger
+fields are then simply absent) -> compare the replayed probability to the
+recorded score -> write one eval-viewer tree per organization.
+"""
+
+from __future__ import annotations
+
+import logging
+import subprocess
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any, Protocol
+
+import requests
+
+from temporal_model.monitor import reconstruct
+from temporal_model.monitor.report import (
+    MODEL_DIR,
+    OrgReport,
+    reshape_details,
+    result_row,
+    write_report,
+)
+from temporal_model.monitor.stack import API_URL, BUCKET, ReplayStack
+from temporal_model.monitor.store import SequenceMeta, iter_metas, slugify
+
+logger = logging.getLogger(__name__)
+
+SCORE_TOLERANCE = 1e-6
+STORE_REL = "data/01_raw/sequences"  # viewer frame paths are relative to monitor/
+
+
+class _StackFactory(Protocol):
+    def __call__(self, compose_file: Path, version: str) -> Any: ...
+
+
+def _default_predict(frames: list[str], roi_xyxyn: list[float] | None) -> dict:
+    body: dict[str, Any] = {"bucket": BUCKET, "frames": frames}
+    if roi_xyxyn is not None:
+        body["roi_xyxyn"] = roi_xyxyn
+    resp = requests.post(
+        f"{API_URL}/predict",
+        params={"verbose": "true", "compute_trigger": "true"},
+        json=body,
+        timeout=600,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _org_report(reports: dict[str, OrgReport], meta: SequenceMeta) -> OrgReport:
+    org = slugify(meta.organization_name)
+    if org not in reports:
+        reports[org] = OrgReport(org_slug=org)
+    return reports[org]
+
+
+def _files_by_key(
+    seq_dir: Path, meta: SequenceMeta, kept: list[str]
+) -> dict[str, Path]:
+    """First stored file per kept bucket_key (several detections may share one)."""
+    files: dict[str, Path] = {}
+    for f in meta.frames:
+        if f.bucket_key in kept and f.bucket_key not in files:
+            files[f.bucket_key] = seq_dir / f.file
+    return files
+
+
+def run_replay(
+    *,
+    store_dir: Path,
+    output_dir: Path,
+    compose_file: Path,
+    stack_factory: _StackFactory = ReplayStack,
+    predict: Callable[[list[str], list[float] | None], dict] = _default_predict,
+) -> dict[str, int]:
+    reports: dict[str, OrgReport] = {}
+    groups: dict[str, list[tuple[Path, SequenceMeta]]] = {}
+    replayed = mismatched = dropped = 0
+
+    for seq_dir, meta in iter_metas(store_dir):
+        if not meta.temporal_api_version:
+            _org_report(reports, meta).drop(meta.key, "no_temporal_version")
+            dropped += 1
+            continue
+        groups.setdefault(meta.temporal_api_version, []).append((seq_dir, meta))
+
+    for version in sorted(groups):
+        items = groups[version]
+        stack = stack_factory(compose_file, version)
+        try:
+            stack.up()
+        except subprocess.CalledProcessError:
+            logger.error("could not start image for api version %s", version)
+            for _, meta in items:
+                _org_report(reports, meta).drop(meta.key, "image_pull_failed")
+                dropped += 1
+            continue
+        try:
+            health = stack.wait_healthy()
+            for seq_dir, meta in items:
+                outcome = _replay_one(stack, health, seq_dir, meta, reports, predict)
+                if outcome == "ok":
+                    replayed += 1
+                elif outcome == "mismatch":
+                    replayed += 1
+                    mismatched += 1
+                else:
+                    dropped += 1
+        finally:
+            stack.down()
+
+    for report in reports.values():
+        write_report(output_dir, report)
+    summary = {"replayed": replayed, "mismatched": mismatched, "dropped": dropped}
+    logger.info(
+        "replay done: %(replayed)d replayed (%(mismatched)d score mismatches), "
+        "%(dropped)d dropped",
+        summary,
+    )
+    return summary
+
+
+def _replay_one(
+    stack: Any,
+    health: dict,
+    seq_dir: Path,
+    meta: SequenceMeta,
+    reports: dict[str, OrgReport],
+    predict: Callable[[list[str], list[float] | None], dict],
+) -> str:
+    report = _org_report(reports, meta)
+    if health.get("model_version") != meta.temporal_model_version:
+        report.drop(meta.key, "model_version_mismatch")
+        return "model_version_mismatch"
+    total, kept, roi = reconstruct.frames_and_roi(meta.frames)
+    if total < reconstruct.MIN_FRAMES:
+        report.drop(meta.key, "too_few_frames")
+        return "too_few_frames"
+    files = _files_by_key(seq_dir, meta, kept)
+    if len(files) < len(kept) or not all(p.is_file() for p in files.values()):
+        report.drop(meta.key, "no_images")
+        return "no_images"
+    try:
+        stack.upload_frames(files)
+        response = predict(kept, roi)
+    except Exception:  # noqa: BLE001 — one bad sequence must not stop the run
+        logger.exception("predict failed for %s", meta.key)
+        report.drop(meta.key, "predict_failed")
+        return "predict_failed"
+
+    details = reshape_details(response["details"])
+    matches = _score_matches(meta.temporal_model_score, response.get("probability"))
+    org = slugify(meta.organization_name)
+    cam = slugify(meta.camera_name)
+    # The frames the model actually saw, in request order, as paths relative
+    # to monitor/ (the viewer resolves them against DATA_ROOT).
+    frames_rel = []
+    for key in kept:
+        rel = files[key].relative_to(seq_dir)  # e.g. images/detection_100.jpg
+        frames_rel.append(
+            f"{STORE_REL}/{org}/{cam}/seq_{meta.sequence_id}/{rel.as_posix()}"
+        )
+    view = {
+        "key": meta.key,
+        # like result_row's source: must equal the reporting tree's <org_slug>
+        "source": org,
+        "label": meta.label,
+        "organization_name": meta.organization_name,
+        "camera_name": meta.camera_name,
+        "started_at": meta.started_at,
+        "frames": frames_rel,
+    }
+    report.add(
+        row=result_row(
+            meta=meta, response=response, details=details, replay_matches=matches
+        ),
+        details=details,
+        view=view,
+        model_config={
+            "variant": MODEL_DIR,
+            "decision": details["decision"],
+            "model_version": health.get("model_version"),
+            "api_version": health.get("api_version"),
+        },
+    )
+    return "ok" if (matches is None or matches) else "mismatch"
+
+
+def _score_matches(recorded: float | None, replayed: float | None) -> bool | None:
+    if recorded is None:
+        return None
+    if replayed is None:
+        return False
+    return abs(recorded - replayed) <= SCORE_TOLERANCE
