@@ -57,7 +57,7 @@ VERBOSE_RESPONSE = {
 
 def make_meta() -> SequenceMeta:
     return SequenceMeta(
-        key="platform_42307",
+        key="alert-api_42307",
         sequence_id=42307,
         label="smoke",
         camera_name="donon-sarrebourg-01",
@@ -134,7 +134,7 @@ def test_result_row():
         replay_matches=True,
     )
     assert row == {
-        "key": "platform_42307",
+        "key": "alert-api_42307",
         "source": "sis-67",
         "label": "smoke",
         "decision": "keep",
@@ -175,7 +175,7 @@ def test_write_report_tree(tmp_path):
         row=row,
         details=details,
         view={
-            "key": "platform_42307",
+            "key": "alert-api_42307",
             "source": "sis-67",
             "label": "smoke",
             "organization_name": "sis-67",
@@ -187,19 +187,19 @@ def test_write_report_tree(tmp_path):
         },
         model_config={"variant": "vit_dinov2_finetune"},
     )
-    report.drop("platform_999", "no_temporal_version")
+    report.drop("alert-api_999", "no_temporal_version")
     write_report(tmp_path, report)
 
     out = tmp_path / "sis-67" / "vit_dinov2_finetune"
     rows = json.loads((out / "results.json").read_text())
-    assert rows[0]["key"] == "platform_42307"
-    written = json.loads((out / "details" / "platform_42307.json").read_text())
+    assert rows[0]["key"] == "alert-api_42307"
+    written = json.loads((out / "details" / "alert-api_42307.json").read_text())
     assert written["tubes"]["kept"][0]["tube_id"] == 7
-    view = json.loads((out / "sequences" / "platform_42307.json").read_text())
+    view = json.loads((out / "sequences" / "alert-api_42307.json").read_text())
     assert view["frames"][0].startswith("data/01_raw/sequences/")
     assert json.loads((out / "model_config.json").read_text()) == {
         "variant": "vit_dinov2_finetune"
     }
     assert json.loads((out / "dropped.json").read_text()) == [
-        {"sequence_id": "platform_999", "reason": "no_temporal_version"}
+        {"sequence_id": "alert-api_999", "reason": "no_temporal_version"}
     ]

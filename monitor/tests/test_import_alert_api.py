@@ -1,4 +1,4 @@
-from temporal_model.monitor.import_platform import import_platform
+from temporal_model.monitor.import_alert_api import import_alert_api
 from temporal_model.monitor.store import read_meta, sequence_exists
 
 SEQ = {
@@ -53,14 +53,14 @@ def fake_download(url: str) -> bytes:
 
 def test_import_writes_store(tmp_path):
     client = FakeClient()
-    stats = import_platform(
+    stats = import_alert_api(
         client, tmp_path, "2026-05-15", "2026-05-16", download=fake_download
     )
     assert stats == {"imported": 1, "skipped": 0}
     assert sequence_exists(tmp_path, 42307)
     seq_dir = tmp_path / "sis-67" / "donon-sarrebourg-01" / "seq_42307"
     meta = read_meta(seq_dir)
-    assert meta.key == "platform_42307"
+    assert meta.key == "alert-api_42307"
     assert meta.label == "smoke"
     assert meta.temporal_api_version == "0.3.1"
     assert [f.bucket_key for f in meta.frames] == [
@@ -76,10 +76,10 @@ def test_import_writes_store(tmp_path):
 
 def test_import_is_incremental(tmp_path):
     client = FakeClient()
-    import_platform(
+    import_alert_api(
         client, tmp_path, "2026-05-15", "2026-05-16", download=fake_download
     )
-    stats = import_platform(
+    stats = import_alert_api(
         client, tmp_path, "2026-05-15", "2026-05-16", download=fake_download
     )
     assert stats == {"imported": 0, "skipped": 1}
@@ -88,10 +88,10 @@ def test_import_is_incremental(tmp_path):
 
 def test_import_force_redownloads(tmp_path):
     client = FakeClient()
-    import_platform(
+    import_alert_api(
         client, tmp_path, "2026-05-15", "2026-05-16", download=fake_download
     )
-    stats = import_platform(
+    stats = import_alert_api(
         client,
         tmp_path,
         "2026-05-15",
@@ -108,7 +108,7 @@ def test_import_handles_missing_org_names(tmp_path):
         def list_organizations(self):
             raise PermissionError("403")
 
-    import_platform(
+    import_alert_api(
         NoOrgClient(), tmp_path, "2026-05-15", "2026-05-16", download=fake_download
     )
     assert (tmp_path / "org-11").is_dir()  # falls back to org-<id>
@@ -120,7 +120,7 @@ def test_import_creates_store_dir_even_when_empty(tmp_path):
             return []
 
     store = tmp_path / "store"
-    stats = import_platform(
+    stats = import_alert_api(
         EmptyClient(), store, "2026-01-01", "2026-01-01", download=fake_download
     )
     assert stats == {"imported": 0, "skipped": 0}

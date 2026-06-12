@@ -32,9 +32,9 @@ class FrameMeta(BaseModel):
 
 
 class SequenceMeta(BaseModel):
-    key: str  # "platform_<sequence_id>" — the viewer join key
+    key: str  # "alert-api_<sequence_id>" — the viewer join key
     sequence_id: int
-    source: str = "platform"
+    source: str = "alert-api"
     label: str  # "smoke" | "fp" | "unknown"
     label_detail: str | None = None
     camera_id: int | None = None

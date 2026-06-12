@@ -13,7 +13,7 @@ from temporal_model.monitor.store import (
 
 def make_meta(sequence_id: int = 42307) -> SequenceMeta:
     return SequenceMeta(
-        key=f"platform_{sequence_id}",
+        key=f"alert-api_{sequence_id}",
         sequence_id=sequence_id,
         label="smoke",
         label_detail="wildfire_smoke",

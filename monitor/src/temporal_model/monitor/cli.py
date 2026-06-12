@@ -48,13 +48,13 @@ def main(argv: list[str] | None = None) -> None:
             AlertApiClient,
             AlertApiConfig,
         )
-        from temporal_model.monitor.import_platform import (  # noqa: PLC0415
-            import_platform,
+        from temporal_model.monitor.import_alert_api import (  # noqa: PLC0415
+            import_alert_api,
         )
 
         client = AlertApiClient(AlertApiConfig.from_env())
         client.login()
-        import_platform(
+        import_alert_api(
             client, args.store, args.date_from, args.date_to, force=args.force
         )
     elif args.command == "replay":

@@ -52,7 +52,7 @@ def store_sequence(
     with_images: bool = True,
 ) -> SequenceMeta:
     meta = SequenceMeta(
-        key=f"platform_{sequence_id}",
+        key=f"alert-api_{sequence_id}",
         sequence_id=sequence_id,
         label="smoke",
         label_detail="wildfire_smoke",
@@ -144,7 +144,7 @@ def test_happy_path_writes_org_tree(tmp_path):
     assert len(stack.uploaded[0]) == 4
     view = json.loads(
         (
-            out / "sis-67" / "vit_dinov2_finetune" / "sequences" / "platform_1.json"
+            out / "sis-67" / "vit_dinov2_finetune" / "sequences" / "alert-api_1.json"
         ).read_text()
     )
     # viewer frames = the kept (replayed) frames, relative to monitor/
@@ -177,10 +177,10 @@ def test_drop_reasons(tmp_path):
     )
     reasons = {d["sequence_id"]: d["reason"] for d in dropped}
     assert reasons == {
-        "platform_1": "no_temporal_version",
-        "platform_2": "too_few_frames",
-        "platform_3": "no_images",
-        "platform_4": "model_version_mismatch",
+        "alert-api_1": "no_temporal_version",
+        "alert-api_2": "too_few_frames",
+        "alert-api_3": "no_images",
+        "alert-api_4": "model_version_mismatch",
     }
 
 

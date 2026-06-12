@@ -55,7 +55,7 @@ def _org_names(client) -> dict[int, str]:
         return {}
 
 
-def import_platform(
+def import_alert_api(
     client,
     store_dir: Path,
     day_from: str,
@@ -94,7 +94,7 @@ def _import_one(
     org_id = camera.get("organization_id")
     label, label_detail = label_from_is_wildfire(seq.get("is_wildfire"))
     meta = SequenceMeta(
-        key=f"platform_{seq['id']}",
+        key=f"alert-api_{seq['id']}",
         sequence_id=seq["id"],
         label=label,
         label_detail=label_detail,
