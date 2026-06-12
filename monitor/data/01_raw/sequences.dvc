@@ -1,6 +1,6 @@
 outs:
-- md5: 13a147c6db769c5869e415dba053430e.dir
-  size: 11541267
-  nfiles: 91
+- md5: 2a122491abe869eeba50d1a887780691.dir
+  size: 22700237
+  nfiles: 185
   hash: md5
   path: sequences
