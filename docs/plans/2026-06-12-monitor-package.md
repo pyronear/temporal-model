@@ -2517,8 +2517,8 @@ Docker must be running; each version group costs one image pull.
   `compute_trigger` (older images ignore the flag → “no trigger” in the
   viewer).
 - `sequences/<key>.json`, `model_config.json`, `dropped.json` (skip reasons:
-  `no_temporal_version`, `image_pull_failed`, `model_version_mismatch`,
-  `too_few_frames`, `no_images`, `predict_failed`).
+  `no_temporal_version`, `image_pull_failed`, `stack_unhealthy`,
+  `model_version_mismatch`, `too_few_frames`, `no_images`, `predict_failed`).
 
 A `replay_matches: false` row means the reconstruction diverged from the
 recorded score — usually detections that arrived after the last production

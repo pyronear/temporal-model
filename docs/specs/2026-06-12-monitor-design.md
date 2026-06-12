@@ -254,7 +254,7 @@ rendered; eval flows are untouched).
 ## Error handling
 
 - Every skipped sequence lands in `dropped.json` with a machine-readable
-  reason: `no_temporal_version`, `image_pull_failed`,
+  reason: `no_temporal_version`, `image_pull_failed`, `stack_unhealthy`,
   `model_version_mismatch`, `too_few_frames`, `no_images`.
 - Import is resumable: a partially-downloaded sequence (images missing vs
   meta) is re-fetched on the next run.
