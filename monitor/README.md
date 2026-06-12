@@ -9,15 +9,26 @@ writes the eval-viewer contract so tubes/boxes/crops are explorable in
 
 Design: [`docs/specs/2026-06-12-monitor-design.md`](../docs/specs/2026-06-12-monitor-design.md)
 
-## Setup
+## Just browsing? Pull the shared data (no credentials, no Docker)
+
+The store and the replay artifacts are pushed to the DVC remote, so viewing
+what production decided requires neither alert-api credentials nor Docker:
 
 ```bash
-make install                 # uv sync
-cp .envrc.example .envrc     # fill in alert-api credentials (direnv loads it)
-dvc pull                     # optional: fetch the shared store + reports
+make install                                       # uv sync (brings dvc[s3])
+uv run dvc pull                                    # fetch store + reports from S3
+cd ../viewer && DATA_ROOT=../monitor npm run dev   # browse at localhost:3000
 ```
 
-## Workflow
+Everything below is only for IMPORTING new sequences and RE-RUNNING the
+model — the producer workflow.
+
+## Importing new data (alert-api credentials required)
+
+```bash
+make install
+cp .envrc.example .envrc     # fill in alert-api credentials (direnv loads it)
+```
 
 ```bash
 make import                                  # 1. fetch new sequences (incremental),
@@ -34,9 +45,12 @@ source, distinguishable via the organization column/filter in the viewer.
 for the CI camera org); pass it multiple times to exclude several. Exclusion affects future imports
 only — already-imported directories must be removed manually.
 
+## Replaying (Docker required)
+
 ```bash
 uv run dvc repro                             # 2. replay through pinned releases
-uv run dvc push                              # 3. share the artifacts
+uv run dvc push                              # 3. share store + artifacts so
+                                             #    teammates can just `dvc pull`
 cd ../viewer && DATA_ROOT=../monitor npm run dev   # 4. browse at localhost:3000
 ```
 
