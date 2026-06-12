@@ -92,29 +92,6 @@ export function MonitorCards({ rows }: { rows: ResultRow[] }) {
         </div>
       </div>
 
-      <details className="rounded-xl border border-slate-200 bg-white p-2.5">
-        <summary className="cursor-pointer text-[9px] font-medium uppercase tracking-tight text-slate-500">
-          How this view works
-        </summary>
-        <div className="mt-1.5 flex flex-col gap-1.5 text-[11px] leading-snug text-slate-600">
-          <p>
-            In production, alert-api asks the temporal model to validate each
-            detection sequence, but it only stores the resulting probability —
-            not the <em>why</em>.
-          </p>
-          <p>
-            This view re-runs every sequence locally through the exact api+model
-            release that scored it, with verbose output, to extract the tubes,
-            boxes and crops shown on the right.
-          </p>
-          <p>
-            Verdicts and probabilities in the table are production&apos;s own;
-            the re-run is only the microscope (its diagnostics live in the
-            detail pane).
-          </p>
-        </div>
-      </details>
-
       {orgs.length > 0 && (
         <div className="flex flex-col gap-0.5 rounded-xl border border-slate-200 bg-white p-2.5">
           <div className="mb-1 text-[9px] font-medium uppercase tracking-tight text-slate-500">
@@ -140,6 +117,32 @@ export function MonitorCards({ rows }: { rows: ResultRow[] }) {
           })}
         </div>
       )}
+
+      <details
+        open
+        className="rounded-xl border border-slate-200 bg-white p-2.5"
+      >
+        <summary className="cursor-pointer text-[9px] font-medium uppercase tracking-tight text-slate-500">
+          How this view works
+        </summary>
+        <div className="mt-1.5 flex flex-col gap-1.5 text-[11px] leading-snug text-slate-600">
+          <p>
+            In production, alert-api asks the temporal model to validate each
+            detection sequence, but it only stores the resulting probability —
+            not the <em>why</em>.
+          </p>
+          <p>
+            This view re-runs every sequence locally through the exact api+model
+            release that scored it, with verbose output, to extract the tubes,
+            boxes and crops shown on the right.
+          </p>
+          <p>
+            Verdicts and probabilities in the table are production&apos;s own;
+            the re-run is only the microscope (its diagnostics live in the
+            detail pane).
+          </p>
+        </div>
+      </details>
     </div>
   );
 }
