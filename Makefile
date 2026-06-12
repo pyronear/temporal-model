@@ -16,20 +16,20 @@ help: ## Show this help
 	    | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
 install: ## uv sync every package
-	@for pkg in $(PACKAGES); do echo "==> $$pkg"; $(MAKE) -C $$pkg install; done
+	@fail=0; for pkg in $(PACKAGES); do echo "==> $$pkg"; $(MAKE) -C $$pkg install || fail=1; done; exit $$fail
 
 lint: ## ruff check every package + docs scripts
-	@for pkg in $(PACKAGES); do echo "==> $$pkg"; $(MAKE) -C $$pkg lint; done
+	@fail=0; for pkg in $(PACKAGES); do echo "==> $$pkg"; $(MAKE) -C $$pkg lint || fail=1; done; exit $$fail
 	@echo "==> docs/assets/scripts"
 	uv run --project core ruff check docs/assets/scripts
 
 format: ## ruff format every package + docs scripts
-	@for pkg in $(PACKAGES); do echo "==> $$pkg"; $(MAKE) -C $$pkg format; done
+	@fail=0; for pkg in $(PACKAGES); do echo "==> $$pkg"; $(MAKE) -C $$pkg format || fail=1; done; exit $$fail
 	@echo "==> docs/assets/scripts"
 	uv run --project core ruff format docs/assets/scripts
 
 test: ## pytest every package
-	@for pkg in $(PACKAGES); do echo "==> $$pkg"; $(MAKE) -C $$pkg test; done
+	@fail=0; for pkg in $(PACKAGES); do echo "==> $$pkg"; $(MAKE) -C $$pkg test || fail=1; done; exit $$fail
 
 fetch-model: ## download the released model.zip from HuggingFace (no creds)
 	cd api && uv run python -m temporal_model.api.release \
