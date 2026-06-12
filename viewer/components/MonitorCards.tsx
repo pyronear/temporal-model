@@ -114,6 +114,7 @@ export function MonitorCards({
               <button
                 key={org}
                 disabled={!clickable}
+                aria-pressed={active}
                 onClick={() =>
                   // clicking the active org clears the filter back to "all"
                   onSelectOrganization?.(active ? "all" : org)
