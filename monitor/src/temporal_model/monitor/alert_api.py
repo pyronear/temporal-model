@@ -15,7 +15,7 @@ from typing import Any
 
 import requests
 
-PAGE_SIZE = 100  # server-side cap (alert-api Query(..., le=100))
+PAGE_SIZE = 100  # detections endpoint enforces le=100; elsewhere just our batch size
 TIMEOUT_S = 60
 
 
@@ -79,7 +79,10 @@ class AlertApiClient:
             offset += PAGE_SIZE
 
     def list_sequences_for_date(self, day: str) -> list[dict]:
-        """All sequences started on ``day`` (YYYY-MM-DD)."""
+        """All sequences started on ``day`` (YYYY-MM-DD).
+
+        The server scopes results to the authenticated account's organization.
+        """
         return self._get_paginated("/api/v1/sequences/all/fromdate", {"from_date": day})
 
     def list_sequence_detections(self, sequence_id: int) -> list[dict]:

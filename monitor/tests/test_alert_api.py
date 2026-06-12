@@ -75,6 +75,13 @@ def test_list_sequence_detections_paginates_ascending():
     assert gets[1][2]["offset"] == 100
 
 
+def test_pagination_stops_on_empty_page():
+    page1 = [{"id": i} for i in range(100)]
+    client, _ = make_client([{"access_token": "t"}, page1, []])
+    client.login()
+    assert len(client.list_sequence_detections(42)) == 100
+
+
 def test_requests_require_login():
     client, _ = make_client([])
     with pytest.raises(RuntimeError, match="login"):
