@@ -28,3 +28,6 @@ api/models/
 
 # brainstorming visual companion
 .superpowers/
+
+# direnv credentials (per-package .envrc.example documents the variables)
+.envrc

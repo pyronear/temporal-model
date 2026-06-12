@@ -1,0 +1,6 @@
+outs:
+- md5: 8b9d7b77dd2a2dacd4f67fe623c7f323.dir
+  size: 448152089
+  nfiles: 3214
+  hash: md5
+  path: sequences

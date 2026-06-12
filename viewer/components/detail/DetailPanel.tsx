@@ -149,22 +149,57 @@ export function DetailPanel({
           color={row.decision === "keep" ? "#059669" : "#475569"}
           hint="the model's keep / discard decision for this sequence"
         />
-        <Stat
-          label="correctness"
-          value={correctnessLabel(row.outcome)}
-          color={outcomeTokens[row.outcome].text}
-          hint="the verdict vs. the ground-truth label"
-        />
-        <Stat
-          label="trigger frame"
-          value={trig == null ? "—" : String(trig)}
-          hint="first frame the model fired (— if discarded)"
-        />
+        {row.replayed_probability === undefined && (
+          <Stat
+            label="correctness"
+            value={correctnessLabel(row.outcome)}
+            color={outcomeTokens[row.outcome].text}
+            hint="the verdict vs. the ground-truth label"
+          />
+        )}
+        {(row.replayed_probability === undefined || trig != null) && (
+          <Stat
+            label="trigger frame"
+            value={trig == null ? "—" : String(trig)}
+            hint="first frame the model fired (— if discarded)"
+          />
+        )}
         <Stat
           label="probability"
           value={row.probability == null ? "—" : row.probability.toFixed(3)}
           hint="max calibrated tube probability driving the decision"
         />
+        {row.replayed_probability !== undefined && (
+          <>
+            <Stat
+              label="replay prob"
+              value={
+                row.replayed_probability == null
+                  ? "—"
+                  : row.replayed_probability.toFixed(3)
+              }
+              hint="probability from the local re-run (diagnostic)"
+            />
+            <Stat
+              label="replay"
+              value={
+                row.replay_matches == null
+                  ? "—"
+                  : row.replay_matches
+                    ? "matches"
+                    : "MISMATCH"
+              }
+              hint={`api ${row.temporal_api_version ?? "?"} · model ${row.temporal_model_version ?? "?"}`}
+            />
+            {row.matched_window_frames != null && (
+              <Stat
+                label="scored window"
+                value={`first ${row.matched_window_frames} frames`}
+                hint="production scored this window; the sequence kept growing afterwards"
+              />
+            )}
+          </>
+        )}
       </div>
       {n > 0 && (
         <div className="grid grid-cols-[2fr_1fr] gap-3">

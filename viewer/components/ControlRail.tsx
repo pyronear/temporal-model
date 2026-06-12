@@ -1,4 +1,5 @@
 import { ModelConfigPanel } from "@/components/ModelConfigPanel";
+import { MonitorCards } from "@/components/MonitorCards";
 import { PerfCards } from "@/components/PerfCards";
 import { SourceSelect } from "@/components/SourceSelect";
 import { ThresholdSlider } from "@/components/ThresholdSlider";
@@ -15,15 +16,29 @@ export function ControlRail(props: {
   defaultThreshold: number;
   onThreshold: (v: number) => void;
   onReset: () => void;
+  monitorMode?: boolean;
+  selectedOrganization?: string;
+  onSelectOrganization?: (org: string) => void;
 }) {
   return (
     <aside className="flex h-full w-72 shrink-0 flex-col gap-4 overflow-auto border-r border-slate-200 bg-slate-50 p-4">
-      <SourceSelect
-        sources={props.sources}
-        value={props.source}
-        onChange={props.onSource}
-      />
-      <PerfCards rows={props.rows} />
+      {/* A single source (the monitor's alert-api tree) needs no picker. */}
+      {props.sources.length > 1 && (
+        <SourceSelect
+          sources={props.sources}
+          value={props.source}
+          onChange={props.onSource}
+        />
+      )}
+      {props.monitorMode ? (
+        <MonitorCards
+          rows={props.rows}
+          selectedOrganization={props.selectedOrganization}
+          onSelectOrganization={props.onSelectOrganization}
+        />
+      ) : (
+        <PerfCards rows={props.rows} />
+      )}
       {props.showSlider && (
         <ThresholdSlider
           value={props.threshold}

@@ -1,0 +1,44 @@
+# Replay stack: the pinned release image (model.zip baked in) + throwaway MinIO.
+# Image tag comes from MONITOR_API_IMAGE (set by `temporal-monitor replay` per
+# api-version group). Ports are offset from api/docker-compose.yml so both
+# stacks can run side by side.
+services:
+  api:
+    image: ${MONITOR_API_IMAGE:?set by temporal-monitor replay}
+    ports:
+      - "18000:8000"
+    environment:
+      - TEMPORAL_API_S3_BUCKET=frames
+      - TEMPORAL_API_S3_ENDPOINT_URL=http://minio:9000
+      - TEMPORAL_API_S3_REGION=us-east-1
+      # local replay only — never reused for shared environments
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
+    depends_on:
+      minio:
+        condition: service_started
+      createbuckets:
+        condition: service_completed_successfully
+
+  minio:
+    image: minio/minio:latest
+    command: server /data
+    ports:
+      - "19000:9000"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+
+  # One-shot: wait for MinIO, then create the bucket the API reads from.
+  createbuckets:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 minioadmin minioadmin; do
+        echo 'waiting for minio...'; sleep 1;
+      done;
+      mc mb --ignore-existing local/frames;
+      echo 'bucket frames ready';
+      "

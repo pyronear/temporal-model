@@ -17,17 +17,22 @@ function Select<T extends string>({
   return (
     <label className="flex items-center gap-1.5 text-xs text-slate-500">
       {label}
-      <select
-        className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800"
-        value={value}
-        onChange={(e) => onChange(e.target.value as T)}
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+      <span className="relative">
+        <select
+          className="cursor-pointer appearance-none rounded-lg border border-slate-200 bg-white py-1 pl-2.5 pr-7 text-sm text-slate-800 shadow-sm transition-colors hover:border-slate-300 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+          value={value}
+          onChange={(e) => onChange(e.target.value as T)}
+        >
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] text-slate-400">
+          ▾
+        </span>
+      </span>
     </label>
   );
 }
@@ -35,15 +40,19 @@ function Select<T extends string>({
 export function FilterBar({
   filters,
   cameras,
+  organizations = [],
   onChange,
   shownCount,
   totalCount,
+  monitorMode = false,
 }: {
   filters: Filters;
   cameras: string[];
+  organizations?: string[];
   onChange: (f: Filters) => void;
   shownCount: number;
   totalCount: number;
+  monitorMode?: boolean;
 }) {
   const toggleOutcome = (o: Outcome) => {
     const on = filters.outcomes.includes(o);
@@ -59,41 +68,58 @@ export function FilterBar({
         {shownCount}/{totalCount} sequences
       </span>
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        {ALL_OUTCOMES.map((o) => {
-          const on = filters.outcomes.includes(o);
-          const t = outcomeTokens[o];
-          return (
-            <button
-              key={o}
-              onClick={() => toggleOutcome(o)}
-              aria-pressed={on}
-              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs ${
-                on ? "border-slate-300" : "border-slate-200 opacity-40"
-              }`}
-              style={on ? { background: t.bg, color: t.text } : undefined}
-            >
-              <span
-                className="inline-block h-2 w-2 rounded-full"
-                style={{ background: t.dot }}
-              />
-              {correctnessLabel(o)}
-            </button>
-          );
-        })}
-      </div>
+      {!monitorMode && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {ALL_OUTCOMES.map((o) => {
+            const on = filters.outcomes.includes(o);
+            const t = outcomeTokens[o];
+            return (
+              <button
+                key={o}
+                onClick={() => toggleOutcome(o)}
+                aria-pressed={on}
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs ${
+                  on ? "border-slate-300" : "border-slate-200 opacity-40"
+                }`}
+                style={on ? { background: t.bg, color: t.text } : undefined}
+              >
+                <span
+                  className="inline-block h-2 w-2 rounded-full"
+                  style={{ background: t.dot }}
+                />
+                {correctnessLabel(o)}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
-      <Select<"all" | Label>
-        label="GT"
-        value={filters.label}
-        onChange={(v) => onChange({ ...filters, label: v })}
-        options={[
-          { value: "all", label: "all" },
-          { value: "smoke", label: "smoke" },
-          { value: "fp", label: "fp" },
-          { value: "unknown", label: "unknown" },
-        ]}
-      />
+      {!monitorMode && (
+        <Select<"all" | Label>
+          label="GT"
+          value={filters.label}
+          onChange={(v) => onChange({ ...filters, label: v })}
+          options={[
+            { value: "all", label: "all" },
+            { value: "smoke", label: "smoke" },
+            { value: "fp", label: "fp" },
+            { value: "unknown", label: "unknown" },
+          ]}
+        />
+      )}
+      {monitorMode && organizations.length > 0 && (
+        <Select<string>
+          label="organization"
+          value={filters.organization}
+          onChange={(v) =>
+            onChange({ ...filters, organization: v, camera: "all" })
+          }
+          options={[
+            { value: "all", label: "all" },
+            ...organizations.map((o) => ({ value: o, label: o })),
+          ]}
+        />
+      )}
       <Select<"all" | Decision>
         label="verdict"
         value={filters.verdict}

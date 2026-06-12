@@ -6,7 +6,9 @@ export type SortCol =
   | "decision"
   | "outcome"
   | "probability"
-  | "tubes";
+  | "tubes"
+  | "organization"
+  | "started";
 export interface Sort {
   col: SortCol;
   dir: "asc" | "desc";
@@ -22,6 +24,11 @@ const str = (r: ResultRow, col: SortCol): string => {
       return r.decision;
     case "outcome":
       return r.outcome;
+    case "organization":
+      return r.organization_name ?? "";
+    case "started":
+      // ISO 8601 strings sort chronologically as plain strings
+      return r.started_at ?? "";
     default:
       return "";
   }

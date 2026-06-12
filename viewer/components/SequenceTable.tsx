@@ -13,7 +13,7 @@ interface Column {
   cellStyle?: (r: ResultRow) => React.CSSProperties;
 }
 
-const COLUMNS: Column[] = [
+const EVAL_COLUMNS: Column[] = [
   { header: "camera", sortCol: "camera", render: (r) => r.camera_name ?? "—" },
   { header: "ground truth", sortCol: "label", render: (r) => r.label },
   { header: "verdict", sortCol: "decision", render: (r) => r.decision },
@@ -35,21 +35,42 @@ const COLUMNS: Column[] = [
   { header: "prob", sortCol: "probability", render: (r) => num(r.probability) },
 ];
 
+const MONITOR_COLUMNS: Column[] = [
+  {
+    header: "started",
+    sortCol: "started",
+    render: (r) =>
+      r.started_at ? r.started_at.slice(0, 16).replace("T", " ") : "—",
+  },
+  {
+    header: "organization",
+    sortCol: "organization",
+    render: (r) => r.organization_name ?? "—",
+  },
+  { header: "camera", sortCol: "camera", render: (r) => r.camera_name ?? "—" },
+  { header: "verdict", sortCol: "decision", render: (r) => r.decision },
+  { header: "tubes", sortCol: "tubes", render: (r) => r.num_tubes_kept },
+  { header: "prob", sortCol: "probability", render: (r) => num(r.probability) },
+];
+
 export function SequenceTable({
   rows,
   selectedKey,
   onSelect,
   sort = null,
   onSort,
+  monitorMode = false,
 }: {
   rows: ResultRow[];
   selectedKey: string | null;
   onSelect: (key: string) => void;
   sort?: Sort | null;
   onSort?: (col: SortCol) => void;
+  monitorMode?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const order = useMemo(() => rows.map((r) => r.key), [rows]);
+  const columns = monitorMode ? MONITOR_COLUMNS : EVAL_COLUMNS;
 
   function move(delta: number) {
     if (!order.length) return;
@@ -79,7 +100,7 @@ export function SequenceTable({
       <table className="w-full border-collapse text-sm">
         <thead className="sticky top-0 bg-white text-left text-xs uppercase tracking-wide text-slate-500">
           <tr>
-            {COLUMNS.map((c) => (
+            {columns.map((c) => (
               <th
                 key={c.header}
                 onClick={() => c.sortCol && onSort?.(c.sortCol)}
@@ -106,7 +127,7 @@ export function SequenceTable({
                 style={{ background: t.bg }}
                 className={`cursor-pointer ${sel ? "ring-2 ring-inset ring-slate-400" : ""}`}
               >
-                {COLUMNS.map((c) => (
+                {columns.map((c) => (
                   <td
                     key={c.header}
                     className="px-3 py-1.5 text-slate-700"
