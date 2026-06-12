@@ -2,7 +2,8 @@ schema: '2.0'
 stages:
   replay:
     cmd: uv run python -m temporal_model.monitor.cli replay --store 
-      data/01_raw/sequences --output-dir data/08_reporting
+      data/01_raw/sequences --output-dir data/08_reporting --trigger-image 
+      temporal-model-api:dev
     deps:
     - path: data/01_raw/sequences
       hash: md5
@@ -15,8 +16,8 @@ stages:
       size: 1403
     - path: src/temporal_model/monitor/cli.py
       hash: md5
-      md5: 8626ff96d62d5676b810bc9c551a1a15
-      size: 3880
+      md5: 1715ab3cbe191376fb8493d7928f7e63
+      size: 4196
     - path: src/temporal_model/monitor/geometry.py
       hash: md5
       md5: 7f811828367c67fd9115ad5e6b69956d
@@ -27,16 +28,16 @@ stages:
       size: 3351
     - path: src/temporal_model/monitor/replay.py
       hash: md5
-      md5: 013874136b20615da1725a3b1c7bbf8b
-      size: 10115
+      md5: 2083fb2cca3aa9c5e394f07c94a12b2e
+      size: 14827
     - path: src/temporal_model/monitor/report.py
       hash: md5
       md5: 90d529cf82cfabb977ec42a39e364335
       size: 6414
     - path: src/temporal_model/monitor/stack.py
       hash: md5
-      md5: 89d3fe2dd45700477bd337616cacf189
-      size: 2874
+      md5: a46cd818f3301d3470e8cd3e3f9f8864
+      size: 2955
     - path: src/temporal_model/monitor/store.py
       hash: md5
       md5: 8ebb0731d13c1b9903e80b3cfb08b546
@@ -44,6 +45,6 @@ stages:
     outs:
     - path: data/08_reporting
       hash: md5
-      md5: 861b7642275bbe79d66903184d67a7de.dir
-      size: 287940
+      md5: f2c06188bf8c711fa97cbd6db5d73a36.dir
+      size: 287544
       nfiles: 153
