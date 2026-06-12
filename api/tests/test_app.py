@@ -66,12 +66,14 @@ class FakeRunner:
         self._output = output
         self._error = error
         self.roi = None
+        self.paths = None
         self.compute_trigger = None
 
     async def predict(
         self, paths, *, roi=None, timer=None, profile=None, compute_trigger=False
     ):
         self.roi = roi
+        self.paths = paths
         self.compute_trigger = compute_trigger
         if self._error:
             raise self._error
@@ -461,3 +463,97 @@ def test_predict_invalid_roi_is_400(client):
     body = r.json()
     assert body["code"] == "invalid_request"
     assert "roi_xyxyn" in body["detail"]
+
+
+@pytest.fixture
+def local_client(monkeypatch, tmp_path):
+    # An edge-box style deployment: frame_source=local, frames on a shared
+    # volume (tmp_path), no S3 involved.
+    monkeypatch.setattr(settings, "frame_source", "local")
+    monkeypatch.setattr(settings, "frames_root", str(tmp_path))
+    for key in KEYS:
+        p = tmp_path / key
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(b"\xff\xd8\xff\xe0jpeg")
+    with TestClient(app) as c:
+        c.app.state.runner = FakeRunner(output=_smoke_output())
+        yield c
+
+
+def test_predict_local_default_source(local_client, tmp_path):
+    # `source` omitted follows settings.frame_source="local"; the runner gets
+    # the real files under the root, in request order — no copy.
+    r = local_client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 200
+    assert r.json()["is_smoke"] is True
+    runner = local_client.app.state.runner
+    assert runner.paths == [(tmp_path / k).resolve() for k in KEYS]
+
+
+def test_predict_local_explicit_source(local_client):
+    r = local_client.post("/predict", json={"frames": KEYS, "source": "local"})
+    assert r.status_code == 200
+
+
+def test_predict_local_rejects_bucket(local_client):
+    r = local_client.post("/predict", json={"frames": KEYS, "bucket": "some-bucket"})
+    assert r.status_code == 400
+    assert r.json()["code"] == "invalid_request"
+    assert "bucket" in r.json()["detail"]
+
+
+def test_predict_local_without_root_400(local_client, monkeypatch):
+    monkeypatch.setattr(settings, "frames_root", "")
+    r = local_client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 400
+    assert r.json()["code"] == "invalid_request"
+    assert "TEMPORAL_API_FRAMES_ROOT" in r.json()["detail"]
+
+
+def test_predict_local_no_root_400_takes_precedence_over_model(
+    local_client, monkeypatch
+):
+    # Mirrors test_predict_no_bucket_400_takes_precedence_over_model: the
+    # prerequisite check runs before the model-loaded check.
+    monkeypatch.setattr(settings, "frames_root", "")
+    local_client.app.state.runner = None
+    r = local_client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 400
+    assert r.json()["code"] == "invalid_request"
+
+
+def test_predict_local_missing_frame_404(local_client):
+    r = local_client.post("/predict", json={"frames": ["cam12/missing.jpg"]})
+    assert r.status_code == 404
+    assert r.json()["code"] == "frame_not_found"
+
+
+def test_predict_local_traversal_400(local_client):
+    r = local_client.post("/predict", json={"frames": ["../etc/passwd"]})
+    assert r.status_code == 400
+    assert r.json()["code"] == "invalid_request"
+
+
+def test_predict_explicit_s3_same_as_omitted(client):
+    # On an s3-default server, explicit source="s3" behaves identically to
+    # omitting it.
+    r = client.post("/predict", json={"frames": KEYS, "source": "s3"})
+    assert r.status_code == 200
+    assert r.json()["is_smoke"] is True
+
+
+def test_predict_source_local_on_s3_server_needs_root(client):
+    # The s3-mode `client` fixture has no frames_root configured: an explicit
+    # local request is a clear 400, not a confusing fallback.
+    r = client.post("/predict", json={"frames": KEYS, "source": "local"})
+    assert r.status_code == 400
+    assert "TEMPORAL_API_FRAMES_ROOT" in r.json()["detail"]
+
+
+def test_predict_local_profiling_stage(local_client, monkeypatch):
+    monkeypatch.setattr(settings, "profile", True)
+    r = local_client.post("/predict?verbose=true", json={"frames": KEYS})
+    assert r.status_code == 200
+    prof = r.json()["details"]["profiling"]
+    assert "local_resolve" in prof["stages_ms"]
+    assert "s3_fetch" not in prof["stages_ms"]

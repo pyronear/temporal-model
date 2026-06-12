@@ -23,6 +23,10 @@ _BUCKET_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
 
 class PredictRequest(BaseModel):
     frames: list[str]
+    # Where `frames` live: "s3" (keys in a bucket) or "local" (relative paths
+    # under the server's frames_root). None → the server's configured default
+    # (settings.frame_source).
+    source: Literal["s3", "local"] | None = None
     # Optional per-request S3 bucket. Falls back to settings.s3_bucket when
     # omitted (alert-api stacks use per-org dynamic bucket names that no single
     # setting can cover).
@@ -38,10 +42,12 @@ class PredictRequest(BaseModel):
     @classmethod
     def _validate_frames(cls, v: list[str]) -> list[str]:
         if not v:
-            raise ValueError("frames must contain at least one S3 key")
+            raise ValueError("frames must contain at least one entry")
         for key in v:
             if "://" in key:
-                raise ValueError(f"frame key must be a bare S3 key, not a URL: {key!r}")
+                raise ValueError(
+                    f"frame must be a bare key or relative path, not a URL: {key!r}"
+                )
         return v
 
     @field_validator("bucket")

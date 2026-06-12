@@ -262,6 +262,20 @@ def test_verbose_details_map_num_tubes_outside_roi():
     assert resp.details.preprocessing.num_tubes_outside_roi == 3
 
 
+def test_request_source_defaults_to_none():
+    assert PredictRequest(frames=["a.jpg"]).source is None
+
+
+@pytest.mark.parametrize("source", ["s3", "local"])
+def test_request_accepts_source(source):
+    assert PredictRequest(frames=["a.jpg"], source=source).source == source
+
+
+def test_request_rejects_unknown_source():
+    with pytest.raises(ValidationError):
+        PredictRequest(frames=["a.jpg"], source="ftp")
+
+
 def test_version_block_carries_nulls_independently():
     # Each identity is null on its own: api when not a release build, model
     # when the package is a legacy unstamped one.
