@@ -20,11 +20,14 @@ export function ControlRail(props: {
 }) {
   return (
     <aside className="flex h-full w-72 shrink-0 flex-col gap-4 overflow-auto border-r border-slate-200 bg-slate-50 p-4">
-      <SourceSelect
-        sources={props.sources}
-        value={props.source}
-        onChange={props.onSource}
-      />
+      {/* A single source (the monitor's alert-api tree) needs no picker. */}
+      {props.sources.length > 1 && (
+        <SourceSelect
+          sources={props.sources}
+          value={props.source}
+          onChange={props.onSource}
+        />
+      )}
       {props.monitorMode ? (
         <MonitorCards rows={props.rows} />
       ) : (
