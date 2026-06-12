@@ -44,8 +44,8 @@ will fail at the `COPY` step without it.)
 
 Configuration via env vars (prefix `TEMPORAL_API_`): `MODEL_PATH`, `DEVICE`,
 `CALIBRATOR_THRESHOLD`, `TOKEN`, `FRAME_SOURCE`, `FRAMES_ROOT`, `S3_BUCKET`,
-`S3_REGION`, `S3_ENDPOINT_URL` (empty = real AWS; set for OVH or MinIO),
-`HOST`, `PORT`. AWS/OVH/MinIO credentials come from the standard boto3 chain
+`S3_REGION`, `S3_ENDPOINT_URL` (empty = real AWS; set for OVH or MinIO).
+AWS/OVH/MinIO credentials come from the standard boto3 chain
 (env vars / IAM role). `S3_BUCKET` is an optional default; a request may
 override it per call with its `bucket` field (needed for alert-api stacks
 whose per-org bucket names are not known ahead of time). A request with

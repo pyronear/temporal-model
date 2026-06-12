@@ -12,7 +12,6 @@ def test_defaults():
     assert s.s3_bucket == ""
     assert s.s3_region is None
     assert s.s3_endpoint_url is None
-    assert s.port == 8000
 
 
 def test_env_override(monkeypatch):

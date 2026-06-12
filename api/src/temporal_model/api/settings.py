@@ -53,9 +53,6 @@ class Settings(BaseSettings):
     # probe arbitrary server paths.
     frames_root: str = ""
 
-    host: str = "0.0.0.0"
-    port: int = 8000
-
     @model_validator(mode="after")
     def _require_frames_root_for_local(self) -> "Settings":
         # A local-default server without a root would 400 on every request;
