@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [core, train, eval, api]
+        package: [core, train, eval, api, benchmark]
     defaults:
       run:
         working-directory: ${{ matrix.package }}
