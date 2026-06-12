@@ -1,4 +1,5 @@
 import pytest
+import requests
 
 import temporal_model.monitor.import_alert_api as _imp_mod
 from temporal_model.monitor.import_alert_api import import_alert_api, import_all_orgs
@@ -371,3 +372,17 @@ def test_scan_exclude_org_skips_one_org(tmp_path, monkeypatch):
     assert sequence_exists(tmp_path, 101)
     assert not sequence_exists(tmp_path, 99)
     assert not sequence_exists(tmp_path, 103)
+
+
+def test_failed_download_skips_sequence_and_continues(tmp_path):
+    def flaky_download(url: str) -> bytes:
+        if "frame-100" in url:
+            raise requests.ConnectionError("s3 timeout")
+        return b"jpg"
+
+    stats = import_alert_api(
+        FakeClient(), tmp_path, "2026-05-15", "2026-05-16", download=flaky_download
+    )
+    # the sequence is skipped (no meta.json), so the next run retries it
+    assert stats["imported"] == 0
+    assert not sequence_exists(tmp_path, 42307)

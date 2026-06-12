@@ -11,6 +11,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import shutil
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -32,10 +33,22 @@ from temporal_model.monitor.store import (
 logger = logging.getLogger(__name__)
 
 
+DOWNLOAD_ATTEMPTS = 3
+
+
 def _default_download(url: str) -> bytes:
-    resp = requests.get(url, timeout=120)
-    resp.raise_for_status()
-    return resp.content
+    """Fetch one frame; retries absorb transient S3/CDN hiccups."""
+    for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
+        try:
+            resp = requests.get(url, timeout=120)
+            resp.raise_for_status()
+            return resp.content
+        except requests.RequestException:
+            if attempt == DOWNLOAD_ATTEMPTS:
+                raise
+            logger.warning("frame download failed (attempt %d), retrying", attempt)
+            time.sleep(2**attempt)
+    raise AssertionError("unreachable")
 
 
 def _date_range(day_from: str, day_to: str) -> list[str]:
@@ -92,7 +105,13 @@ def import_alert_api(
             if not force and sequence_exists(store_dir, seq["id"]):
                 skipped += 1
                 continue
-            _import_one(client, store_dir, seq, cameras, org_names, download)
+            try:
+                _import_one(client, store_dir, seq, cameras, org_names, download)
+            except requests.RequestException:
+                logger.exception(
+                    "import failed for sequence %s; will retry next run", seq["id"]
+                )
+                continue
             imported += 1
     logger.info(
         "import done: %d imported, %d skipped, %d excluded", imported, skipped, excluded
@@ -219,7 +238,13 @@ def import_all_orgs(
         if not force and sequence_exists(store_dir, seq["id"]):
             skipped += 1
             continue
-        _import_one(client, store_dir, seq, cameras, org_names, download)
+        try:
+            _import_one(client, store_dir, seq, cameras, org_names, download)
+        except requests.RequestException:
+            logger.exception(
+                "import failed for sequence %s; will retry next run", seq["id"]
+            )
+            continue
         imported += 1
     logger.info(
         "scan import done: %d imported, %d skipped, %d excluded",
