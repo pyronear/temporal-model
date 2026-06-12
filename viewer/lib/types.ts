@@ -22,8 +22,10 @@ export interface ResultRow {
   camera_name: string | null;
   started_at: string | null;
   // Monitor-only provenance (absent in eval reporting trees).
-  recorded_probability?: number | null;
+  replayed_probability?: number | null;
+  replayed_decision?: Decision | null;
   replay_matches?: boolean | null;
+  matched_window_frames?: number | null;
   temporal_model_version?: string | null;
   temporal_api_version?: string | null;
 }

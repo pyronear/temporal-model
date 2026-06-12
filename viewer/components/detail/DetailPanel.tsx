@@ -165,16 +165,16 @@ export function DetailPanel({
           value={row.probability == null ? "—" : row.probability.toFixed(3)}
           hint="max calibrated tube probability driving the decision"
         />
-        {row.recorded_probability !== undefined && (
+        {row.replayed_probability !== undefined && (
           <>
             <Stat
-              label="prod prob"
+              label="replay prob"
               value={
-                row.recorded_probability == null
+                row.replayed_probability == null
                   ? "—"
-                  : row.recorded_probability.toFixed(3)
+                  : row.replayed_probability.toFixed(3)
               }
-              hint="probability recorded by production (alert-api)"
+              hint="probability from the local re-run (diagnostic)"
             />
             <Stat
               label="replay"
@@ -187,6 +187,13 @@ export function DetailPanel({
               }
               hint={`api ${row.temporal_api_version ?? "?"} · model ${row.temporal_model_version ?? "?"}`}
             />
+            {row.matched_window_frames != null && (
+              <Stat
+                label="scored window"
+                value={`first ${row.matched_window_frames} frames`}
+                hint="production scored this window; the sequence kept growing afterwards"
+              />
+            )}
           </>
         )}
       </div>

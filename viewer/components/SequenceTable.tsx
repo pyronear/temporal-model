@@ -35,23 +35,6 @@ const COLUMNS: Column[] = [
   { header: "prob", sortCol: "probability", render: (r) => num(r.probability) },
 ];
 
-const MONITOR_COLUMNS: Column[] = [
-  {
-    header: "prod prob",
-    sortCol: null,
-    render: (r) => num(r.recorded_probability ?? null),
-  },
-  {
-    header: "match",
-    sortCol: null,
-    render: (r) =>
-      r.replay_matches == null ? "—" : r.replay_matches ? "=" : "≠",
-    cellStyle: (r) => ({
-      color: r.replay_matches === false ? "#b91c1c" : undefined,
-    }),
-  },
-];
-
 export function SequenceTable({
   rows,
   selectedKey,
@@ -67,8 +50,7 @@ export function SequenceTable({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const order = useMemo(() => rows.map((r) => r.key), [rows]);
-  const hasProvenance = rows.some((r) => r.recorded_probability !== undefined);
-  const columns = hasProvenance ? [...COLUMNS, ...MONITOR_COLUMNS] : COLUMNS;
+  const columns = COLUMNS;
 
   function move(delta: number) {
     if (!order.length) return;

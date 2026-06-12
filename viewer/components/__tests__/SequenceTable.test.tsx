@@ -35,15 +35,17 @@ it("renders rows and fires onSelect on click", () => {
   expect(onSelect).toHaveBeenCalledWith("b");
 });
 
-it("shows provenance columns only for monitor rows", () => {
-  // eval rows: no prod prob column
+it("never shows prod prob column (match signal lives in detail pane)", () => {
+  // eval rows
   render(<SequenceTable rows={rows} selectedKey={null} onSelect={() => {}} />);
   expect(screen.queryByText("prod prob")).toBeNull();
   cleanup();
+  // monitor rows with provenance fields
   const monitorRow = {
     ...rows[0],
     key: "platform_1",
-    recorded_probability: 0.931,
+    replayed_probability: 0.931,
+    replayed_decision: "keep" as const,
     replay_matches: false,
   };
   render(
@@ -53,7 +55,5 @@ it("shows provenance columns only for monitor rows", () => {
       onSelect={() => {}}
     />,
   );
-  expect(screen.getByText("prod prob")).toBeTruthy();
-  expect(screen.getByText("0.931")).toBeTruthy();
-  expect(screen.getByText("≠")).toBeTruthy(); // mismatch marker
+  expect(screen.queryByText("prod prob")).toBeNull();
 });
