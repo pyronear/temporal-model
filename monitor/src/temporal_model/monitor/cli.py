@@ -24,6 +24,19 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     imp.add_argument(
         "--force", action="store_true", help="re-download already-stored sequences"
     )
+    imp.add_argument(
+        "--all-orgs",
+        action="store_true",
+        help="scan the global sequence-id space to import every organization "
+        "(admin token required); default imports only the account's own org",
+    )
+    imp.add_argument(
+        "--seed-id",
+        type=int,
+        default=None,
+        help="recent sequence id to seed the --all-orgs scan (only needed on "
+        "an empty store when the own-org listing is empty)",
+    )
 
     rep = sub.add_parser(
         "replay", help="re-run stored sequences through their pinned api release"
@@ -50,13 +63,24 @@ def main(argv: list[str] | None = None) -> None:
         )
         from temporal_model.monitor.import_alert_api import (  # noqa: PLC0415
             import_alert_api,
+            import_all_orgs,
         )
 
         client = AlertApiClient(AlertApiConfig.from_env())
         client.login()
-        import_alert_api(
-            client, args.store, args.date_from, args.date_to, force=args.force
-        )
+        if args.all_orgs:
+            import_all_orgs(
+                client,
+                args.store,
+                args.date_from,
+                args.date_to,
+                force=args.force,
+                seed_id=args.seed_id,
+            )
+        else:
+            import_alert_api(
+                client, args.store, args.date_from, args.date_to, force=args.force
+            )
     elif args.command == "replay":
         from temporal_model.monitor.replay import run_replay  # noqa: PLC0415
 

@@ -23,6 +23,14 @@ dvc pull                     # optional: fetch the shared store + reports
 make import                                  # 1. fetch new sequences (incremental),
                                              #    dvc add + push the store
 make import ARGS="--date-from 2026-06-01 --date-to 2026-06-10"  # backfill a range
+make import ARGS="--all-orgs"                # admin token: every organization (id-space scan)
+```
+
+The alert-api listing (`/sequences/all/fromdate`) is limited to the authenticated account's own
+organization; `--all-orgs` scans the global sequence-id space instead (admin token required), so
+every organization (sdis-07, sdis-77, ...) lands in its own viewer source.
+
+```bash
 uv run dvc repro                             # 2. replay through pinned releases
 uv run dvc push                              # 3. share the artifacts
 cd ../viewer && DATA_ROOT=../monitor npm run dev   # 4. browse at localhost:3000

@@ -1,14 +1,18 @@
 import pytest
+import requests
 
 from temporal_model.monitor.alert_api import AlertApiClient, AlertApiConfig
 
 
 class FakeResponse:
-    def __init__(self, payload):
+    def __init__(self, payload, status_code=200):
         self.payload = payload
+        self.status_code = status_code
 
     def raise_for_status(self):
-        pass
+        if self.status_code >= 400:
+            exc = requests.HTTPError(response=self)
+            raise exc
 
     def json(self):
         return self.payload
@@ -34,7 +38,9 @@ CONFIG = AlertApiConfig(url="https://api.test", login="user", password="pw")
 
 
 def make_client(responses):
-    session = FakeSession([FakeResponse(r) for r in responses])
+    # Each item is either a plain payload (200 OK) or a FakeResponse already built.
+    wrapped = [r if isinstance(r, FakeResponse) else FakeResponse(r) for r in responses]
+    session = FakeSession(wrapped)
     client = AlertApiClient(CONFIG, session=session)
     return client, session
 
@@ -98,3 +104,30 @@ def test_list_cameras_and_organizations():
     gets = [c for c in session.calls if c[0] == "GET"]
     assert gets[0][1].endswith("/api/v1/cameras/")
     assert gets[0][2] == {"include_non_trustable": True}
+
+
+def test_get_sequence_returns_payload_on_200():
+    payload = {"id": 99, "started_at": "2026-06-01T10:00:00"}
+    client, session = make_client([{"access_token": "t"}, payload])
+    client.login()
+    result = client.get_sequence(99)
+    assert result == payload
+    gets = [c for c in session.calls if c[0] == "GET"]
+    assert gets[0][1].endswith("/api/v1/sequences/99")
+
+
+def test_get_sequence_returns_none_on_404():
+    client, session = make_client(
+        [{"access_token": "t"}, FakeResponse(None, status_code=404)]
+    )
+    client.login()
+    assert client.get_sequence(999) is None
+
+
+def test_get_sequence_reraises_on_500():
+    client, session = make_client(
+        [{"access_token": "t"}, FakeResponse(None, status_code=500)]
+    )
+    client.login()
+    with pytest.raises(requests.HTTPError):
+        client.get_sequence(1)

@@ -98,3 +98,12 @@ class AlertApiClient:
 
     def list_organizations(self) -> list[dict]:
         return self._get("/api/v1/organizations/")
+
+    def get_sequence(self, sequence_id: int) -> dict | None:
+        """One sequence by id (admin: any org), or None when it doesn't exist."""
+        try:
+            return self._get(f"/api/v1/sequences/{sequence_id}")
+        except requests.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code == 404:
+                return None
+            raise

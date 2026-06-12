@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import shutil
 from collections.abc import Callable
 from pathlib import Path
 
@@ -19,6 +20,8 @@ from temporal_model.monitor.store import (
     IMAGES_DIR,
     FrameMeta,
     SequenceMeta,
+    find_sequence_dirs,
+    iter_metas,
     label_from_is_wildfire,
     sequence_dir,
     sequence_exists,
@@ -119,6 +122,10 @@ def _import_one(
         ],
     )
     seq_dir = sequence_dir(store_dir, meta)
+    # Remove stale dirs from a previous import under a different org/camera name.
+    for stale in find_sequence_dirs(store_dir, seq["id"]):
+        if stale != seq_dir:
+            shutil.rmtree(stale)
     images_dir = seq_dir / IMAGES_DIR
     images_dir.mkdir(parents=True, exist_ok=True)
     for det in dets:
@@ -126,3 +133,95 @@ def _import_one(
     # meta.json last: its presence marks the sequence complete, so a crashed
     # download is re-fetched (not skipped) on the next run.
     write_meta(seq_dir, meta)
+
+
+HEAD_GAP = 25  # consecutive missing IDs that mean "past the newest sequence"
+OLDER_STOP = 25  # consecutive too-old sequences that mean "past the date range"
+
+
+def import_all_orgs(
+    client,
+    store_dir: Path,
+    day_from: str,
+    day_to: str,
+    *,
+    force: bool = False,
+    seed_id: int | None = None,
+    download: Callable[[str], bytes] = _default_download,
+) -> dict[str, int]:
+    """Import sequences of EVERY organization by scanning the global ID space.
+
+    The listing endpoint is locked to the token's organization, but an admin
+    token can read any sequence by id and ids are a global autoincrement,
+    roughly monotone with started_at. Strategy: seed from the store's max id
+    (or the own-org listing, or --seed-id), probe upward until HEAD_GAP
+    consecutive 404s (the head), then walk downward importing sequences whose
+    started_at date falls within [day_from, day_to], stopping after
+    OLDER_STOP consecutive sequences older than day_from. 404 holes (deleted
+    sequences) are skipped in both directions.
+    """
+    store_dir.mkdir(parents=True, exist_ok=True)
+    seed = (
+        seed_id or _max_store_id(store_dir) or _max_listed_id(client, day_from, day_to)
+    )
+    if seed is None:
+        raise SystemExit(
+            "cannot seed the id scan: store is empty and the account's own-org "
+            "listing returned nothing — pass --seed-id <recent sequence id>"
+        )
+    head = _find_head(client, seed)
+    cameras = _camera_index(client)
+    org_names = _org_names(client)
+    imported = skipped = 0
+    misses = older = 0
+    sid = head
+    while sid > 0 and misses < HEAD_GAP and older < OLDER_STOP:
+        seq = client.get_sequence(sid)
+        sid -= 1
+        if seq is None:
+            misses += 1
+            continue
+        misses = 0
+        day = (seq.get("started_at") or "")[:10]
+        if day > day_to:
+            continue
+        if day < day_from:
+            older += 1
+            continue
+        older = 0
+        if not force and sequence_exists(store_dir, seq["id"]):
+            skipped += 1
+            continue
+        _import_one(client, store_dir, seq, cameras, org_names, download)
+        imported += 1
+    logger.info("scan import done: %d imported, %d skipped", imported, skipped)
+    return {"imported": imported, "skipped": skipped}
+
+
+def _max_store_id(store_dir: Path) -> int | None:
+    ids = [meta.sequence_id for _, meta in iter_metas(store_dir)]
+    return max(ids) if ids else None
+
+
+def _max_listed_id(client, day_from: str, day_to: str) -> int | None:
+    ids = [
+        s["id"]
+        for day in _date_range(day_from, day_to)
+        for s in client.list_sequences_for_date(day)
+    ]
+    return max(ids) if ids else None
+
+
+def _find_head(client, seed: int) -> int:
+    """Highest existing sequence id at or above ``seed``."""
+    head = seed
+    misses = 0
+    sid = seed + 1
+    while misses < HEAD_GAP:
+        if client.get_sequence(sid) is None:
+            misses += 1
+        else:
+            head = sid
+            misses = 0
+        sid += 1
+    return head

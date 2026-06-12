@@ -84,8 +84,15 @@ def read_meta(seq_dir: Path) -> SequenceMeta:
     return SequenceMeta.model_validate_json((seq_dir / META_NAME).read_text())
 
 
+def find_sequence_dirs(store_dir: Path, sequence_id: int) -> list[Path]:
+    """All store dirs holding this sequence (>1 only after an org/camera rename)."""
+    return sorted(
+        p.parent for p in store_dir.glob(f"*/*/seq_{sequence_id}/{META_NAME}")
+    )
+
+
 def sequence_exists(store_dir: Path, sequence_id: int) -> bool:
-    return any(store_dir.glob(f"*/*/seq_{sequence_id}/{META_NAME}"))
+    return bool(find_sequence_dirs(store_dir, sequence_id))
 
 
 def iter_metas(store_dir: Path) -> Iterator[tuple[Path, SequenceMeta]]:
