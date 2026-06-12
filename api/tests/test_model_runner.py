@@ -308,6 +308,17 @@ def test_predict_supplied_detections_threads_roi():
     assert model.roi_calls[-1] == (0.1, 0.2, 0.3, 0.4)
 
 
+def test_predict_supplied_detections_threads_compute_trigger():
+    model = _OrchestrationModel()
+    runner = ModelRunner(model, name="m", version="1", calibrated=True)
+    asyncio.run(
+        runner.predict(
+            ["c/x_00.jpg"], detections=[[_supplied_box()]], compute_trigger=True
+        )
+    )
+    assert model.trigger_calls[-1] is True
+
+
 def test_predict_supplied_matches_detector_path():
     # Supplying the exact box the detector would produce (xywhn 0.5/0.5/0.5/0.5
     # == xyxyn 0.25..0.75) hands the model identical FrameDetections.

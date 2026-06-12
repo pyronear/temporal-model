@@ -199,6 +199,7 @@ class ModelRunner:
                 frame_detections=_supplied_frame_detections(frames, detections),
                 roi=roi,
                 timer=timer,
+                compute_trigger=compute_trigger,
             )
             if profile is not None:
                 profile["n_frames"] = len(frames)
