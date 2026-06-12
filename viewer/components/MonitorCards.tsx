@@ -97,19 +97,24 @@ export function MonitorCards({ rows }: { rows: ResultRow[] }) {
           <div className="mb-1 text-[9px] font-medium uppercase tracking-tight text-slate-500">
             By organization
           </div>
-          {orgs.map(([org, counts]) => (
-            <div
-              key={org}
-              className="flex items-center justify-between text-[11px]"
-            >
-              <span className="truncate text-slate-700">{org}</span>
-              <span className="ml-2 shrink-0 tabular-nums">
-                <span style={{ color: "#047857" }}>{counts.kept}</span>
-                <span className="text-slate-300">/</span>
-                <span className="text-slate-400">{counts.discarded}</span>
-              </span>
-            </div>
-          ))}
+          {orgs.map(([org, counts]) => {
+            const total = counts.kept + counts.discarded;
+            const pct = total ? Math.round((counts.kept / total) * 100) : 0;
+            return (
+              <div
+                key={org}
+                className="flex items-center justify-between text-[11px]"
+              >
+                <span className="truncate text-slate-700">{org}</span>
+                <span className="ml-2 shrink-0 tabular-nums">
+                  <span style={{ color: "#047857" }}>{counts.kept}</span>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-slate-400">{counts.discarded}</span>
+                  <span className="ml-1 text-slate-400">({pct}%)</span>
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
