@@ -22,6 +22,25 @@ it("tokens exist for every outcome", () => {
   }
 });
 
-it("rowTokens falls back to verdict tint for n/a (GT unknown)", () => {
-  expect(rowTokens("n/a", "keep").bg).not.toBe(rowTokens("n/a", "discard").bg);
+it("rowTokens: n/a keep is green-tinted, n/a discard is gray", () => {
+  const keep = rowTokens("n/a", "keep");
+  const discard = rowTokens("n/a", "discard");
+  // keep → green family (matches kept-smoke bg)
+  expect(keep).toEqual({ bg: "#ecfdf5", dot: "#10b981", text: "#047857" });
+  // discard → muted gray
+  expect(discard).toEqual({ bg: "#f8fafc", dot: "#94a3b8", text: "#64748b" });
+  // they must be distinct
+  expect(keep.bg).not.toBe(discard.bg);
+  expect(keep.dot).not.toBe(discard.dot);
+});
+
+it("rowTokens: labeled outcomes are byte-identical to outcomeTokens", () => {
+  expect(rowTokens("kept-smoke", "keep")).toEqual(outcomeTokens["kept-smoke"]);
+  expect(rowTokens("discarded-fp", "discard")).toEqual(
+    outcomeTokens["discarded-fp"],
+  );
+  expect(rowTokens("kept-fp", "keep")).toEqual(outcomeTokens["kept-fp"]);
+  expect(rowTokens("discarded-smoke", "discard")).toEqual(
+    outcomeTokens["discarded-smoke"],
+  );
 });
