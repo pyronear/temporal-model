@@ -31,9 +31,9 @@ Five independent packages, each with its own `pyproject.toml` and `tests/`.
 
 ```bash
 make                # list all available targets (same as `make help`)
-make install        # uv sync across all four packages
-make test           # pytest across all four packages
-make lint           # ruff check across all four packages
+make install        # uv sync across all five packages
+make test           # pytest across all five packages
+make lint           # ruff check across all five packages + docs/assets/scripts
 ```
 
 Per package, `cd <pkg> && make install|lint|format|test`.
