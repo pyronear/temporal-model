@@ -157,11 +157,13 @@ export function DetailPanel({
             hint="the verdict vs. the ground-truth label"
           />
         )}
-        <Stat
-          label="trigger frame"
-          value={trig == null ? "—" : String(trig)}
-          hint="first frame the model fired (— if discarded)"
-        />
+        {(row.replayed_probability === undefined || trig != null) && (
+          <Stat
+            label="trigger frame"
+            value={trig == null ? "—" : String(trig)}
+            hint="first frame the model fired (— if discarded)"
+          />
+        )}
         <Stat
           label="probability"
           value={row.probability == null ? "—" : row.probability.toFixed(3)}
