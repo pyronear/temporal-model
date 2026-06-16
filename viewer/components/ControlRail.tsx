@@ -60,7 +60,11 @@ export function ControlRail(props: {
         />
       )}
       {props.triageMode && props.showSlider && (
-        <ThresholdSweep rows={props.rows} current={props.threshold} />
+        <ThresholdSweep
+          rows={props.rows}
+          current={props.threshold}
+          onSelect={props.onThreshold}
+        />
       )}
       <div className="mt-auto" />
       <ModelConfigPanel cfg={props.cfg} />

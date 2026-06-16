@@ -1,5 +1,5 @@
-import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { ThresholdSweep } from "@/components/ThresholdSweep";
 import type { ResultRow } from "@/lib/types";
 
@@ -39,6 +39,13 @@ describe("ThresholdSweep", () => {
     expect(row035).toHaveAttribute("aria-current", "true");
     const row070 = screen.getByText("0.70").closest("tr")!;
     expect(row070).not.toHaveAttribute("aria-current");
+  });
+
+  it("calls onSelect with the row's threshold when a row is clicked", () => {
+    const onSelect = vi.fn();
+    render(<ThresholdSweep rows={rows} current={0.35} onSelect={onSelect} />);
+    fireEvent.click(screen.getByText("0.50").closest("tr")!);
+    expect(onSelect).toHaveBeenCalledWith(0.5);
   });
 
   it("ignores null probabilities and renders without crashing when empty", () => {

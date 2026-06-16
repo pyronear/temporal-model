@@ -15,9 +15,11 @@ const THRESHOLDS = [
 export function ThresholdSweep({
   rows,
   current,
+  onSelect,
 }: {
   rows: ResultRow[];
   current: number;
+  onSelect?: (threshold: number) => void;
 }) {
   const total = rows.length;
   const counts = useMemo(() => {
@@ -56,8 +58,11 @@ export function ThresholdSweep({
             return (
               <tr
                 key={t}
-                className={active ? "bg-slate-100 font-medium" : ""}
+                onClick={() => onSelect?.(t)}
                 aria-current={active ? "true" : undefined}
+                className={`${
+                  onSelect ? "cursor-pointer hover:bg-slate-50" : ""
+                } ${active ? "bg-slate-100 font-medium" : ""}`}
               >
                 <td className="text-left text-slate-600">{t.toFixed(2)}</td>
                 <td className="text-right" style={{ color: "#047857" }}>
