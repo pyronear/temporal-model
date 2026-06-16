@@ -1,3 +1,5 @@
+import threading
+
 from temporal_model.triage.pull import pull_unannotated
 from temporal_model.triage.store import (
     SequenceMeta,
@@ -80,6 +82,38 @@ def test_pull_forwards_processing_stage(tmp_path):
     client = FakeClient([SEQ], DETS)
     pull_unannotated(client, tmp_path, download=lambda url: b"img")
     assert client.last_stage == "ready_to_annotate"
+
+
+def test_pull_parallel_downloads_every_frame(tmp_path):
+    dets = [
+        {"id": i, "recorded_at": f"2026-06-01T10:{i:02d}:00", "bucket_key": f"k/{i}"}
+        for i in range(12)
+    ]
+    seq = dict(SEQ, id=99)
+    client = FakeClient([seq], {99: dets})
+
+    seen = set()
+    lock = threading.Lock()
+
+    def dl(url):
+        with lock:
+            seen.add(url)
+        return b"img"
+
+    counts = pull_unannotated(client, tmp_path, workers=6, download=dl)
+    assert counts == {"pulled": 1, "skipped": 0}
+    seq_dir = sequence_dir(
+        tmp_path,
+        SequenceMeta(
+            key="pyro-annotator_99",
+            sequence_id=99,
+            camera_name="cam-a",
+            organization_name="sis-67",
+        ),
+    )
+    files = sorted(p.name for p in (seq_dir / "images").glob("*.jpg"))
+    assert len(files) == 12  # all frames written despite concurrency
+    assert len(seen) == 12  # each distinct signed URL fetched exactly once
 
 
 def test_limit_is_forwarded(tmp_path):

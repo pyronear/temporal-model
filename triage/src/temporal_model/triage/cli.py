@@ -9,7 +9,7 @@ from pathlib import Path
 
 from temporal_model.triage.annotator_api import AnnotatorApiClient, AnnotatorApiConfig
 from temporal_model.triage.model_config import read_model_config
-from temporal_model.triage.pull import pull_unannotated
+from temporal_model.triage.pull import DEFAULT_WORKERS, pull_unannotated
 from temporal_model.triage.report import write_triage_report
 from temporal_model.triage.score import score_sequences
 
@@ -40,6 +40,7 @@ def _cmd_pull(args: argparse.Namespace) -> None:
         processing_stage=args.stage,
         limit=args.limit,
         page_size=args.page_size,
+        workers=args.workers,
     )
     print(json.dumps(counts, indent=2))
 
@@ -84,6 +85,12 @@ def main(argv: list[str] | None = None) -> None:
     )
     p_pull.add_argument("--limit", type=int, default=None, help="cap sequences pulled")
     p_pull.add_argument("--page-size", type=int, default=100)
+    p_pull.add_argument(
+        "--workers",
+        type=int,
+        default=DEFAULT_WORKERS,
+        help=f"concurrent frame downloads per sequence (default: {DEFAULT_WORKERS})",
+    )
     p_pull.set_defaults(func=_cmd_pull)
 
     p_score = sub.add_parser("score", help="score the store + write report")

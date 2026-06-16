@@ -45,7 +45,15 @@ class AnnotatorApiClient:
         self, config: AnnotatorApiConfig, session: requests.Session | None = None
     ) -> None:
         self.config = config
-        self.session = session if session is not None else requests.Session()
+        if session is not None:
+            self.session = session
+        else:
+            self.session = requests.Session()
+            # Enlarge the pool so concurrent signed-URL fetches (the pull's
+            # ThreadPoolExecutor) don't exhaust urllib3's default 10 connections.
+            adapter = requests.adapters.HTTPAdapter(pool_connections=4, pool_maxsize=32)
+            self.session.mount("https://", adapter)
+            self.session.mount("http://", adapter)
         self.token: str | None = None
 
     def login(self) -> None:
