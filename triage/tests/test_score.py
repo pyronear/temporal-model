@@ -6,6 +6,12 @@ from temporal_model.triage.score import (
     score_sequences,
     sequence_score,
 )
+from temporal_model.triage.store import (
+    FrameRef,
+    SequenceMeta,
+    sequence_dir,
+    write_meta,
+)
 
 
 def _details(probs):
@@ -46,13 +52,6 @@ class _FakeModel:
 
 
 def test_score_sequences_classifies_and_carries_through(tmp_path):
-    from temporal_model.triage.store import (
-        FrameRef,
-        SequenceMeta,
-        sequence_dir,
-        write_meta,
-    )
-
     meta = SequenceMeta(
         key="pyro-annotator_1",
         sequence_id=1,
