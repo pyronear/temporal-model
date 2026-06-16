@@ -98,9 +98,7 @@ export function TriageCards({
             <div
               className="h-full rounded-full bg-slate-400"
               style={{
-                width: rows.length
-                  ? `${(unlabel / rows.length) * 100}%`
-                  : "0%",
+                width: rows.length ? `${(unlabel / rows.length) * 100}%` : "0%",
               }}
             />
           </div>
@@ -122,9 +120,7 @@ export function TriageCards({
                 key={org}
                 disabled={!clickable}
                 aria-pressed={active}
-                onClick={() =>
-                  onSelectOrganization?.(active ? "all" : org)
-                }
+                onClick={() => onSelectOrganization?.(active ? "all" : org)}
                 className={`-mx-2.5 flex items-center justify-between px-2.5 py-0.5 text-left text-[11px] ${
                   active ? "bg-slate-100" : ""
                 } ${clickable ? "cursor-pointer hover:bg-slate-50" : ""}`}
@@ -157,9 +153,9 @@ export function TriageCards({
           <p>
             <span style={{ color: "#047857" }}>To review</span> = score ≥
             threshold: worth a human&apos;s eyes.{" "}
-            <span className="text-slate-500">Unlabel</span>{" "}
-            = score &lt; threshold: almost certainly a false positive, queued to
-            be marked <em>unlabeled</em> in the annotator.
+            <span className="text-slate-500">Unlabel</span> = score &lt;
+            threshold: almost certainly a false positive, queued to be marked{" "}
+            <em>unlabeled</em> in the annotator.
           </p>
           <p>
             Verdicts are the model&apos;s; the per-tube boxes and crops on the
