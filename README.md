@@ -33,9 +33,9 @@ Seven independent packages, each with its own `pyproject.toml` and `tests/`.
 
 ```bash
 make                # list all available targets (same as `make help`)
-make install        # uv sync across all six packages
-make test           # pytest across all six packages
-make lint           # ruff check across all six packages + docs/assets/scripts
+make install        # uv sync across all seven packages
+make test           # pytest across all seven packages
+make lint           # ruff check across all seven packages + docs/assets/scripts
 ```
 
 Per package, `cd <pkg> && make install|lint|format|test`.
@@ -67,6 +67,20 @@ the pyro-annotator sequence store and writes a self-describing report under
 `benchmark/data/08_reporting/<host>-<timestamp>/`. Designed to run on different
 VMs for comparison — see `benchmark/README.md` and the `scripts/` provision /
 push / pull helpers.
+
+### Triage the annotation backlog
+
+```bash
+cd triage && make install                          # uv sync (brings dvc[s3])
+AWS_PROFILE=pyronear uv run dvc pull                # fetch the scored store + report
+cd ../viewer && DATA_ROOT=../triage npm run dev     # browse at localhost:3000
+```
+
+`triage/` pulls the pyro-annotator's unannotated backlog (read-only), scores it
+with the model, and splits it into **To Review** (worth a human's eyes) and
+**Unlabel** (auto false-positive) buckets, browsable in the viewer. The commands
+above are the *consumer* flow (no annotator credentials, no model, no Docker);
+producing new data needs credentials — see `triage/README.md`.
 
 ## Origin
 
