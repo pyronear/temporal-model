@@ -31,16 +31,22 @@ separate, deliberate human step.
 
 The scored set is pushed to the DVC S3 remote as **tar shards** (~36 objects,
 not ~290k loose files). Browsing needs only S3 read access (`AWS_PROFILE=pyronear`)
-— no annotator credentials, no `model.zip`, no Docker:
+— no annotator credentials, no `model.zip`, no GPU, no Docker.
+
+**Prerequisites:** this repo checked out on the branch holding `data/02_shards.dvc`
+(until merged), `uv` + Node 22 + `npm`, the `pyronear` AWS profile configured, and
+**~55 GB free disk** (26 GB DVC cache + 26 GB unpacked working tree). Then:
 
 ```bash
 cd triage
 make install                                   # uv sync (brings dvc[s3])
-AWS_PROFILE=pyronear uv run dvc pull            # fetch data/02_shards from S3
+AWS_PROFILE=pyronear uv run dvc pull            # fetch data/02_shards from S3 (~26 GB)
 uv run temporal-triage unpack                  # tars → loose store + report
 ( cd ../viewer && npm install )                # first time only
 make viewer                                    # browse at http://localhost:3000
 ```
+
+This exact sequence is verified end-to-end from a clean clone.
 
 `dvc pull` fetches `data/02_shards` (frame + report tars + manifests + the small
 aggregate files); `unpack` restores the loose `data/01_raw/sequences` (frames)
