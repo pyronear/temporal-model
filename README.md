@@ -13,7 +13,7 @@ through the full pipeline, with figures generated from real sequences.
 
 ## Packages
 
-Six independent packages, each with its own `pyproject.toml` and `tests/`.
+Seven independent packages, each with its own `pyproject.toml` and `tests/`.
 
 | Path | Import | Purpose |
 |------|--------|---------|
@@ -23,6 +23,7 @@ Six independent packages, each with its own `pyproject.toml` and `tests/`.
 | `api/`   | `temporal_model.api`   | FastAPI serving layer, shipped as a Docker service. Depends on `core`. |
 | `benchmark/` | `temporal_model.benchmark` | Latency/throughput/resource benchmark with a per-stage `predict()` breakdown, runnable across VMs. Depends on `core`. |
 | `monitor/` | `temporal_model.monitor` | Production decision replay: import scored sequences from alert-api, re-run them through the pinned api+model release, view tubes in the eval viewer. |
+| `triage/` | `temporal_model.triage` | Annotation-backlog triage: pull the pyro-annotator unannotated queue (read-only), score it, split into an unlabel worklist + a local-review viewer set. Depends on `core`. |
 
 `train`/`eval`/`api`/`benchmark` depend on `core` via a `uv` path source
 (`temporal-model-core = { path = "../core", editable = true }`). `core` and

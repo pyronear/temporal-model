@@ -1,4 +1,4 @@
-PACKAGES := core train eval api benchmark monitor
+PACKAGES := core train eval api benchmark monitor triage
 
 # Released model.zip version fetched from HuggingFace by `fetch-model`.
 # Pinned in api/MODEL_VERSION — the repo version and the model version are

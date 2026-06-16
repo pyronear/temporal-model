@@ -1,0 +1,7 @@
+# DVC stage parameters. `triage.threshold` splits the backlog: sequences scoring
+# >= it go to local review; the rest become the unlabel worklist.
+triage:
+  threshold: 0.35
+
+pull:
+  page_size: 100
