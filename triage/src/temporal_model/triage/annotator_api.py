@@ -71,12 +71,19 @@ class AnnotatorApiClient:
         return resp.json()
 
     def iter_unannotated_sequences(
-        self, *, page_size: int = PAGE_SIZE, limit: int | None = None
+        self,
+        *,
+        processing_stage: str = "ready_to_annotate",
+        page_size: int = PAGE_SIZE,
+        limit: int | None = None,
     ) -> Iterator[dict]:
-        """Yield sequences with no annotation (has_annotation=false), newest first.
+        """Yield the unannotated backlog, newest first.
 
-        Stops early once ``limit`` sequences have been yielded — and does not
-        fetch further pages — so ``--limit`` is cheap for small test pulls.
+        Defaults to ``processing_stage=ready_to_annotate`` — the deployed
+        annotator pre-creates a SequenceAnnotation record at that stage for the
+        whole human queue (so ``has_annotation=false`` is near-empty; the real
+        backlog lives here). Stops early once ``limit`` sequences have been
+        yielded — and does not fetch further pages — so ``--limit`` is cheap.
         """
         yielded = 0
         page = 1
@@ -84,7 +91,7 @@ class AnnotatorApiClient:
             payload = self._get(
                 "/api/v1/sequences/",
                 {
-                    "has_annotation": False,
+                    "processing_stage": processing_stage,
                     "page": page,
                     "size": min(page_size, PAGE_SIZE),
                     "order_by": "created_at",

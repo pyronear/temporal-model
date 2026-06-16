@@ -47,6 +47,7 @@ def pull_unannotated(
     client,
     store_dir: Path,
     *,
+    processing_stage: str = "ready_to_annotate",
     limit: int | None = None,
     page_size: int = 100,
     download: Callable[[str], bytes] = _default_download,
@@ -54,7 +55,9 @@ def pull_unannotated(
     """Pull unannotated sequences + their frames. Returns {pulled, skipped}."""
     store_dir.mkdir(parents=True, exist_ok=True)
     pulled = skipped = 0
-    for seq in client.iter_unannotated_sequences(page_size=page_size, limit=limit):
+    for seq in client.iter_unannotated_sequences(
+        processing_stage=processing_stage, page_size=page_size, limit=limit
+    ):
         if sequence_exists(store_dir, seq["id"]):
             skipped += 1
             continue

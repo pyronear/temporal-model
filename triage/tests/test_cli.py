@@ -17,6 +17,7 @@ def test_pull_command_invokes_pull(monkeypatch, tmp_path):
     cli.main(["pull", "--store", str(tmp_path), "--limit", "3"])
     assert calls["client"] is fake_client
     assert calls["kw"]["limit"] == 3
+    assert calls["kw"]["processing_stage"] == "ready_to_annotate"
     assert calls["store"] == tmp_path
 
 

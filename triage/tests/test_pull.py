@@ -13,7 +13,10 @@ class FakeClient:
         self._detections = detections
         self.detection_calls = 0
 
-    def iter_unannotated_sequences(self, *, page_size=100, limit=None):
+    def iter_unannotated_sequences(
+        self, *, processing_stage="ready_to_annotate", page_size=100, limit=None
+    ):
+        self.last_stage = processing_stage
         seqs = self._sequences if limit is None else self._sequences[:limit]
         yield from seqs
 
@@ -71,6 +74,12 @@ def test_pull_is_incremental(tmp_path):
     pull_unannotated(client, tmp_path, download=lambda url: b"img")
     counts = pull_unannotated(client, tmp_path, download=lambda url: b"img")
     assert counts == {"pulled": 0, "skipped": 1}
+
+
+def test_pull_forwards_processing_stage(tmp_path):
+    client = FakeClient([SEQ], DETS)
+    pull_unannotated(client, tmp_path, download=lambda url: b"img")
+    assert client.last_stage == "ready_to_annotate"
 
 
 def test_limit_is_forwarded(tmp_path):

@@ -25,9 +25,11 @@ The default threshold is **0.35**.
 
 ## Scope & constraints
 
+- **API host.** The REST API is `annotationapi.pyronear.org` (the live FastAPI
+  service); `annotator.pyronear.org` is the frontend SPA, not the API.
 - **Read-only against the pyro-annotator API.** `triage` only issues `GET`s
-  (plus the one `POST /auth/login` to obtain a bearer token). It never writes
-  annotations to production. The low-score "assign to unlabeled" action is
+  (plus the one `POST /api/v1/auth/login` to obtain a bearer token). It never
+  writes annotations to production. The low-score "assign to unlabeled" action is
   emitted as an artifact (sequence ids + a ready-to-POST `bulk` payload) and
   applied by a human in a separate, deliberate step — out of scope for this
   package.
@@ -43,10 +45,14 @@ The default threshold is **0.35**.
 1. **New sibling package `triage/`** (`temporal_model.triage`, script
    `temporal-triage`, distribution `temporal-model-triage`), depending on
    `core` via the `uv` path source — same shape as `benchmark`/`monitor`.
-2. **Pull scope = `has_annotation=false`.** The broadest "never been touched"
-   set: every sequence with no `SequenceAnnotation` record. The annotator's
-   `GET /sequences/` listing is not implicitly org-scoped, so an account token
-   pages the global unannotated backlog across all organizations.
+2. **Pull scope = `processing_stage=ready_to_annotate`.** The deployed
+   annotator pre-creates a `SequenceAnnotation` record at `ready_to_annotate`
+   for the whole human queue, so `has_annotation=false` is near-empty (2 live)
+   while `ready_to_annotate` is the real backlog (21,489 live, matching the
+   UI's "Ready to Annotate" count). The `GET /sequences/` listing is not
+   implicitly org-scoped, so an account token pages the global backlog across
+   all organizations. The stage is a `--stage` flag (default
+   `ready_to_annotate`) so other stages can be pulled later.
 3. **Read-only; low scorers become a worklist, not a write.** `triage` emits
    `unlabeled.json` (ids + bulk-unlabel payload). Applying it is a separate
    human step.
@@ -71,8 +77,8 @@ Two CLI commands.
 
 1. `POST /api/v1/auth/login` → bearer token (creds via `.envrc`, like
    `monitor`).
-2. Page `GET /api/v1/sequences/?has_annotation=false` (newest first),
-   honouring `--limit` / `--page-size`.
+2. Page `GET /api/v1/sequences/?processing_stage=ready_to_annotate` (newest
+   first), honouring `--stage` / `--limit` / `--page-size`.
 3. For each sequence not already on disk: `GET /api/v1/detections/?sequence_id=…`
    for its frames, `GET /api/v1/detections/{id}/url` for each signed image URL,
    download the image, and write the store entry.

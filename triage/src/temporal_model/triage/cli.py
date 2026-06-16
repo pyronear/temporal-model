@@ -35,7 +35,11 @@ def _load_model(model_zip: Path, device: str | None):
 def _cmd_pull(args: argparse.Namespace) -> None:
     client = _build_client()
     counts = pull_unannotated(
-        client, args.store, limit=args.limit, page_size=args.page_size
+        client,
+        args.store,
+        processing_stage=args.stage,
+        limit=args.limit,
+        page_size=args.page_size,
     )
     print(json.dumps(counts, indent=2))
 
@@ -73,6 +77,11 @@ def main(argv: list[str] | None = None) -> None:
 
     p_pull = sub.add_parser("pull", help="fetch unannotated sequences (read-only)")
     p_pull.add_argument("--store", type=Path, default=DEFAULT_STORE)
+    p_pull.add_argument(
+        "--stage",
+        default="ready_to_annotate",
+        help="annotator processing_stage to pull (default: ready_to_annotate)",
+    )
     p_pull.add_argument("--limit", type=int, default=None, help="cap sequences pulled")
     p_pull.add_argument("--page-size", type=int, default=100)
     p_pull.set_defaults(func=_cmd_pull)
