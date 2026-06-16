@@ -43,6 +43,9 @@ export default function Page() {
   });
 
   const defaultThr = useMemo(() => {
+    // Triage trees write a top-level `threshold` (the triage split, 0.35) —
+    // prefer it so the slider opens at the triage default, not the model's.
+    if (typeof cfg.threshold === "number") return cfg.threshold;
     const v = cfg.decision?.logistic_threshold;
     return typeof v === "number" ? v : DEFAULT_LOGISTIC_THRESHOLD;
   }, [cfg]);
@@ -82,11 +85,11 @@ export default function Page() {
     () => sourceRows.some((r) => r.triage_bucket !== undefined),
     [sourceRows],
   );
-  // Monitor rows carry production's verdict and triage rows are pre-bucketed at
-  // a fixed threshold — neither is re-decided locally, so the slider is eval-only.
+  // Monitor rows carry production's verdict (never re-decided locally). Eval and
+  // triage both re-bucket live from probability, so they get the slider — triage
+  // uses it to explore how the threshold trades off To Review vs Unlabel.
   const showSlider =
     !monitorMode &&
-    !triageMode &&
     cfg.decision?.aggregation === "logistic" &&
     sourceRows.some((r) => r.probability != null);
   const rows = useMemo(

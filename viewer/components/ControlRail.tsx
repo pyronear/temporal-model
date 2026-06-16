@@ -35,7 +35,7 @@ export function ControlRail(props: {
       {props.triageMode ? (
         <TriageCards
           rows={props.rows}
-          threshold={props.cfg.threshold}
+          threshold={props.threshold}
           selectedOrganization={props.selectedOrganization}
           onSelectOrganization={props.onSelectOrganization}
         />
@@ -54,6 +54,8 @@ export function ControlRail(props: {
           defaultValue={props.defaultThreshold}
           onChange={props.onThreshold}
           onReset={props.onReset}
+          label={props.triageMode ? "triage threshold" : "logistic threshold"}
+          defaultLabel={props.triageMode ? "default" : "model default"}
         />
       )}
       <div className="mt-auto" />
