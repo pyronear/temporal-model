@@ -10,6 +10,7 @@ the model's own keep/discard rule.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,8 @@ from temporal_model.triage.store import (
 )
 
 logger = logging.getLogger(__name__)
+
+PROGRESS_EVERY = 250  # log a heartbeat every N scored sequences
 
 
 @dataclass
@@ -52,9 +55,12 @@ def score_sequences(
     model, store_dir: Path, *, threshold: float
 ) -> tuple[list[ScoredSequence], list[dict]]:
     """Run predict() over every stored sequence; classify each by threshold."""
+    seq_dirs = list(iter_sequence_dirs(store_dir))
+    total = len(seq_dirs)
+    start = time.monotonic()
     scored: list[ScoredSequence] = []
     dropped: list[dict] = []
-    for seq_dir in iter_sequence_dirs(store_dir):
+    for i, seq_dir in enumerate(seq_dirs, 1):
         meta = read_meta(seq_dir)
         frame_paths = [seq_dir / f.file for f in meta.frames]
         if not frame_paths:
@@ -80,4 +86,16 @@ def score_sequences(
                 frame_paths=frame_paths,
             )
         )
+        if i % PROGRESS_EVERY == 0:
+            elapsed = time.monotonic() - start
+            rate = i / elapsed if elapsed else 0.0
+            review = sum(1 for s in scored if s.bucket == "review")
+            logger.info(
+                "scored %d/%d (%.1f seq/s, %d review / %d unlabel)",
+                i,
+                total,
+                rate,
+                review,
+                len(scored) - review,
+            )
     return scored, dropped
