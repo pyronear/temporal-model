@@ -5,17 +5,21 @@ export function ThresholdSlider({
   defaultValue,
   onChange,
   onReset,
+  label = "logistic threshold",
+  defaultLabel = "model default",
 }: {
   value: number;
   defaultValue: number;
   onChange: (v: number) => void;
   onReset: () => void;
+  label?: string;
+  defaultLabel?: string;
 }) {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
         <label className="text-[11px] uppercase tracking-wide text-slate-500">
-          logistic threshold
+          {label}
         </label>
         <button
           onClick={onReset}
@@ -30,13 +34,15 @@ export function ThresholdSlider({
         max={1}
         step={0.01}
         value={value}
-        aria-label="logistic threshold"
+        aria-label={label}
         onChange={(e) => onChange(parseFloat(e.target.value))}
         className="w-full"
       />
       <div className="flex justify-between text-[11px] text-slate-400">
         <span>{value.toFixed(2)}</span>
-        <span>model default: {defaultValue.toFixed(3)}</span>
+        <span>
+          {defaultLabel}: {defaultValue.toFixed(2)}
+        </span>
       </div>
     </div>
   );

@@ -45,6 +45,7 @@ export function FilterBar({
   shownCount,
   totalCount,
   monitorMode = false,
+  triageMode = false,
 }: {
   filters: Filters;
   cameras: string[];
@@ -53,7 +54,11 @@ export function FilterBar({
   shownCount: number;
   totalCount: number;
   monitorMode?: boolean;
+  triageMode?: boolean;
 }) {
+  // Triage shares the monitor layout (no correctness/GT, has an org filter); it
+  // only relabels the verdict options as Review / Unlabel.
+  const breakdownMode = monitorMode || triageMode;
   const toggleOutcome = (o: Outcome) => {
     const on = filters.outcomes.includes(o);
     const outcomes = on
@@ -68,7 +73,7 @@ export function FilterBar({
         {shownCount}/{totalCount} sequences
       </span>
 
-      {!monitorMode && (
+      {!breakdownMode && (
         <div className="flex flex-wrap items-center gap-1.5">
           {ALL_OUTCOMES.map((o) => {
             const on = filters.outcomes.includes(o);
@@ -94,7 +99,7 @@ export function FilterBar({
         </div>
       )}
 
-      {!monitorMode && (
+      {!breakdownMode && (
         <Select<"all" | Label>
           label="GT"
           value={filters.label}
@@ -107,7 +112,7 @@ export function FilterBar({
           ]}
         />
       )}
-      {monitorMode && organizations.length > 0 && (
+      {breakdownMode && organizations.length > 0 && (
         <Select<string>
           label="organization"
           value={filters.organization}
@@ -121,13 +126,13 @@ export function FilterBar({
         />
       )}
       <Select<"all" | Decision>
-        label="verdict"
+        label={triageMode ? "bucket" : "verdict"}
         value={filters.verdict}
         onChange={(v) => onChange({ ...filters, verdict: v })}
         options={[
           { value: "all", label: "all" },
-          { value: "keep", label: "keep" },
-          { value: "discard", label: "discard" },
+          { value: "keep", label: triageMode ? "to review" : "keep" },
+          { value: "discard", label: triageMode ? "unlabel" : "discard" },
         ]}
       />
       {cameras.length > 0 && (

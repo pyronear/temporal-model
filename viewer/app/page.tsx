@@ -1,5 +1,11 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { ControlRail } from "@/components/ControlRail";
 import { DetailPanel } from "@/components/detail/DetailPanel";
 import { FilterBar } from "@/components/FilterBar";
@@ -18,7 +24,7 @@ import {
   type Filters,
 } from "@/lib/filters";
 import { applyThreshold } from "@/lib/outcomes";
-import { nextSort, sortRows, type Sort } from "@/lib/sort";
+import { nextSort, sortRows, type Sort, type SortCol } from "@/lib/sort";
 import type {
   BboxTubeDetails,
   ModelConfig,
@@ -43,6 +49,9 @@ export default function Page() {
   });
 
   const defaultThr = useMemo(() => {
+    // Triage trees write a top-level `threshold` (the triage split, 0.35) —
+    // prefer it so the slider opens at the triage default, not the model's.
+    if (typeof cfg.threshold === "number") return cfg.threshold;
     const v = cfg.decision?.logistic_threshold;
     return typeof v === "number" ? v : DEFAULT_LOGISTIC_THRESHOLD;
   }, [cfg]);
@@ -76,15 +85,28 @@ export default function Page() {
     () => sourceRows.some((r) => r.replayed_probability !== undefined),
     [sourceRows],
   );
-  // Monitor rows carry production's verdict — never re-decided locally, so
-  // the threshold slider is eval-only.
+  // Triage rows carry a fixed-threshold bucket (triage_bucket); their presence
+  // switches the rail/table/filters to triage mode.
+  const triageMode = useMemo(
+    () => sourceRows.some((r) => r.triage_bucket !== undefined),
+    [sourceRows],
+  );
+  // Monitor rows carry production's verdict (never re-decided locally). Eval and
+  // triage both re-bucket live from probability, so they get the slider — triage
+  // uses it to explore how the threshold trades off To Review vs Unlabel.
   const showSlider =
     !monitorMode &&
-    cfg.decision?.aggregation === "logistic" &&
+    (triageMode || cfg.decision?.aggregation === "logistic") &&
     sourceRows.some((r) => r.probability != null);
+  // Defer the THRESHOLD INPUT (not the output): the slider value updates every
+  // tick (smooth), but the expensive applyThreshold + table reconciliation run
+  // off the deferred value, so React skips intermediate drag values. No manual
+  // debounce; the rail/table catch up when the drag slows.
+  const deferredThreshold = useDeferredValue(threshold);
   const rows = useMemo(
-    () => (showSlider ? applyThreshold(sourceRows, threshold) : sourceRows),
-    [sourceRows, showSlider, threshold],
+    () =>
+      showSlider ? applyThreshold(sourceRows, deferredThreshold) : sourceRows,
+    [sourceRows, showSlider, deferredThreshold],
   );
 
   // Filters reset when the source changes (camera options are source-specific).
@@ -110,6 +132,11 @@ export default function Page() {
     [sourceRows],
   );
   const [sort, setSort] = useState<Sort | null>(null);
+  // Stable callback so React.memo(SequenceTable) isn't defeated each render.
+  const handleSort = useCallback(
+    (col: SortCol) => setSort((cur) => nextSort(cur, col)),
+    [],
+  );
   const tableRows = useMemo(
     () => sortRows(applyFilters(rows, filters), sort),
     [rows, filters, sort],
@@ -144,6 +171,7 @@ export default function Page() {
         onThreshold={setThreshold}
         onReset={() => setThreshold(defaultThr)}
         monitorMode={monitorMode}
+        triageMode={triageMode}
         selectedOrganization={filters.organization}
         onSelectOrganization={(org) =>
           // mirror the FilterBar's org change: camera resets with the org
@@ -159,6 +187,7 @@ export default function Page() {
           shownCount={tableRows.length}
           totalCount={rows.length}
           monitorMode={monitorMode}
+          triageMode={triageMode}
         />
         <div className="min-h-0 flex-1">
           <SequenceTable
@@ -166,8 +195,9 @@ export default function Page() {
             selectedKey={selected}
             onSelect={setSelectedKey}
             sort={sort}
-            onSort={(col) => setSort((cur) => nextSort(cur, col))}
+            onSort={handleSort}
             monitorMode={monitorMode}
+            triageMode={triageMode}
           />
         </div>
       </div>

@@ -1,0 +1,8 @@
+# Copy to triage/.envrc (untracked) and fill in; direnv loads it automatically.
+# Read-only credentials for the pyro-annotator API.
+# NB: the API is served at annotationapi.pyronear.org — annotator.pyronear.org
+# is the frontend SPA, not the API. triage only ever issues GETs (plus the
+# login POST that mints the token).
+export ANNOTATOR_API_URL=https://annotationapi.pyronear.org
+export ANNOTATOR_API_LOGIN=changeme
+export ANNOTATOR_API_PASSWORD=changeme

@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "temporal-model-triage"
+version = "0.1.0"
+description = "Triage the pyro-annotator unannotated backlog: pull sequences read-only, score them with the temporal model, split at a threshold into an 'unlabel' worklist and a local-review viewer set"
+requires-python = ">=3.11"
+dependencies = [
+    "temporal-model-core",
+    "pydantic>=2.7",
+    "requests>=2.31",
+    "pyyaml>=6",
+    "pandas>=2.0",
+    "pyarrow>=14",
+]
+
+[project.scripts]
+temporal-triage = "temporal_model.triage.cli:main"
+
+[tool.uv.sources]
+temporal-model-core = { path = "../core", editable = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/temporal_model"]
+
+[dependency-groups]
+dev = [
+    "dvc[s3]>=3.56",
+    "pytest>=8.0",
+    "ruff>=0.9",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B", "SIM", "PLC0415"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["temporal_model"]
+
+[tool.ruff.format]
+quote-style = "double"

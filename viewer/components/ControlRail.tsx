@@ -3,6 +3,8 @@ import { MonitorCards } from "@/components/MonitorCards";
 import { PerfCards } from "@/components/PerfCards";
 import { SourceSelect } from "@/components/SourceSelect";
 import { ThresholdSlider } from "@/components/ThresholdSlider";
+import { ThresholdSweep } from "@/components/ThresholdSweep";
+import { TriageCards } from "@/components/TriageCards";
 import type { ModelConfig, ResultRow } from "@/lib/types";
 
 export function ControlRail(props: {
@@ -17,6 +19,7 @@ export function ControlRail(props: {
   onThreshold: (v: number) => void;
   onReset: () => void;
   monitorMode?: boolean;
+  triageMode?: boolean;
   selectedOrganization?: string;
   onSelectOrganization?: (org: string) => void;
 }) {
@@ -30,7 +33,14 @@ export function ControlRail(props: {
           onChange={props.onSource}
         />
       )}
-      {props.monitorMode ? (
+      {props.triageMode ? (
+        <TriageCards
+          rows={props.rows}
+          threshold={props.threshold}
+          selectedOrganization={props.selectedOrganization}
+          onSelectOrganization={props.onSelectOrganization}
+        />
+      ) : props.monitorMode ? (
         <MonitorCards
           rows={props.rows}
           selectedOrganization={props.selectedOrganization}
@@ -45,6 +55,15 @@ export function ControlRail(props: {
           defaultValue={props.defaultThreshold}
           onChange={props.onThreshold}
           onReset={props.onReset}
+          label={props.triageMode ? "triage threshold" : "logistic threshold"}
+          defaultLabel={props.triageMode ? "default" : "model default"}
+        />
+      )}
+      {props.triageMode && props.showSlider && (
+        <ThresholdSweep
+          rows={props.rows}
+          current={props.threshold}
+          onSelect={props.onThreshold}
         />
       )}
       <div className="mt-auto" />

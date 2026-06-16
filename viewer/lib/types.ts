@@ -21,6 +21,10 @@ export interface ResultRow {
   organization_name: string | null;
   camera_name: string | null;
   started_at: string | null;
+  // Triage-only (absent in eval/monitor trees): the per-sequence triage score
+  // and its bucket. Their presence is what switches the viewer to triage mode.
+  triage_score?: number | null;
+  triage_bucket?: "review" | "unlabeled";
   // Monitor-only provenance (absent in eval reporting trees).
   replayed_probability?: number | null;
   replayed_decision?: Decision | null;
@@ -87,4 +91,6 @@ export interface ModelConfig {
   classifier?: { max_frames?: number; backbone?: string } | null;
   tubes?: Record<string, unknown> | null;
   calibrator?: unknown;
+  // Triage-only: the fixed triage split threshold written into model_config.json.
+  threshold?: number | null;
 }
