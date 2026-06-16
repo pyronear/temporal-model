@@ -37,7 +37,7 @@ describe("TriageCards", () => {
   it("labels the buckets Review and Unlabel", () => {
     render(<TriageCards rows={rows} threshold={0.35} />);
     // "Review"/"Unlabel" appear both as card labels and in the explainer text.
-    expect(screen.getAllByText("Review").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("To Review").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Unlabel").length).toBeGreaterThanOrEqual(1);
   });
 
@@ -61,7 +61,7 @@ describe("TriageCards", () => {
 
   it("renders empty without crashing", () => {
     render(<TriageCards rows={[]} />);
-    expect(screen.getAllByText("Review").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("To Review").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Unlabel").length).toBeGreaterThanOrEqual(1);
   });
 });

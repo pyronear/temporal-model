@@ -149,14 +149,17 @@ export function DetailPanel({
           color={row.decision === "keep" ? "#059669" : "#475569"}
           hint="the model's keep / discard decision for this sequence"
         />
-        {row.replayed_probability === undefined && (
-          <Stat
-            label="correctness"
-            value={correctnessLabel(row.outcome)}
-            color={outcomeTokens[row.outcome].text}
-            hint="the verdict vs. the ground-truth label"
-          />
-        )}
+        {/* Eval-only: triage rows are unlabeled (no ground truth), monitor
+            rows carry production's verdict — neither has a correctness. */}
+        {row.replayed_probability === undefined &&
+          row.triage_bucket === undefined && (
+            <Stat
+              label="correctness"
+              value={correctnessLabel(row.outcome)}
+              color={outcomeTokens[row.outcome].text}
+              hint="the verdict vs. the ground-truth label"
+            />
+          )}
         {(row.replayed_probability === undefined || trig != null) && (
           <Stat
             label="trigger frame"

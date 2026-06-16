@@ -57,7 +57,7 @@ const MONITOR_COLUMNS: Column[] = [
 // triage rows are unlabeled (label "unknown"), so there is no ground truth.
 const triageBucket = (r: ResultRow): { label: string; color: string } =>
   r.decision === "keep"
-    ? { label: "review", color: "#047857" }
+    ? { label: "to review", color: "#047857" }
     : { label: "unlabel", color: "#64748b" };
 
 const TRIAGE_COLUMNS: Column[] = [

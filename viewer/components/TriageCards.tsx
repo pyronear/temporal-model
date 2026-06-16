@@ -55,7 +55,7 @@ export function TriageCards({
       <div className="grid grid-cols-2 gap-2">
         <div className="flex flex-col rounded-xl border border-slate-200 bg-white p-2.5">
           <div className="flex h-4 items-center whitespace-nowrap text-[9px] font-medium uppercase tracking-tight text-slate-500">
-            Review
+            To Review
           </div>
           <div
             className="text-base font-semibold tabular-nums"
@@ -151,8 +151,9 @@ export function TriageCards({
             (read-only), each scored by the temporal model.
           </p>
           <p>
-            <span style={{ color: "#047857" }}>Review</span> = score ≥ threshold:
-            worth a human&apos;s eyes. <span className="text-slate-500">Unlabel</span>{" "}
+            <span style={{ color: "#047857" }}>To review</span> = score ≥
+            threshold: worth a human&apos;s eyes.{" "}
+            <span className="text-slate-500">Unlabel</span>{" "}
             = score &lt; threshold: almost certainly a false positive, queued to
             be marked <em>unlabeled</em> in the annotator.
           </p>

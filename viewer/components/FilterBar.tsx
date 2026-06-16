@@ -131,7 +131,7 @@ export function FilterBar({
         onChange={(v) => onChange({ ...filters, verdict: v })}
         options={[
           { value: "all", label: "all" },
-          { value: "keep", label: triageMode ? "review" : "keep" },
+          { value: "keep", label: triageMode ? "to review" : "keep" },
           { value: "discard", label: triageMode ? "unlabel" : "discard" },
         ]}
       />
