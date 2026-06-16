@@ -1,7 +1,24 @@
 # triage/: Tar-Sharded Frame Storage
 
 **Date:** 2026-06-16
-**Status:** Draft (design only — not implemented)
+**Status:** Implemented (`shards.py`, `pack`/`unpack` CLI)
+
+## Implementation notes (deltas from the original draft)
+
+- **The report is sharded too.** At full scale `details/` + `sequences/` are
+  ~43k tiny files — not "small". `pack` bundles per-sequence `details.json` +
+  `sequence.json` into `report/` shards; only the ~6 aggregate files
+  (`results.json`/`.parquet`, worklists, `model_config`, `dropped`) stay loose.
+- **Frames and predictions are separate shard sets** (`frames/` append-only and
+  model-independent; `report/` rebuilt per run) — a re-score never re-packs the
+  26 GB of frames.
+- **Every prediction is tagged with `model_version`** (the release version from
+  the model.zip manifest, e.g. `0.2.0`), so a future re-score's predictions stay
+  distinguishable. Multi-version report namespacing is deferred until a second
+  model run actually happens.
+- **No `dvc.yaml` pipeline.** The 247k-file store is impractical as a stage dep
+  and the workflow is staged/manual, so the single DVC-tracked artifact is
+  `data/02_shards`, added with `dvc add`.
 
 ## Motivation
 
