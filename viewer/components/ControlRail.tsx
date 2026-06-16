@@ -3,6 +3,7 @@ import { MonitorCards } from "@/components/MonitorCards";
 import { PerfCards } from "@/components/PerfCards";
 import { SourceSelect } from "@/components/SourceSelect";
 import { ThresholdSlider } from "@/components/ThresholdSlider";
+import { TriageCards } from "@/components/TriageCards";
 import type { ModelConfig, ResultRow } from "@/lib/types";
 
 export function ControlRail(props: {
@@ -17,6 +18,7 @@ export function ControlRail(props: {
   onThreshold: (v: number) => void;
   onReset: () => void;
   monitorMode?: boolean;
+  triageMode?: boolean;
   selectedOrganization?: string;
   onSelectOrganization?: (org: string) => void;
 }) {
@@ -30,7 +32,14 @@ export function ControlRail(props: {
           onChange={props.onSource}
         />
       )}
-      {props.monitorMode ? (
+      {props.triageMode ? (
+        <TriageCards
+          rows={props.rows}
+          threshold={props.cfg.threshold}
+          selectedOrganization={props.selectedOrganization}
+          onSelectOrganization={props.onSelectOrganization}
+        />
+      ) : props.monitorMode ? (
         <MonitorCards
           rows={props.rows}
           selectedOrganization={props.selectedOrganization}

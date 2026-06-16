@@ -76,10 +76,17 @@ export default function Page() {
     () => sourceRows.some((r) => r.replayed_probability !== undefined),
     [sourceRows],
   );
-  // Monitor rows carry production's verdict — never re-decided locally, so
-  // the threshold slider is eval-only.
+  // Triage rows carry a fixed-threshold bucket (triage_bucket); their presence
+  // switches the rail/table/filters to triage mode.
+  const triageMode = useMemo(
+    () => sourceRows.some((r) => r.triage_bucket !== undefined),
+    [sourceRows],
+  );
+  // Monitor rows carry production's verdict and triage rows are pre-bucketed at
+  // a fixed threshold — neither is re-decided locally, so the slider is eval-only.
   const showSlider =
     !monitorMode &&
+    !triageMode &&
     cfg.decision?.aggregation === "logistic" &&
     sourceRows.some((r) => r.probability != null);
   const rows = useMemo(
@@ -144,6 +151,7 @@ export default function Page() {
         onThreshold={setThreshold}
         onReset={() => setThreshold(defaultThr)}
         monitorMode={monitorMode}
+        triageMode={triageMode}
         selectedOrganization={filters.organization}
         onSelectOrganization={(org) =>
           // mirror the FilterBar's org change: camera resets with the org
@@ -159,6 +167,7 @@ export default function Page() {
           shownCount={tableRows.length}
           totalCount={rows.length}
           monitorMode={monitorMode}
+          triageMode={triageMode}
         />
         <div className="min-h-0 flex-1">
           <SequenceTable
@@ -168,6 +177,7 @@ export default function Page() {
             sort={sort}
             onSort={(col) => setSort((cur) => nextSort(cur, col))}
             monitorMode={monitorMode}
+            triageMode={triageMode}
           />
         </div>
       </div>
