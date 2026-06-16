@@ -10,6 +10,7 @@ stages:
       - src/temporal_model/triage/score.py
       - src/temporal_model/triage/report.py
       - src/temporal_model/triage/store.py
+      - src/temporal_model/triage/model_config.py
       - src/temporal_model/triage/cli.py
       - data/01_raw/sequences
       - ../api/models/model.zip
