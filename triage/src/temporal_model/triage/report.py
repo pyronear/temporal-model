@@ -70,6 +70,11 @@ def write_triage_report(
 
     rows = [_result_row(s) for s in scored]
     (out / "results.json").write_text(json.dumps(rows, indent=2))
+    # Columnar twin of results.json for analytical reuse (matches eval's
+    # results.parquet). Local import keeps pandas off the lightweight pull path.
+    import pandas as pd  # noqa: PLC0415
+
+    pd.DataFrame(rows).to_parquet(out / "results.parquet")
     (out / "model_config.json").write_text(
         json.dumps({**model_config, "threshold": threshold}, indent=2, default=str)
     )

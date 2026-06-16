@@ -17,4 +17,4 @@ stages:
       - triage.threshold
     outs:
       - data/08_reporting/pyro-annotator/vit_dinov2_finetune:
-          cache: false
+          cache: true   # cached → dvc push shares the scored report (like monitor)

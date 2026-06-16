@@ -1,0 +1,40 @@
+schema: '2.0'
+stages:
+  score:
+    cmd: uv run temporal-triage score --store data/01_raw/sequences --output-dir
+      data/08_reporting --model-zip ../api/models/model.zip --threshold 0.35
+    deps:
+    - path: ../api/models/model.zip
+      hash: md5
+      md5: 54b565d2bc6f4b270766afb0a2288893
+      size: 162765235
+    - path: data/01_raw/sequences
+      hash: md5
+      md5: f92f9d6912397deafe47fa42e63d4d8d.dir
+      size: 714180879
+      nfiles: 7508
+    - path: src/temporal_model/triage/cli.py
+      hash: md5
+      md5: 344cca2ed219dbaccf236d983859c896
+      size: 3806
+    - path: src/temporal_model/triage/report.py
+      hash: md5
+      md5: ea1ba9cd30fd7b7c4b238832456b9ed9
+      size: 4702
+    - path: src/temporal_model/triage/score.py
+      hash: md5
+      md5: c73b31b78fc39872803eac12a2a1cefb
+      size: 2859
+    - path: src/temporal_model/triage/store.py
+      hash: md5
+      md5: d39c7ce2e6f7ea605fb4223b72b511f3
+      size: 3269
+    params:
+      params.yaml:
+        triage.threshold: 0.35
+    outs:
+    - path: data/08_reporting/pyro-annotator/vit_dinov2_finetune
+      hash: md5
+      md5: c11c36cad75a13127673f323672db9b4.dir
+      size: 3382214
+      nfiles: 1006

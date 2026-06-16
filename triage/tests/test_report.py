@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pandas as pd
+
 from temporal_model.triage.report import MODEL_DIR, write_triage_report
 from temporal_model.triage.score import ScoredSequence
 from temporal_model.triage.store import FrameRef, SequenceMeta
@@ -69,3 +71,21 @@ def test_write_triage_report_emits_contract_and_worklists(tmp_path):
     review = json.loads((out / "review.json").read_text())
     assert review["sequence_ids"] == [1]
     assert review["items"][0]["score"] == 0.92
+
+
+def test_results_parquet_mirrors_results_json(tmp_path):
+    scored = [
+        _scored("pyro-annotator_1", 1, 0.92, "review"),
+        _scored("pyro-annotator_2", 2, 0.10, "unlabeled"),
+    ]
+    write_triage_report(
+        tmp_path, scored, dropped=[], threshold=0.35, model_config={}
+    )
+    out = tmp_path / "pyro-annotator" / MODEL_DIR
+    df = pd.read_parquet(out / "results.parquet")
+    rows = json.loads((out / "results.json").read_text())
+    assert len(df) == len(rows) == 2
+    assert dict(zip(df["key"], df["triage_bucket"], strict=True)) == {
+        "pyro-annotator_1": "review",
+        "pyro-annotator_2": "unlabeled",
+    }
