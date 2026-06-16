@@ -3,6 +3,7 @@ import threading
 from temporal_model.triage.pull import pull_unannotated
 from temporal_model.triage.store import (
     SequenceMeta,
+    iter_sequence_dirs,
     read_meta,
     sequence_dir,
     sequence_exists,
@@ -114,6 +115,36 @@ def test_pull_parallel_downloads_every_frame(tmp_path):
     files = sorted(p.name for p in (seq_dir / "images").glob("*.jpg"))
     assert len(files) == 12  # all frames written despite concurrency
     assert len(seen) == 12  # each distinct signed URL fetched exactly once
+
+
+def test_pull_sequence_level_concurrency(tmp_path):
+    seqs = [dict(SEQ, id=i, camera_name=f"cam-{i}") for i in range(5)]
+    dets = {
+        i: [
+            {
+                "id": i * 10 + j,
+                "recorded_at": f"2026-06-01T10:0{j}:00",
+                "bucket_key": f"k/{i}-{j}",
+            }
+            for j in range(3)
+        ]
+        for i in range(5)
+    }
+    client = FakeClient(seqs, dets)
+    pulled_urls = set()
+    lock = threading.Lock()
+
+    def dl(url):
+        with lock:
+            pulled_urls.add(url)
+        return b"img"
+
+    counts = pull_unannotated(
+        client, tmp_path, seq_workers=3, workers=2, download=dl
+    )
+    assert counts == {"pulled": 5, "skipped": 0}
+    assert sum(1 for _ in iter_sequence_dirs(tmp_path)) == 5  # all sequences landed
+    assert len(pulled_urls) == 15  # 5 sequences x 3 frames, no drops under concurrency
 
 
 def test_limit_is_forwarded(tmp_path):

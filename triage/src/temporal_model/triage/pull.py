@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import requests
@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 DOWNLOAD_ATTEMPTS = 3
 DEFAULT_WORKERS = 16  # per-sequence frame fetch+download concurrency
+DEFAULT_SEQ_WORKERS = 1  # sequences processed in parallel (1 = serial)
 PROGRESS_EVERY = 25  # log a progress line every N pulled sequences
 
 
@@ -46,6 +47,20 @@ def _default_download(url: str) -> bytes:
     raise AssertionError("unreachable")
 
 
+def _pull_one_safe(
+    client, store_dir: Path, seq: dict, download: Callable[[str], bytes], workers: int
+) -> bool:
+    """Pull one sequence; a download error is logged and turned into False so the
+    sequence is retried next run (meta.json is written last, so it isn't marked
+    complete) without aborting the rest of the pull."""
+    try:
+        _pull_one(client, store_dir, seq, download, workers)
+        return True
+    except requests.RequestException:
+        logger.exception("pull failed for sequence %s; will retry next run", seq["id"])
+        return False
+
+
 def pull_unannotated(
     client,
     store_dir: Path,
@@ -54,41 +69,60 @@ def pull_unannotated(
     limit: int | None = None,
     page_size: int = 100,
     workers: int = DEFAULT_WORKERS,
+    seq_workers: int = DEFAULT_SEQ_WORKERS,
     download: Callable[[str], bytes] = _default_download,
 ) -> dict[str, int]:
     """Pull unannotated sequences + their frames. Returns {pulled, skipped}.
 
-    Each sequence's frames are fetched + downloaded concurrently (``workers``
-    threads); a progress line is logged every ``PROGRESS_EVERY`` pulled.
+    ``seq_workers`` sequences are processed concurrently; within each, frames are
+    fetched + downloaded with ``workers`` threads. Total in-flight requests are
+    ~``seq_workers * workers`` — keep that near the client's HTTP pool size. A
+    progress line is logged every ``PROGRESS_EVERY`` pulled.
     """
     store_dir.mkdir(parents=True, exist_ok=True)
     start = time.monotonic()
     pulled = skipped = 0
+
+    # Skip-existing in the listing pass (cheap glob); only new sequences download.
+    new_seqs: list[dict] = []
     for seq in client.iter_unannotated_sequences(
         processing_stage=processing_stage, page_size=page_size, limit=limit
     ):
         if sequence_exists(store_dir, seq["id"]):
             skipped += 1
-            continue
-        try:
-            _pull_one(client, store_dir, seq, download, workers)
-        except requests.RequestException:
-            logger.exception(
-                "pull failed for sequence %s; will retry next run", seq["id"]
-            )
-            continue
+        else:
+            new_seqs.append(seq)
+
+    def _record(ok: bool) -> None:
+        nonlocal pulled
+        if not ok:
+            return
         pulled += 1
         if pulled % PROGRESS_EVERY == 0:
             elapsed = time.monotonic() - start
             rate = pulled / elapsed if elapsed else 0.0
-            target = f"/{limit}" if limit else ""
             logger.info(
-                "progress: %d%s pulled, %d skipped (%.1f seq/s)",
+                "progress: %d/%d pulled, %d skipped (%.1f seq/s)",
                 pulled,
-                target,
+                len(new_seqs),
                 skipped,
                 rate,
             )
+
+    if seq_workers <= 1:
+        for seq in new_seqs:
+            _record(_pull_one_safe(client, store_dir, seq, download, workers))
+    else:
+        with ThreadPoolExecutor(max_workers=seq_workers) as ex:
+            futures = [
+                ex.submit(_pull_one_safe, client, store_dir, seq, download, workers)
+                for seq in new_seqs
+            ]
+            # as_completed runs in this (single) thread, so the counter + progress
+            # logging stay race-free.
+            for fut in as_completed(futures):
+                _record(fut.result())
+
     logger.info("pull done: %d pulled, %d skipped", pulled, skipped)
     return {"pulled": pulled, "skipped": skipped}
 

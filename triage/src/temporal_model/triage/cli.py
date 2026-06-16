@@ -9,7 +9,11 @@ from pathlib import Path
 
 from temporal_model.triage.annotator_api import AnnotatorApiClient, AnnotatorApiConfig
 from temporal_model.triage.model_config import read_model_config
-from temporal_model.triage.pull import DEFAULT_WORKERS, pull_unannotated
+from temporal_model.triage.pull import (
+    DEFAULT_SEQ_WORKERS,
+    DEFAULT_WORKERS,
+    pull_unannotated,
+)
 from temporal_model.triage.report import write_triage_report
 from temporal_model.triage.score import score_sequences
 
@@ -41,6 +45,7 @@ def _cmd_pull(args: argparse.Namespace) -> None:
         limit=args.limit,
         page_size=args.page_size,
         workers=args.workers,
+        seq_workers=args.seq_workers,
     )
     print(json.dumps(counts, indent=2))
 
@@ -90,6 +95,13 @@ def main(argv: list[str] | None = None) -> None:
         type=int,
         default=DEFAULT_WORKERS,
         help=f"concurrent frame downloads per sequence (default: {DEFAULT_WORKERS})",
+    )
+    p_pull.add_argument(
+        "--seq-workers",
+        type=int,
+        default=DEFAULT_SEQ_WORKERS,
+        help="sequences pulled in parallel (default: %(default)s); total in-flight "
+        "requests ~= seq-workers * workers, keep near the HTTP pool size",
     )
     p_pull.set_defaults(func=_cmd_pull)
 
