@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { ControlRail } from "@/components/ControlRail";
 import { DetailPanel } from "@/components/detail/DetailPanel";
 import { FilterBar } from "@/components/FilterBar";
@@ -96,6 +96,10 @@ export default function Page() {
     () => (showSlider ? applyThreshold(sourceRows, threshold) : sourceRows),
     [sourceRows, showSlider, threshold],
   );
+  // The slider + rail cards re-bucket from `rows` instantly (cheap), but the
+  // big table re-render is deferred so dragging the threshold stays smooth on
+  // large stores (React skips intermediate drag values, no manual debounce).
+  const deferredRows = useDeferredValue(rows);
 
   // Filters reset when the source changes (camera options are source-specific).
   const [filters, setFilters] = useState<Filters>(defaultFilters);
@@ -121,8 +125,8 @@ export default function Page() {
   );
   const [sort, setSort] = useState<Sort | null>(null);
   const tableRows = useMemo(
-    () => sortRows(applyFilters(rows, filters), sort),
-    [rows, filters, sort],
+    () => sortRows(applyFilters(deferredRows, filters), sort),
+    [deferredRows, filters, sort],
   );
 
   // Effective selection is derived: fall back to the first visible row when the

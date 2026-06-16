@@ -3,6 +3,7 @@ import { MonitorCards } from "@/components/MonitorCards";
 import { PerfCards } from "@/components/PerfCards";
 import { SourceSelect } from "@/components/SourceSelect";
 import { ThresholdSlider } from "@/components/ThresholdSlider";
+import { ThresholdSweep } from "@/components/ThresholdSweep";
 import { TriageCards } from "@/components/TriageCards";
 import type { ModelConfig, ResultRow } from "@/lib/types";
 
@@ -57,6 +58,9 @@ export function ControlRail(props: {
           label={props.triageMode ? "triage threshold" : "logistic threshold"}
           defaultLabel={props.triageMode ? "default" : "model default"}
         />
+      )}
+      {props.triageMode && props.showSlider && (
+        <ThresholdSweep rows={props.rows} current={props.threshold} />
       )}
       <div className="mt-auto" />
       <ModelConfigPanel cfg={props.cfg} />
