@@ -44,6 +44,7 @@ def read_model_config(model_zip: Path) -> dict:
         return {}
     provenance = manifest.get("provenance") or {}
     return {
+        "model_version": manifest.get("model_version"),  # release version, e.g. "0.2.0"
         "detector": provenance.get("detector"),
         "variant": manifest.get("variant"),
         "train_git_sha": provenance.get("train_git_sha"),

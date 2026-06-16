@@ -3,9 +3,24 @@ from pathlib import Path
 
 import pandas as pd
 
-from temporal_model.triage.report import MODEL_DIR, write_triage_report
+from temporal_model.triage.report import (
+    MODEL_DIR,
+    model_version_of,
+    write_triage_report,
+)
 from temporal_model.triage.score import ScoredSequence
 from temporal_model.triage.store import FrameRef, SequenceMeta
+
+
+def test_model_version_prefers_release_then_falls_back():
+    assert model_version_of({"model_version": "0.2.0"}) == "0.2.0"
+    assert (
+        model_version_of(
+            {"variant": "vit_dinov2_finetune", "train_git_sha": "4b4d43ad77"}
+        )
+        == "vit_dinov2_finetune@4b4d43ad"
+    )
+    assert model_version_of({}) == "unknown"
 
 
 def _scored(key, sid, score, bucket):
@@ -44,7 +59,7 @@ def test_write_triage_report_emits_contract_and_worklists(tmp_path):
         scored,
         dropped=[{"sequence_id": "pyro-annotator_9", "reason": "no_images"}],
         threshold=0.35,
-        model_config={"model_version": "0.1.0"},
+        model_config={"model_version": "0.2.0", "variant": "vit_dinov2_finetune"},
     )
     out = tmp_path / "pyro-annotator" / MODEL_DIR
 
@@ -72,15 +87,18 @@ def test_write_triage_report_emits_contract_and_worklists(tmp_path):
     assert review["sequence_ids"] == [1]
     assert review["items"][0]["score"] == 0.92
 
+    # every prediction is tagged with the release model version
+    assert all(r["model_version"] == "0.2.0" for r in rows)
+    cfg = json.loads((out / "model_config.json").read_text())
+    assert cfg["model_version"] == "0.2.0"
+
 
 def test_results_parquet_mirrors_results_json(tmp_path):
     scored = [
         _scored("pyro-annotator_1", 1, 0.92, "review"),
         _scored("pyro-annotator_2", 2, 0.10, "unlabeled"),
     ]
-    write_triage_report(
-        tmp_path, scored, dropped=[], threshold=0.35, model_config={}
-    )
+    write_triage_report(tmp_path, scored, dropped=[], threshold=0.35, model_config={})
     out = tmp_path / "pyro-annotator" / MODEL_DIR
     df = pd.read_parquet(out / "results.parquet")
     rows = json.loads((out / "results.json").read_text())

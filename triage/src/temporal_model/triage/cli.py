@@ -14,11 +14,14 @@ from temporal_model.triage.pull import (
     DEFAULT_WORKERS,
     pull_unannotated,
 )
-from temporal_model.triage.report import write_triage_report
+from temporal_model.triage.report import MODEL_DIR, SOURCE, write_triage_report
 from temporal_model.triage.score import score_sequences
+from temporal_model.triage.shards import DEFAULT_TARGET_BYTES, pack, unpack
 
 DEFAULT_STORE = Path("data/01_raw/sequences")
 DEFAULT_OUTPUT = Path("data/08_reporting")
+DEFAULT_REPORT = DEFAULT_OUTPUT / SOURCE / MODEL_DIR
+DEFAULT_SHARDS = Path("data/02_shards")
 DEFAULT_MODEL_ZIP = Path("../api/models/model.zip")
 DEFAULT_THRESHOLD = 0.35
 
@@ -76,6 +79,22 @@ def _cmd_score(args: argparse.Namespace) -> None:
     )
 
 
+def _cmd_pack(args: argparse.Namespace) -> None:
+    counts = pack(
+        args.store, args.report_dir, args.shards, target_bytes=args.target_bytes
+    )
+    print(json.dumps(counts, indent=2))
+
+
+def _cmd_unpack(args: argparse.Namespace) -> None:
+    unpack(args.shards, args.store, args.report_dir)
+    print(
+        json.dumps(
+            {"store": str(args.store), "report_dir": str(args.report_dir)}, indent=2
+        )
+    )
+
+
 def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     parser = argparse.ArgumentParser(prog="temporal-triage", description=__doc__)
@@ -112,6 +131,21 @@ def main(argv: list[str] | None = None) -> None:
     p_score.add_argument("--threshold", type=float, default=DEFAULT_THRESHOLD)
     p_score.add_argument("--device", default=None, help="cuda/mps/cpu (default auto)")
     p_score.set_defaults(func=_cmd_score)
+
+    p_pack = sub.add_parser("pack", help="tar-shard the store + report for DVC")
+    p_pack.add_argument("--store", type=Path, default=DEFAULT_STORE)
+    p_pack.add_argument("--report-dir", type=Path, default=DEFAULT_REPORT)
+    p_pack.add_argument("--shards", type=Path, default=DEFAULT_SHARDS)
+    p_pack.add_argument("--target-bytes", type=int, default=DEFAULT_TARGET_BYTES)
+    p_pack.set_defaults(func=_cmd_pack)
+
+    p_unpack = sub.add_parser(
+        "unpack", help="restore the loose store + report from shards"
+    )
+    p_unpack.add_argument("--shards", type=Path, default=DEFAULT_SHARDS)
+    p_unpack.add_argument("--store", type=Path, default=DEFAULT_STORE)
+    p_unpack.add_argument("--report-dir", type=Path, default=DEFAULT_REPORT)
+    p_unpack.set_defaults(func=_cmd_unpack)
 
     args = parser.parse_args(argv)
     args.func(args)

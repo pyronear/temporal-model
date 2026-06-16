@@ -23,7 +23,22 @@ SOURCE = "pyro-annotator"
 MODEL_DIR = "vit_dinov2_finetune"  # viewer/lib/paths.ts MODEL_NAME
 
 
-def _result_row(s: ScoredSequence) -> dict:
+def model_version_of(model_config: dict) -> str:
+    """Per-prediction model identity — the packaged release version (e.g. "0.2.0").
+
+    Lets a future re-score (likely a different model) keep its predictions
+    distinguishable. Falls back to ``<variant>@<train_git_sha[:8]>`` then
+    "unknown" when the packaged model carries no version/provenance.
+    """
+    version = model_config.get("model_version")
+    if version:
+        return str(version)
+    variant = model_config.get("variant") or "unknown"
+    sha = model_config.get("train_git_sha")
+    return f"{variant}@{sha[:8]}" if sha else variant
+
+
+def _result_row(s: ScoredSequence, model_version: str) -> dict:
     kept = s.details.get("tubes", {}).get("kept", [])
     decision = "keep" if s.bucket == "review" else "discard"
     return {
@@ -34,6 +49,7 @@ def _result_row(s: ScoredSequence) -> dict:
         "outcome": "n/a",  # no ground truth to score against
         "triage_score": s.score,
         "triage_bucket": s.bucket,
+        "model_version": model_version,
         "score": max((t["logit"] for t in kept), default=None),
         "probability": s.score,
         "num_tubes_kept": len(kept),
@@ -68,7 +84,8 @@ def write_triage_report(
     (out / "details").mkdir(parents=True, exist_ok=True)
     (out / "sequences").mkdir(parents=True, exist_ok=True)
 
-    rows = [_result_row(s) for s in scored]
+    model_version = model_version_of(model_config)
+    rows = [_result_row(s, model_version) for s in scored]
     (out / "results.json").write_text(json.dumps(rows, indent=2))
     # Columnar twin of results.json for analytical reuse (matches eval's
     # results.parquet). Local import keeps pandas off the lightweight pull path.
@@ -76,7 +93,11 @@ def write_triage_report(
 
     pd.DataFrame(rows).to_parquet(out / "results.parquet")
     (out / "model_config.json").write_text(
-        json.dumps({**model_config, "threshold": threshold}, indent=2, default=str)
+        json.dumps(
+            {**model_config, "threshold": threshold, "model_version": model_version},
+            indent=2,
+            default=str,
+        )
     )
     (out / "dropped.json").write_text(json.dumps(dropped, indent=2))
     for s in scored:
