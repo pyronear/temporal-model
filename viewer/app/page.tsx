@@ -96,7 +96,7 @@ export default function Page() {
   // uses it to explore how the threshold trades off To Review vs Unlabel.
   const showSlider =
     !monitorMode &&
-    cfg.decision?.aggregation === "logistic" &&
+    (triageMode || cfg.decision?.aggregation === "logistic") &&
     sourceRows.some((r) => r.probability != null);
   // Defer the THRESHOLD INPUT (not the output): the slider value updates every
   // tick (smooth), but the expensive applyThreshold + table reconciliation run

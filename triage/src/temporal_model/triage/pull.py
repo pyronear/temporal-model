@@ -50,13 +50,16 @@ def _default_download(url: str) -> bytes:
 def _pull_one_safe(
     client, store_dir: Path, seq: dict, download: Callable[[str], bytes], workers: int
 ) -> bool:
-    """Pull one sequence; a download error is logged and turned into False so the
+    """Pull one sequence; ANY error is logged and turned into False so the
     sequence is retried next run (meta.json is written last, so it isn't marked
-    complete) without aborting the rest of the pull."""
+    complete) without aborting the rest of the pull. Broad on purpose: a bad
+    detection record (e.g. null recorded_at) or a disk error on one sequence must
+    not kill a 20k-sequence run — especially in the concurrent path, where an
+    uncaught exception surfaces at ``fut.result()`` and abandons the queue."""
     try:
         _pull_one(client, store_dir, seq, download, workers)
         return True
-    except requests.RequestException:
+    except Exception:  # noqa: BLE001 — record + continue; resilience over strictness
         logger.exception("pull failed for sequence %s; will retry next run", seq["id"])
         return False
 
@@ -131,7 +134,8 @@ def _pull_one(
     client, store_dir: Path, seq: dict, download: Callable[[str], bytes], workers: int
 ):
     dets = client.list_detections(seq["id"])
-    dets = sorted(dets, key=lambda d: d["recorded_at"])
+    # recorded_at can be null/absent; sort tolerantly (None sorts first as "").
+    dets = sorted(dets, key=lambda d: d.get("recorded_at") or "")
     meta = SequenceMeta(
         key=f"pyro-annotator_{seq['id']}",
         sequence_id=seq["id"],

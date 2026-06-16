@@ -72,8 +72,10 @@ push / pull helpers.
 
 ```bash
 cd triage && make install                          # uv sync (brings dvc[s3])
-AWS_PROFILE=pyronear uv run dvc pull                # fetch the scored store + report
-cd ../viewer && DATA_ROOT=../triage npm run dev     # browse at localhost:3000
+AWS_PROFILE=pyronear uv run dvc pull                # fetch data/02_shards from S3
+uv run temporal-triage unpack                      # tars → loose store + report
+( cd ../viewer && npm install )                     # first time only
+make viewer                                         # browse at localhost:3000
 ```
 
 `triage/` pulls the pyro-annotator's unannotated backlog (read-only), scores it

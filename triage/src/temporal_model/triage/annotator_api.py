@@ -95,13 +95,14 @@ class AnnotatorApiClient:
         """
         yielded = 0
         page = 1
+        size = min(page_size, PAGE_SIZE)
         while True:
             payload = self._get(
                 "/api/v1/sequences/",
                 {
                     "processing_stage": processing_stage,
                     "page": page,
-                    "size": min(page_size, PAGE_SIZE),
+                    "size": size,
                     "order_by": "created_at",
                     "order_direction": "desc",
                 },
@@ -112,7 +113,9 @@ class AnnotatorApiClient:
                 yielded += 1
                 if limit is not None and yielded >= limit:
                     return
-            if page >= payload.get("pages", page) or not items:
+            # Stop on a short/empty page — robust even if the server omits
+            # ``pages`` (relying on it would stop after page 1 when absent).
+            if len(items) < size:
                 return
             page += 1
 
@@ -133,7 +136,8 @@ class AnnotatorApiClient:
             )
             items = payload.get("items", [])
             rows.extend(items)
-            if page >= payload.get("pages", page) or not items:
+            # Short/empty page = last (no reliance on a possibly-absent `pages`).
+            if len(items) < PAGE_SIZE:
                 return rows
             page += 1
 
