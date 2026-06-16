@@ -144,10 +144,20 @@ export function DetailPanel({
       </header>
       <div className="grid grid-cols-4 gap-2 text-sm">
         <Stat
-          label="verdict"
-          value={row.decision}
+          label={row.triage_bucket === undefined ? "verdict" : "bucket"}
+          value={
+            row.triage_bucket === undefined
+              ? row.decision
+              : row.decision === "keep"
+                ? "to review"
+                : "unlabel"
+          }
           color={row.decision === "keep" ? "#059669" : "#475569"}
-          hint="the model's keep / discard decision for this sequence"
+          hint={
+            row.triage_bucket === undefined
+              ? "the model's keep / discard decision for this sequence"
+              : "to review (≥ threshold) or unlabel (< threshold)"
+          }
         />
         {/* Eval-only: triage rows are unlabeled (no ground truth), monitor
             rows carry production's verdict — neither has a correctness. */}
