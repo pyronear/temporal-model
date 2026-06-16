@@ -1,5 +1,11 @@
 "use client";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { ControlRail } from "@/components/ControlRail";
 import { DetailPanel } from "@/components/detail/DetailPanel";
 import { FilterBar } from "@/components/FilterBar";
@@ -18,7 +24,7 @@ import {
   type Filters,
 } from "@/lib/filters";
 import { applyThreshold } from "@/lib/outcomes";
-import { nextSort, sortRows, type Sort } from "@/lib/sort";
+import { nextSort, sortRows, type Sort, type SortCol } from "@/lib/sort";
 import type {
   BboxTubeDetails,
   ModelConfig,
@@ -92,14 +98,16 @@ export default function Page() {
     !monitorMode &&
     cfg.decision?.aggregation === "logistic" &&
     sourceRows.some((r) => r.probability != null);
+  // Defer the THRESHOLD INPUT (not the output): the slider value updates every
+  // tick (smooth), but the expensive applyThreshold + table reconciliation run
+  // off the deferred value, so React skips intermediate drag values. No manual
+  // debounce; the rail/table catch up when the drag slows.
+  const deferredThreshold = useDeferredValue(threshold);
   const rows = useMemo(
-    () => (showSlider ? applyThreshold(sourceRows, threshold) : sourceRows),
-    [sourceRows, showSlider, threshold],
+    () =>
+      showSlider ? applyThreshold(sourceRows, deferredThreshold) : sourceRows,
+    [sourceRows, showSlider, deferredThreshold],
   );
-  // The slider + rail cards re-bucket from `rows` instantly (cheap), but the
-  // big table re-render is deferred so dragging the threshold stays smooth on
-  // large stores (React skips intermediate drag values, no manual debounce).
-  const deferredRows = useDeferredValue(rows);
 
   // Filters reset when the source changes (camera options are source-specific).
   const [filters, setFilters] = useState<Filters>(defaultFilters);
@@ -124,9 +132,14 @@ export default function Page() {
     [sourceRows],
   );
   const [sort, setSort] = useState<Sort | null>(null);
+  // Stable callback so React.memo(SequenceTable) isn't defeated each render.
+  const handleSort = useCallback(
+    (col: SortCol) => setSort((cur) => nextSort(cur, col)),
+    [],
+  );
   const tableRows = useMemo(
-    () => sortRows(applyFilters(deferredRows, filters), sort),
-    [deferredRows, filters, sort],
+    () => sortRows(applyFilters(rows, filters), sort),
+    [rows, filters, sort],
   );
 
   // Effective selection is derived: fall back to the first visible row when the
@@ -182,7 +195,7 @@ export default function Page() {
             selectedKey={selected}
             onSelect={setSelectedKey}
             sort={sort}
-            onSort={(col) => setSort((cur) => nextSort(cur, col))}
+            onSort={handleSort}
             monitorMode={monitorMode}
             triageMode={triageMode}
           />

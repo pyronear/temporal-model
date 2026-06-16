@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useRef, type ReactNode } from "react";
+import { memo, useMemo, useRef, type ReactNode } from "react";
 import { correctnessLabel, outcomeTokens, rowTokens } from "@/lib/correctness";
 import type { Sort, SortCol } from "@/lib/sort";
 import type { ResultRow } from "@/lib/types";
@@ -98,7 +98,7 @@ const TRIAGE_COLUMNS: Column[] = [
   },
 ];
 
-export function SequenceTable({
+function SequenceTableInner({
   rows,
   selectedKey,
   onSelect,
@@ -195,3 +195,7 @@ export function SequenceTable({
     </div>
   );
 }
+
+// Memoized: with stable props (deferred tableRows + useCallback handlers) the
+// 21k-row table is skipped entirely while the threshold slider is dragged.
+export const SequenceTable = memo(SequenceTableInner);

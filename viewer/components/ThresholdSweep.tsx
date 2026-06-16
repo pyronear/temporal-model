@@ -1,7 +1,10 @@
 import { useMemo } from "react";
 import type { ResultRow } from "@/lib/types";
 
-const THRESHOLDS = [0.1, 0.2, 0.35, 0.5, 0.7, 0.9];
+// Dense 0.05 steps around the ~0.45 operating point, bigger gaps at the extremes.
+const THRESHOLDS = [
+  0.1, 0.2, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.7, 0.8, 0.9,
+];
 
 /**
  * Compact tradeoff table under the triage slider: at each standard threshold,

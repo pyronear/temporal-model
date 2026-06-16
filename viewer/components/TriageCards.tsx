@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import type { ResultRow } from "@/lib/types";
 
 /**
@@ -17,21 +18,24 @@ export function TriageCards({
   selectedOrganization?: string;
   onSelectOrganization?: (org: string) => void;
 }) {
-  const review = rows.filter((r) => r.decision === "keep").length;
-  const unlabel = rows.filter((r) => r.decision === "discard").length;
-
-  // Per-org breakdown (review/unlabel), sorted by total desc.
-  const orgMap = new Map<string, { review: number; unlabel: number }>();
-  for (const r of rows) {
-    const org = r.organization_name ?? "—";
-    const entry = orgMap.get(org) ?? { review: 0, unlabel: 0 };
-    if (r.decision === "keep") entry.review++;
-    else entry.unlabel++;
-    orgMap.set(org, entry);
-  }
-  const orgs = [...orgMap.entries()].sort(
-    (a, b) => b[1].review + b[1].unlabel - (a[1].review + a[1].unlabel),
-  );
+  // Memoized on rows so re-renders for the live header value (threshold) don't
+  // re-scan all rows each tick.
+  const { review, unlabel, orgs } = useMemo(() => {
+    const review = rows.filter((r) => r.decision === "keep").length;
+    // Per-org breakdown (review/unlabel), sorted by total desc.
+    const orgMap = new Map<string, { review: number; unlabel: number }>();
+    for (const r of rows) {
+      const org = r.organization_name ?? "—";
+      const entry = orgMap.get(org) ?? { review: 0, unlabel: 0 };
+      if (r.decision === "keep") entry.review++;
+      else entry.unlabel++;
+      orgMap.set(org, entry);
+    }
+    const orgs = [...orgMap.entries()].sort(
+      (a, b) => b[1].review + b[1].unlabel - (a[1].review + a[1].unlabel),
+    );
+    return { review, unlabel: rows.length - review, orgs };
+  }, [rows]);
 
   const pctOf = (n: number) =>
     rows.length ? Math.round((n / rows.length) * 100) : 0;
