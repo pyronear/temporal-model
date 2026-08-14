@@ -2,7 +2,7 @@
 
 How to retrain, evaluate, and release the temporal smoke classifier when a new
 [pyro-dataset](https://github.com/pyronear/pyro-dataset) version ships. Every
-command below was run for the v3.0.0 → v4.1.0 retrain (PR #TODO); numbers in
+command below was run for the v3.0.0 → v4.1.0 retrain (PR #65); numbers in
 the examples are that run's real output.
 
 **Prerequisites**
@@ -183,7 +183,7 @@ Commit (pointers and locks only — blobs never enter git):
 - `eval/dvc.lock`
 
 Open the PR in the self-documenting style: every section is the real output of
-the commands above (see PR #TODO for the template).
+the commands above (see PR #65 for the template).
 
 ## 5. Release the new model (after the PR merges)
 
