@@ -2,7 +2,7 @@
 
 How to retrain, evaluate, and release the temporal smoke classifier when a new
 [pyro-dataset](https://github.com/pyronear/pyro-dataset) version ships. Every
-command below was run for the v3.0.0 → v4.1.0 retrain (PR #65); numbers in
+step below was executed for the v3.0.0 → v4.1.0 retrain (PR #65); numbers in
 the examples are that run's real output.
 
 **Prerequisites**
@@ -11,8 +11,9 @@ the examples are that run's real output.
   `eval/` both need their `uv sync`).
 - AWS credentials that can read pyro-dataset's DVC remote and read/write this
   repo's DVC remotes (`AWS_PROFILE=pyronear` below).
-- Disk: the raw v4.1.0 train+val import is ~8 GB, and the pipeline roughly
-  triples that downstream (truncated copies, patches, checkpoints).
+- Disk: the raw v4.1.0 train+val import is ~9 GB (8.2 train + 0.8 val), and
+  the pipeline roughly triples that downstream (truncated copies, patches,
+  checkpoints).
 
 **The loop at a glance**
 
@@ -26,23 +27,29 @@ release bump api/MODEL_VERSION → publish model.zip to HF → git tag
 
 ## 0. Snapshot the current model's metrics (before touching anything)
 
-The eval reporting tree is overwritten in place, and its `metrics.json` files
-are `cache: false` (not recoverable from the DVC remote). Save them first —
-they are the "old" column of your comparison table:
+The eval reporting tree is overwritten in place, and **every** reporting
+output is `cache: false` (metrics, results, `details/`, `sequences/` — none of
+it is recoverable from the DVC remote). Snapshot the whole tree, to a location
+that survives a reboot: it is the "old" column of your comparison table, and
+the per-sequence artifacts are what let you ask later *which* sequences
+flipped, not just how the totals moved:
 
 ```bash
 cd eval
-mkdir -p /tmp/baseline-metrics
-for src in train val pyro-annotator; do
-  cp data/08_reporting/$src/vit_dinov2_finetune/metrics.json /tmp/baseline-metrics/$src.json
-done
+cp -r data/08_reporting ~/baselines/temporal-model-08_reporting-$(date +%F)
 ```
 
 If a source's reporting tree is missing locally (it happens — `cache: false`
 outputs never round-trip through the remote), regenerate it with the **old**
-model before updating anything: `uv run dvc repro evaluate_pyro_annotator`
-(pull `data/01_raw/pyro-annotator.dvc` first if needed). Verify what you
-snapshotted is canonical: the file md5s must match the ones recorded in
+model before updating anything:
+
+```bash
+uv run dvc repro evaluate@train evaluate@val evaluate_pyro_annotator
+```
+
+(note the `@` names — `evaluate` is a foreach stage; pull
+`data/01_raw/pyro-annotator.dvc` first if needed). Verify what you snapshotted
+is canonical: the `metrics.json` md5s must match the ones recorded in
 `eval/dvc.lock`.
 
 ## 1. Point the raw-data imports at the new dataset release
@@ -57,8 +64,12 @@ cd train
 AWS_PROFILE=pyronear uv run dvc update \
   data/01_raw/datasets_full/train.dvc \
   data/01_raw/datasets_full/val.dvc \
-  --rev v4.1.0
+  --rev vX.Y.Z          # the new pyro-dataset release tag
 ```
+
+Beware: `dvc update` against a tag the pointers already record is a silent
+no-op — if you forget to change the `--rev`, everything downstream "succeeds"
+on the old data.
 
 This rewrites both `.dvc` pointers (`rev: v4.1.0` + the new content hashes) and
 materialises the new data. Sanity-check the sequence counts against the numbers
@@ -143,7 +154,17 @@ sequence-level protocol eval (next step) is.
 
   ```bash
   cd eval
-  make update-model     # dvc update model.zip.dvc
+  make update-model   # runs: dvc update data/06_models/vit_dinov2_finetune/model.zip.dvc
+  ```
+
+  **Forgetting this step is silent.** The import is frozen and `dvc status`
+  does not check frozen-stage dependencies, so eval would happily re-score the
+  *old* model on all three sources — your "comparison" would be the old model
+  against itself. After updating, confirm the two files are identical:
+
+  ```bash
+  md5sum data/06_models/vit_dinov2_finetune/model.zip \
+         ../train/data/06_models/vit_dinov2_finetune/model.zip
   ```
 
 Then re-score everything (train/val splits + the fixed pyro-annotator store):
@@ -171,9 +192,15 @@ Judge the two families of numbers differently:
 ## 4. Push data, commit pointers
 
 ```bash
-cd train && AWS_PROFILE=pyronear uv run dvc push
+cd train && AWS_PROFILE=pyronear uv run dvc push dvc.yaml   # pipeline outputs only
 cd ../eval && AWS_PROFILE=pyronear uv run dvc push
 ```
+
+The `dvc.yaml` target on the train side skips the ~9 GB raw imports: those
+blobs already live in pyro-dataset's own DVC remote and are re-fetchable from
+the pinned `rev_lock`, so pushing them here only duplicates them into this
+repo's bucket and adds an hour-plus of upload per dataset bump (a bare
+`dvc push` does exactly that).
 
 Commit (pointers and locks only — blobs never enter git):
 
@@ -187,23 +214,16 @@ the commands above (see PR #65 for the template).
 
 ## 5. Release the new model (after the PR merges)
 
-Two decoupled versions exist (see `docs/releasing.md` /
-`docs/model-versioning.md`): the **model version** (`api/MODEL_VERSION` → the
-HuggingFace artifact) and the **code version** (git tag → Docker image). A
-retrain bumps the model version; ship it by:
+A retrain bumps the **model version** (`api/MODEL_VERSION` → the HuggingFace
+artifact), which is decoupled from the code version (git tag → Docker image).
+Follow **"Cutting a release" in [`docs/releasing.md`](../releasing.md)** — that
+is the canonical procedure; don't work from a copy of it here. The
+retrain-specific parts:
 
-```bash
-# 1. bump the pin + publish model.zip to HuggingFace
-#    (needs a WRITE HF token — the read token in api/.envrc will 403 at upload)
-echo "X.Y.Z" > api/MODEL_VERSION
-cd api && uv run python -m temporal_model.api.release \
-    publish --version X.Y.Z --file ../train/data/06_models/vit_dinov2_finetune/model.zip
-
-# 2. commit the MODEL_VERSION bump, then cut a code release that bakes it in
-git tag vA.B.C && git push origin vA.B.C
-```
-
-The tag triggers `.github/workflows/push.yml`, which fetches the pinned
-`model.zip` from HF, builds `pyronear/temporal-model-api:A.B.C`, and
-auto-creates the GitHub Release. `publish` is immutable per version — a
-re-publish of an existing version fails by design.
+- the `model.zip` to publish is
+  `train/data/06_models/vit_dinov2_finetune/model.zip` — the artifact this
+  loop just built, packaged, and evaluated;
+- `publish` needs a **write** HF token (the read token in `api/.envrc` 403s at
+  upload);
+- `publish` is immutable per version — a re-publish of an existing version
+  fails by design, so double-check the new version number before running it.
