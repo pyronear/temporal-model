@@ -17,8 +17,10 @@ import yaml
 from starlette.concurrency import run_in_threadpool
 
 from temporal_model.core.stage_timer import StageTimer, stage_ctx
+from temporal_model.core.types import Detection, FrameDetections
 
 from .detection_cache import DetectionCache
+from .schemas import SuppliedDetection
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +45,37 @@ def _load_core_model(package_path: Path, device: str | None) -> Any:
     from temporal_model.core.model import BboxTubeTemporalModel  # noqa: PLC0415
 
     return BboxTubeTemporalModel.from_package(package_path, device=device)
+
+
+def _supplied_frame_detections(
+    frames: list[Any], detections: list[list[SuppliedDetection]]
+) -> dict[str, FrameDetections]:
+    """Convert caller-supplied xyxyn boxes to per-frame ``FrameDetections``.
+
+    ``detections`` is index-aligned with ``frames`` (lengths validated at the
+    HTTP boundary; ``strict=True`` is a safety net). Boxes arrive as
+    normalized corners and become center-based xywhn ``Detection``s; supplied
+    boxes are smoke by definition (``class_id=0``).
+    """
+    resolved: dict[str, FrameDetections] = {}
+    for idx, (frame, boxes) in enumerate(zip(frames, detections, strict=True)):
+        resolved[frame.frame_id] = FrameDetections(
+            frame_idx=idx,
+            frame_id=frame.frame_id,
+            timestamp=frame.timestamp,
+            detections=[
+                Detection(
+                    class_id=0,
+                    cx=(b.xyxyn[0] + b.xyxyn[2]) / 2.0,
+                    cy=(b.xyxyn[1] + b.xyxyn[3]) / 2.0,
+                    w=b.xyxyn[2] - b.xyxyn[0],
+                    h=b.xyxyn[3] - b.xyxyn[1],
+                    confidence=b.confidence,
+                )
+                for b in boxes
+            ],
+        )
+    return resolved
 
 
 class ModelRunner:
@@ -122,6 +155,7 @@ class ModelRunner:
         frame_paths: list[Path],
         *,
         roi: tuple[float, float, float, float] | None = None,
+        detections: list[list[SuppliedDetection]] | None = None,
         timer: StageTimer | None = None,
         profile: dict[str, Any] | None = None,
         compute_trigger: bool = False,
@@ -132,23 +166,51 @@ class ModelRunner:
         cache is accessed by one prediction at a time. When ``timer``/``profile``
         are supplied, the ``detector`` stage is timed and cache counts recorded.
         ``roi`` is passed through to the core model untouched — the cache stays
-        full-frame (see the invariant in the ROI spec).
+        full-frame (see the invariant in the ROI spec). When ``detections`` is
+        supplied (index-aligned per-frame boxes from the caller's own
+        detector), the bundled detector and its cache are bypassed entirely:
+        no read, no write, no ``detector`` stage.
         """
         async with self._lock:
             return await run_in_threadpool(
-                self._predict_sync, frame_paths, roi, timer, profile, compute_trigger
+                self._predict_sync,
+                frame_paths,
+                roi,
+                detections,
+                timer,
+                profile,
+                compute_trigger,
             )
 
     def _predict_sync(
         self,
         frame_paths: list[Path],
         roi: tuple[float, float, float, float] | None = None,
+        detections: list[list[SuppliedDetection]] | None = None,
         timer: StageTimer | None = None,
         profile: dict[str, Any] | None = None,
         compute_trigger: bool = False,
     ) -> Any:
         started = time.perf_counter()
         frames = self._model.load_sequence(frame_paths)
+        if detections is not None:
+            out = self._model.predict(
+                frames,
+                frame_detections=_supplied_frame_detections(frames, detections),
+                roi=roi,
+                timer=timer,
+                compute_trigger=compute_trigger,
+            )
+            if profile is not None:
+                profile["n_frames"] = len(frames)
+                profile["cache_hits"] = 0
+                profile["cache_misses"] = 0
+            logger.info(
+                "predict: supplied detections, seq_len=%d, %.0fms",
+                len(frames),
+                (time.perf_counter() - started) * 1000.0,
+            )
+            return out
         resolved: dict[str, Any] = {}
         misses = []
         for f in frames:

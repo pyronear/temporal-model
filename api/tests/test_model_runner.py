@@ -3,13 +3,15 @@ import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 import yaml
 
 from temporal_model.api import model_runner as mr
 from temporal_model.api.model_runner import ModelRunner, read_manifest
+from temporal_model.api.schemas import SuppliedDetection
 from temporal_model.core.protocol import Frame
 from temporal_model.core.stage_timer import StageTimer
-from temporal_model.core.types import FrameDetections
+from temporal_model.core.types import Detection, FrameDetections
 
 
 def _make_package(tmp_path, manifest: dict):
@@ -121,6 +123,7 @@ class _OrchestrationModel:
         self.detect_calls: list[list[str]] = []
         self.predict_calls: list[set[str]] = []
         self.roi_calls: list[tuple | None] = []
+        self.frame_detections_calls: list[dict] = []
         self.trigger_calls: list[bool] = []
 
     def load_sequence(self, paths):
@@ -133,7 +136,12 @@ class _OrchestrationModel:
         self.detect_calls.append([f.frame_id for f in frames])
         return [
             FrameDetections(
-                frame_idx=i, frame_id=f.frame_id, timestamp=None, detections=[]
+                frame_idx=i,
+                frame_id=f.frame_id,
+                timestamp=None,
+                detections=[
+                    Detection(class_id=0, cx=0.5, cy=0.5, w=0.5, h=0.5, confidence=0.75)
+                ],
             )
             for i, f in enumerate(frames)
         ]
@@ -149,6 +157,7 @@ class _OrchestrationModel:
     ):
         self.predict_calls.append(set(frame_detections or {}))
         self.roi_calls.append(roi)
+        self.frame_detections_calls.append(frame_detections or {})
         self.trigger_calls.append(compute_trigger)
         return SimpleNamespace(frame_ids=[f.frame_id for f in frames])
 
@@ -213,6 +222,118 @@ def test_predict_cache_disabled_detects_every_frame():
 
     assert model.detect_calls[0] == ["x_00", "x_01"]
     assert model.detect_calls[1] == ["x_00", "x_01", "x_02"]  # full each call
+
+
+def _supplied_box():
+    return SuppliedDetection(xyxyn=(0.1, 0.2, 0.5, 0.8), confidence=0.7)
+
+
+def test_predict_with_supplied_detections_skips_detect():
+    model = _OrchestrationModel()
+    runner = ModelRunner(model, name="m", version="1", calibrated=True)
+    asyncio.run(
+        runner.predict(["c/x_00.jpg", "c/x_01.jpg"], detections=[[_supplied_box()], []])
+    )
+
+    assert model.detect_calls == []
+    assert model.predict_calls[-1] == {"x_00", "x_01"}
+
+
+def test_predict_supplied_detections_converted_to_xywhn():
+    model = _OrchestrationModel()
+    runner = ModelRunner(model, name="m", version="1", calibrated=True)
+    asyncio.run(runner.predict(["c/x_00.jpg"], detections=[[_supplied_box()]]))
+
+    fd = model.frame_detections_calls[-1]["x_00"]
+    assert fd.frame_idx == 0
+    [det] = fd.detections
+    assert (det.cx, det.cy, det.w, det.h) == pytest.approx((0.3, 0.5, 0.4, 0.6))
+    assert det.confidence == 0.7
+    assert det.class_id == 0
+
+
+def test_predict_supplied_empty_frame_has_no_detections():
+    model = _OrchestrationModel()
+    runner = ModelRunner(model, name="m", version="1", calibrated=True)
+    asyncio.run(runner.predict(["c/x_00.jpg"], detections=[[]]))
+
+    assert model.frame_detections_calls[-1]["x_00"].detections == []
+
+
+def test_predict_supplied_detections_do_not_enter_cache():
+    model = _OrchestrationModel()
+    runner = ModelRunner(
+        model, name="m", version="1", calibrated=True, detection_cache_size=4096
+    )
+    asyncio.run(runner.predict(["c/x_00.jpg"], detections=[[_supplied_box()]]))
+    asyncio.run(runner.predict(["c/x_00.jpg"]))
+
+    # The supplied run wrote nothing: the plain run must re-detect the frame.
+    assert model.detect_calls == [["x_00"]]
+
+
+def test_predict_supplied_detections_ignore_cached_entries():
+    model = _OrchestrationModel()
+    runner = ModelRunner(
+        model, name="m", version="1", calibrated=True, detection_cache_size=4096
+    )
+    asyncio.run(runner.predict(["c/x_00.jpg"]))  # warms cache (confidence 0.75)
+    asyncio.run(runner.predict(["c/x_00.jpg"], detections=[[_supplied_box()]]))
+
+    # The supplied run used the supplied box, not the cached detector output.
+    [det] = model.frame_detections_calls[-1]["x_00"].detections
+    assert det.confidence == 0.7
+
+
+def test_predict_supplied_detections_profile_counters():
+    model = _OrchestrationModel()
+    runner = ModelRunner(model, name="m", version="1", calibrated=True)
+    profile: dict = {}
+    asyncio.run(
+        runner.predict(["c/x_00.jpg"], detections=[[_supplied_box()]], profile=profile)
+    )
+
+    assert profile == {"n_frames": 1, "cache_hits": 0, "cache_misses": 0}
+
+
+def test_predict_supplied_detections_threads_roi():
+    model = _OrchestrationModel()
+    runner = ModelRunner(model, name="m", version="1", calibrated=True)
+    asyncio.run(
+        runner.predict(
+            ["c/x_00.jpg"], detections=[[_supplied_box()]], roi=(0.1, 0.2, 0.3, 0.4)
+        )
+    )
+
+    assert model.roi_calls[-1] == (0.1, 0.2, 0.3, 0.4)
+
+
+def test_predict_supplied_detections_threads_compute_trigger():
+    model = _OrchestrationModel()
+    runner = ModelRunner(model, name="m", version="1", calibrated=True)
+    asyncio.run(
+        runner.predict(
+            ["c/x_00.jpg"], detections=[[_supplied_box()]], compute_trigger=True
+        )
+    )
+    assert model.trigger_calls[-1] is True
+
+
+def test_predict_supplied_matches_detector_path():
+    # Supplying the exact box the detector would produce (xywhn 0.5/0.5/0.5/0.5
+    # == xyxyn 0.25..0.75) hands the model identical FrameDetections.
+    model = _OrchestrationModel()
+    runner = ModelRunner(model, name="m", version="1", calibrated=True)
+    paths = ["c/x_00.jpg", "c/x_01.jpg"]
+
+    asyncio.run(runner.predict(paths))
+    detector_fds = model.frame_detections_calls[-1]
+
+    equivalent = SuppliedDetection(xyxyn=(0.25, 0.25, 0.75, 0.75), confidence=0.75)
+    asyncio.run(runner.predict(paths, detections=[[equivalent], [equivalent]]))
+    supplied_fds = model.frame_detections_calls[-1]
+
+    assert supplied_fds == detector_fds
 
 
 class _StubFrame:

@@ -66,13 +66,22 @@ class FakeRunner:
         self._output = output
         self._error = error
         self.roi = None
+        self.detections = None
         self.paths = None
         self.compute_trigger = None
 
     async def predict(
-        self, paths, *, roi=None, timer=None, profile=None, compute_trigger=False
+        self,
+        paths,
+        *,
+        roi=None,
+        detections=None,
+        timer=None,
+        profile=None,
+        compute_trigger=False,
     ):
         self.roi = roi
+        self.detections = detections
         self.paths = paths
         self.compute_trigger = compute_trigger
         if self._error:
@@ -465,6 +474,53 @@ def test_predict_invalid_roi_is_400(client):
     assert "roi_xyxyn" in body["detail"]
 
 
+def test_predict_passes_detections_to_runner(client):
+    r = client.post(
+        "/predict",
+        json={
+            "frames": KEYS,
+            "detections": [
+                [{"xyxyn": [0.1, 0.2, 0.3, 0.4], "confidence": 0.6}],
+                [],
+            ],
+        },
+    )
+    assert r.status_code == 200
+    sent = client.app.state.runner.detections
+    assert sent[0][0].xyxyn == (0.1, 0.2, 0.3, 0.4)
+    assert sent[0][0].confidence == 0.6
+    assert sent[1] == []
+
+
+def test_predict_without_detections_passes_none(client):
+    r = client.post("/predict", json={"frames": KEYS})
+    assert r.status_code == 200
+    assert client.app.state.runner.detections is None
+
+
+def test_predict_detections_length_mismatch_is_400(client):
+    r = client.post("/predict", json={"frames": KEYS, "detections": [[]]})
+    assert r.status_code == 400
+    body = r.json()
+    assert body["code"] == "invalid_request"
+    assert "one entry per frame" in body["detail"]
+
+
+def test_predict_malformed_detection_is_400(client):
+    r = client.post(
+        "/predict",
+        json={
+            "frames": KEYS,
+            "detections": [
+                [{"xyxyn": [0.3, 0.2, 0.1, 0.4], "confidence": 0.6}],
+                [],
+            ],
+        },
+    )
+    assert r.status_code == 400
+    assert r.json()["code"] == "invalid_request"
+
+
 @pytest.fixture
 def local_client(monkeypatch, tmp_path):
     # An edge-box style deployment: frame_source=local, frames on a shared
@@ -520,6 +576,34 @@ def test_predict_local_no_root_400_takes_precedence_over_model(
     r = local_client.post("/predict", json={"frames": KEYS})
     assert r.status_code == 400
     assert r.json()["code"] == "invalid_request"
+
+
+def test_predict_detections_compose_with_roi(client):
+    r = client.post(
+        "/predict",
+        json={
+            "frames": KEYS,
+            "detections": [[], []],
+            "roi_xyxyn": [0.0, 0.0, 1.0, 1.0],
+        },
+    )
+    assert r.status_code == 200
+    assert client.app.state.runner.roi == (0.0, 0.0, 1.0, 1.0)
+    assert client.app.state.runner.detections == [[], []]
+
+
+def test_predict_verbose_detections_source_request(client):
+    r = client.post(
+        "/predict?verbose=true", json={"frames": KEYS, "detections": [[], []]}
+    )
+    assert r.status_code == 200
+    assert r.json()["details"]["preprocessing"]["detections_source"] == "request"
+
+
+def test_predict_verbose_detections_source_detector(client):
+    r = client.post("/predict?verbose=true", json={"frames": KEYS})
+    assert r.status_code == 200
+    assert r.json()["details"]["preprocessing"]["detections_source"] == "detector"
 
 
 def test_predict_local_missing_frame_404(local_client):

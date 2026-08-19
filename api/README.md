@@ -9,12 +9,17 @@ Import as `temporal_model.api`. Depends on `temporal-model-core`.
 
 - `GET /health` — readiness + loaded model name/version + API code version.
 - `POST /predict` — body `{ "frames": [...], "source": "s3" | "local",
-  "bucket": "<name>", "roi_xyxyn": [x_min, y_min, x_max, y_max] }`
+  "bucket": "<name>", "roi_xyxyn": [x_min, y_min, x_max, y_max],
+  "detections": [[{"xyxyn": [...], "confidence": 0.6}], []] }`
   (ordered frames; `source` optional, falls back to `FRAME_SOURCE` — with
   `s3`, frames are S3 keys and `bucket` optionally overrides `S3_BUCKET`;
   with `local`, frames are relative paths under `FRAMES_ROOT` and `bucket`
   is invalid; `roi_xyxyn` optional normalized region of interest — tubes
-  with no real detection intersecting it are dropped before scoring);
+  with no real detection intersecting it are dropped before scoring;
+  `detections` optional caller-supplied boxes, one list per frame
+  index-aligned with `frames`, `[]` = that frame's detector saw nothing —
+  skips the bundled YOLO and its cache entirely, tubes are built from the
+  supplied boxes);
   returns `{ is_smoke, probability, version }` (`probability` = max kept-tube
   calibrated probability, `null` if uncalibrated).
   `version` is `{api, model}` — the code release (== the Docker image tag,
@@ -25,8 +30,10 @@ Import as `temporal_model.api`. Depends on `temporal-model-core`.
   top-level `trigger_frame_index` (`null` if nothing crossed) — with
   `verbose=true` it also fills `details.decision.trigger_tube_id` and
   per-tube `details.tubes[].first_crossing_frame`. See
-  `docs/specs/2026-06-02-api-service-design.md` and
-  `docs/specs/2026-06-11-api-local-frames-design.md` for the full contract.
+  `docs/specs/2026-06-02-api-service-design.md`,
+  `docs/specs/2026-06-11-api-local-frames-design.md` and
+  `docs/specs/2026-06-11-api-supplied-detections-design.md` for the full
+  contract.
 
 ## Run
 

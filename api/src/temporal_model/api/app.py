@@ -186,6 +186,7 @@ async def predict(
             out = await runner.predict(
                 paths,
                 roi=body.roi_xyxyn,
+                detections=body.detections,
                 timer=timer,
                 profile=profile,
                 compute_trigger=compute_trigger,
@@ -210,6 +211,9 @@ async def predict(
                 compute_trigger=compute_trigger,
                 threshold_overridden=runner.threshold_overridden,
                 packaged_threshold=runner.packaged_threshold,
+                detections_source=(
+                    "request" if body.detections is not None else "detector"
+                ),
                 profiling=profiling,
             )
         except ApiError:

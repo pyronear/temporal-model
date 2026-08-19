@@ -10,7 +10,7 @@ are only set when requested, so the route serializes with
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from temporal_model.core.tubes import validate_roi
 
@@ -19,6 +19,30 @@ from temporal_model.core.tubes import validate_roi
 # (colons), slashes and other malformed names early as a 400 instead of letting
 # them fail deep in boto3.
 _BUCKET_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
+
+
+class SuppliedDetection(BaseModel):
+    """One caller-supplied detection box (normalized xyxyn corners).
+
+    Geometry rules match ``roi_xyxyn``. Checked inline rather than via the
+    core ``validate_roi`` helper so the error message names the detection
+    field, not "roi".
+    """
+
+    xyxyn: tuple[float, float, float, float]
+    confidence: float = Field(ge=0.0, le=1.0)
+
+    @field_validator("xyxyn")
+    @classmethod
+    def _validate_xyxyn(
+        cls, v: tuple[float, float, float, float]
+    ) -> tuple[float, float, float, float]:
+        x_min, y_min, x_max, y_max = v
+        if not all(0.0 <= c <= 1.0 for c in v):
+            raise ValueError("xyxyn coordinates must be in [0, 1]")
+        if x_min >= x_max or y_min >= y_max:
+            raise ValueError("xyxyn requires x_min < x_max and y_min < y_max")
+        return v
 
 
 class PredictRequest(BaseModel):
@@ -37,6 +61,12 @@ class PredictRequest(BaseModel):
     # detection intersecting it are dropped before scoring (see
     # docs/specs/2026-06-10-api-roi-design.md).
     roi_xyxyn: tuple[float, float, float, float] | None = None
+    # Optional caller-supplied detections, one list per frame, index-aligned
+    # with `frames` ([] = that frame's detector saw nothing — never null).
+    # When set, the bundled YOLO and its cache are bypassed entirely and tubes
+    # are built from these boxes (see
+    # docs/specs/2026-06-11-api-supplied-detections-design.md).
+    detections: list[list[SuppliedDetection]] | None = None
 
     @field_validator("frames")
     @classmethod
@@ -76,6 +106,15 @@ class PredictRequest(BaseModel):
             raise ValueError(f"roi_xyxyn: {e}") from e
         return v
 
+    @model_validator(mode="after")
+    def _detections_match_frames(self) -> "PredictRequest":
+        if self.detections is not None and len(self.detections) != len(self.frames):
+            raise ValueError(
+                "detections must have exactly one entry per frame "
+                f"(got {len(self.detections)} entries for {len(self.frames)} frames)"
+            )
+        return self
+
 
 class FrameEntry(BaseModel):
     frame_idx: int
@@ -113,6 +152,9 @@ class Preprocessing(BaseModel):
     padded_frame_indices: list[int]
     num_tube_candidates: int
     num_tubes_outside_roi: int
+    # Provenance: "request" when the caller supplied the detections (bundled
+    # detector bypassed), "detector" when the bundled YOLO produced them.
+    detections_source: Literal["request", "detector"]
 
 
 class Details(BaseModel):
@@ -160,6 +202,7 @@ def _to_details(
     *,
     threshold_overridden: bool,
     packaged_threshold: float | None,
+    detections_source: Literal["request", "detector"],
     profiling: dict[str, Any] | None = None,
     compute_trigger: bool = False,
 ) -> Details:
@@ -189,6 +232,7 @@ def _to_details(
             # Strict like num_candidates: core (same-commit path dependency)
             # always emits the key; a silent 0 here would mask a core rename.
             num_tubes_outside_roi=tubes_block["num_outside_roi"],
+            detections_source=detections_source,
         ),
         tubes=[Tube(**t) for t in kept],
         profiling=profiling,
@@ -205,6 +249,7 @@ def to_response(
     compute_trigger: bool = False,
     threshold_overridden: bool = False,
     packaged_threshold: float | None = None,
+    detections_source: Literal["request", "detector"] = "detector",
     profiling: dict[str, Any] | None = None,
 ) -> PredictResponse:
     """Reshape a core model output into the public response DTO."""
@@ -221,6 +266,7 @@ def to_response(
             out.details,
             threshold_overridden=threshold_overridden,
             packaged_threshold=packaged_threshold,
+            detections_source=detections_source,
             profiling=profiling,
             compute_trigger=compute_trigger,
         )
