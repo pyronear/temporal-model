@@ -5,6 +5,16 @@ How to retrain, evaluate, and release the temporal smoke classifier when a new
 step below was executed for the v3.0.0 → v4.1.0 retrain (PR #65); numbers in
 the examples are that run's real output.
 
+> **CI path (preferred):** steps 1–4 are automated by
+> [`.github/workflows/train.yml`](../../.github/workflows/train.yml). Push a
+> branch named `train_vX.Y.Z` (the new pyro-dataset release tag) and CI spins
+> up a GPU runner, bumps the dataset pointers to that tag, retrains, refreshes
+> eval, pushes the DVC data, and opens a `result_*` PR with the old-vs-new
+> pyro-annotator table (baseline = `results/` on main). A `train_*` branch
+> whose suffix is not a version tag trains on the pointers as committed
+> (code-change retrain). The manual loop below remains the reference for
+> running locally and for understanding what CI does.
+
 **Prerequisites**
 
 - A GPU machine with this repo checked out and `make install` run (`train/` and
