@@ -1,0 +1,228 @@
+name: Train on GPU
+
+on:
+  push:
+    branches:
+      - "train_*"
+
+# The train job pushes the result_* branch with the checkout-persisted
+# GITHUB_TOKEN; don't rely on the repo's default token permissions for that.
+permissions:
+  contents: write
+
+# One training run per branch at a time; a second push queues instead of
+# racing the first run for the same result_* branch.
+concurrency:
+  group: train-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  start-runner:
+    name: Start EC2 GPU runner
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.start-ec2-runner.outputs.label }}
+      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-3
+
+      - name: Start EC2 runner
+        id: start-ec2-runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.GH_PAT }}
+          ec2-image-id: ami-078da566f22c68a26
+          ec2-instance-type: g4dn.xlarge
+          subnet-id: subnet-0ed91f5fc60959086
+          security-group-id: sg-05cd9ff586699e8db
+
+  train:
+    name: Train and evaluate
+    needs: start-runner
+    runs-on: ${{ needs.start-runner.outputs.label }}
+    timeout-minutes: 1440
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: "3.11"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-3
+
+      # Branch name is the remote control: train_vX.Y.Z bumps the dataset
+      # imports to that pyro-dataset release; any other train_* name trains
+      # on the pointers as committed (code-change retrain).
+      - name: Resolve dataset revision from branch name
+        run: |
+          REV="${GITHUB_REF_NAME#train_}"
+          # Anchored: vX.Y.Z with optional hyphen suffix (e.g. v4.0.0-corrected).
+          # train_v4.1.0_experiment is a code-change branch, not a dataset bump.
+          if [[ "$REV" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)*$ ]]; then
+            echo "Dataset bump requested: $REV"
+            echo "DATASET_REV=$REV" >> "$GITHUB_ENV"
+          else
+            echo "No dataset version in branch name; training on committed pointers."
+          fi
+
+      - name: Install train dependencies
+        working-directory: train
+        run: uv sync
+
+      - name: Update dataset pointers
+        if: env.DATASET_REV != ''
+        working-directory: train
+        run: |
+          uv run dvc update \
+            data/01_raw/datasets_full/train.dvc \
+            data/01_raw/datasets_full/val.dvc \
+            --rev "$DATASET_REV"
+          # dvc update against an already-recorded tag is a silent no-op;
+          # make sure both pointers really record the requested revision.
+          grep -q "rev: $DATASET_REV" data/01_raw/datasets_full/train.dvc
+          grep -q "rev: $DATASET_REV" data/01_raw/datasets_full/val.dvc
+
+      - name: Run train pipeline
+        working-directory: train
+        run: |
+          uv run dvc pull \
+            data/01_raw/datasets_full/train.dvc \
+            data/01_raw/datasets_full/val.dvc \
+            data/06_models/detectors/yolo11s_nimble-narwhal_v6.0.0/yolo_weights.pt.dvc
+          uv run dvc repro --pull
+
+      - name: Push train artifacts to DVC remote
+        working-directory: train
+        # dvc.yaml target = pipeline outputs only; the raw imports stay in
+        # pyro-dataset's own remote (see the retrain runbook).
+        run: uv run dvc push dvc.yaml
+
+      - name: Install eval dependencies
+        working-directory: eval
+        run: uv sync
+
+      - name: Refresh eval inputs
+        working-directory: eval
+        run: |
+          rsync -a --delete ../train/data/01_raw/datasets/ data/01_raw/datasets/
+          make update-model
+          # Forgetting the model refresh is silent (frozen import); prove the
+          # eval copy is the model this run just built.
+          cmp data/06_models/vit_dinov2_finetune/model.zip \
+              ../train/data/06_models/vit_dinov2_finetune/model.zip
+
+      - name: Run eval pipeline
+        working-directory: eval
+        run: |
+          uv run dvc pull data/01_raw/pyro-annotator.dvc
+          uv run dvc repro --pull
+
+      - name: Push eval artifacts to DVC remote
+        working-directory: eval
+        run: uv run dvc push
+
+      - name: Push results to result branch
+        run: |
+          RESULT_BRANCH="result_${GITHUB_REF_NAME#train_}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          mkdir -p results
+          for src in train val pyro-annotator; do
+            cp "eval/data/08_reporting/$src/vit_dinov2_finetune/metrics.json" \
+               "results/$src.json"
+          done
+
+          git checkout -b "$RESULT_BRANCH"
+          git add \
+            train/data/01_raw/datasets_full/train.dvc \
+            train/data/01_raw/datasets_full/val.dvc \
+            train/dvc.lock \
+            eval/data/06_models/vit_dinov2_finetune/model.zip.dvc \
+            eval/dvc.lock \
+            results/
+          git commit -m "chore: training results from $GITHUB_REF_NAME [skip ci]"
+          git push --force origin "$RESULT_BRANCH"
+
+      - name: Install gh CLI
+        run: |
+          if ! which gh > /dev/null 2>&1; then
+            sudo mkdir -p -m 755 /etc/apt/keyrings
+            wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+              | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
+            sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+              | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt-get update -qq
+            sudo apt-get install -y gh
+          fi
+
+      - name: Open PR and publish metrics
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          RESULT_BRANCH="result_${GITHUB_REF_NAME#train_}"
+
+          # Baseline = the results/ snapshots committed on main (absent on
+          # the first run; the report degrades to a no-baseline table).
+          git fetch origin main --depth=1 2>/dev/null || true
+          BASELINE_DIR=$(mktemp -d)
+          for src in train val pyro-annotator; do
+            git show "origin/main:results/$src.json" \
+              > "$BASELINE_DIR/$src.json" 2>/dev/null \
+              || rm -f "$BASELINE_DIR/$src.json"
+          done
+
+          BODY=$(uv run --project eval python scripts/report-training-metrics.py \
+            --results-dir results \
+            --baseline-dir "$BASELINE_DIR" \
+            --dataset-rev "${DATASET_REV:-unchanged}" \
+            --result-branch "$RESULT_BRANCH")
+
+          PR_NUMBER=$(gh pr list --head "$RESULT_BRANCH" --base main \
+            --json number --jq '.[0].number')
+
+          if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+            gh pr create \
+              --base main \
+              --head "$RESULT_BRANCH" \
+              --title "Training results: $RESULT_BRANCH" \
+              --body "$BODY"
+          else
+            gh pr comment "$PR_NUMBER" --body "$BODY"
+          fi
+
+  stop-runner:
+    name: Stop EC2 GPU runner
+    needs: [start-runner, train]
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-3
+
+      - name: Stop EC2 runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.GH_PAT }}
+          label: ${{ needs.start-runner.outputs.label }}
+          ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
