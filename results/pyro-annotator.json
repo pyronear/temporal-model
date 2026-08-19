@@ -1,0 +1,16 @@
+{
+  "model_name": "vit_dinov2_finetune-pyro-annotator",
+  "num_sequences": 317,
+  "tp": 43,
+  "fp": 140,
+  "fn": 1,
+  "tn": 133,
+  "precision": 0.235,
+  "recall": 0.9773,
+  "f1": 0.3789,
+  "fpr": 0.5128,
+  "mean_ttd_frames": 3.2,
+  "median_ttd_frames": 3,
+  "pr_auc": 0.6289,
+  "roc_auc": 0.8678
+}

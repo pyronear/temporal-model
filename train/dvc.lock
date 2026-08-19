@@ -325,7 +325,7 @@ stages:
           num_workers: 4
           learning_rate: 0.0001
           weight_decay: 0.05
-          max_epochs: 30
+          max_epochs: 2
           early_stop_patience: 5
           seed: 42
           global_pool: token
@@ -343,17 +343,17 @@ stages:
     outs:
     - path: data/06_models/vit_dinov2_finetune/best_checkpoint.pt
       hash: md5
-      md5: f88ee50e746af9dca6b9a99e14afde6d
-      size: 143536811
+      md5: 9786e4dad10a90183c158134896995a0
+      size: 143536747
     - path: data/06_models/vit_dinov2_finetune/csv_logs/
       hash: md5
-      md5: 84a2f1b7a1e76346dd15503850bfaae3.dir
-      size: 5987
+      md5: 9a01682fae43c3136f0859123f10bf3d.dir
+      size: 1794
       nfiles: 2
     - path: data/06_models/vit_dinov2_finetune/plots/training_curves.png
       hash: md5
-      md5: 99b5ab532bbba7eee685a04acff09bd0
-      size: 166276
+      md5: 20a1223854d30584c9388cf28d0f0385
+      size: 167452
   package:
     cmd: uv run python -m temporal_model.train.package --variant 
       vit_dinov2_finetune --output data/06_models/vit_dinov2_finetune/model.zip
@@ -412,8 +412,8 @@ stages:
       size: 19225626
     - path: data/06_models/vit_dinov2_finetune/best_checkpoint.pt
       hash: md5
-      md5: f88ee50e746af9dca6b9a99e14afde6d
-      size: 143536811
+      md5: 9786e4dad10a90183c158134896995a0
+      size: 143536747
     - path: src/temporal_model/train/calibration.py
       hash: md5
       md5: 9fcc002b92d7c66b446ef1f20a3d88df
@@ -464,7 +464,7 @@ stages:
           num_workers: 4
           learning_rate: 0.0001
           weight_decay: 0.05
-          max_epochs: 30
+          max_epochs: 2
           early_stop_patience: 5
           seed: 42
           global_pool: token
@@ -488,5 +488,5 @@ stages:
     outs:
     - path: data/06_models/vit_dinov2_finetune/model.zip
       hash: md5
-      md5: 2f5f1cbee0ff8ea407a5320aad2bd8d8
-      size: 162765216
+      md5: 8052f2bb1761fc3f321378c080933979
+      size: 162765153

@@ -1,0 +1,16 @@
+{
+  "model_name": "vit_dinov2_finetune-val",
+  "num_sequences": 350,
+  "tp": 167,
+  "fp": 25,
+  "fn": 8,
+  "tn": 150,
+  "precision": 0.8698,
+  "recall": 0.9543,
+  "f1": 0.9101,
+  "fpr": 0.1429,
+  "mean_ttd_frames": 1.8,
+  "median_ttd_frames": 1,
+  "pr_auc": 0.9723,
+  "roc_auc": 0.9691
+}
