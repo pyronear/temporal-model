@@ -128,7 +128,11 @@ jobs:
         working-directory: eval
         run: |
           uv run dvc pull data/01_raw/pyro-annotator.dvc
-          uv run dvc repro --pull
+          # Eval reporting outputs are cache: false — they never round-trip
+          # through the DVC remote, so on a fresh runner an unchanged lock
+          # still means missing metrics files (dvc skips the stage anyway).
+          # Force: scoring must actually run on every training run.
+          uv run dvc repro --force
 
       - name: Push eval artifacts to DVC remote
         working-directory: eval
