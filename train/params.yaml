@@ -46,7 +46,7 @@ _train_defaults: &train_defaults
   num_workers: 4
   learning_rate: 0.001
   weight_decay: 0.01
-  max_epochs: 30
+  max_epochs: 2
   early_stop_patience: 5
   seed: 42
 
