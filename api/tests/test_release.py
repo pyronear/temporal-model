@@ -1,5 +1,6 @@
 """Tests for the release CLI (HuggingFace calls mocked)."""
 
+import hashlib
 import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -132,20 +133,32 @@ def test_fetch_onnx_downloads_the_onnx_artifact(tmp_path: Path) -> None:
 
 def test_publish_with_onnx_uploads_both_stamped_archives(tmp_path: Path) -> None:
     z = _make_zip(tmp_path / "m.zip", {"variant": "vit"})
-    onnx_z = _make_zip(tmp_path / "m_onnx.zip", {"format_version": 1})
+    onnx_z = _make_zip(
+        tmp_path / "m_onnx.zip",
+        {"format_version": 1, "source": {"package": "m.zip", "sha256": "stale"}},
+    )
     api = MagicMock()
     stamped = {}
+    sha = {}
 
     def capture(**kw):
-        if kw["path_in_repo"].endswith(".zip"):
-            stamped[kw["path_in_repo"]] = release.read_model_version(
-                Path(kw["path_or_fileobj"])
-            )
+        name = kw["path_in_repo"]
+        if name.endswith(".zip"):
+            p = Path(kw["path_or_fileobj"])
+            stamped[name] = release.read_model_version(p)
+            sha[name] = hashlib.sha256(p.read_bytes()).hexdigest()
+            if name == "model_onnx.zip":
+                with zipfile.ZipFile(p) as zf:
+                    sha["onnx_source"] = yaml.safe_load(zf.read("manifest.yaml"))[
+                        "source"
+                    ]
 
     api.upload_file.side_effect = capture
     release.publish("0.3.0", z, onnx_path=onnx_z, repo="org/r", api=api)
 
     assert stamped == {"model.zip": "0.3.0", "model_onnx.zip": "0.3.0"}
+    # the ONNX manifest points at the *uploaded* (stamped) model.zip, not the input
+    assert sha["onnx_source"] == {"package": "model.zip", "sha256": sha["model.zip"]}
     assert release.read_model_version(onnx_z) is None
     uploaded = {c.kwargs["path_in_repo"] for c in api.upload_file.call_args_list}
     assert uploaded == {"model.zip", "model_onnx.zip", "README.md"}

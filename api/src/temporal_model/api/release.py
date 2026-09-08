@@ -12,6 +12,7 @@ same tag and ``fetch --onnx`` downloads it instead of ``model.zip``.
 """
 
 import argparse
+import hashlib
 import shutil
 import tempfile
 import zipfile
@@ -51,17 +52,38 @@ def read_model_version(zip_path: Path) -> str | None:
     return manifest.get("model_version")
 
 
-def stamp_model_version(zip_path: Path, version: str) -> None:
-    """Set ``manifest.model_version = version`` inside the zip (rewrites archive)."""
+def _update_manifest(zip_path: Path, **fields) -> None:
+    """Merge ``fields`` into the zip's manifest (rewrites the archive in place)."""
     with zipfile.ZipFile(zip_path) as zf:
         names = zf.namelist()
         blobs = {n: zf.read(n) for n in names}
     manifest = yaml.safe_load(blobs[MANIFEST_FILENAME])
-    manifest["model_version"] = version
+    manifest.update(fields)
     blobs[MANIFEST_FILENAME] = yaml.dump(manifest, default_flow_style=False).encode()
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_STORED) as zf:
         for n in names:
             zf.writestr(n, blobs[n])
+
+
+def stamp_model_version(zip_path: Path, version: str) -> None:
+    """Set ``manifest.model_version = version`` inside the zip (rewrites archive)."""
+    _update_manifest(zip_path, model_version=version)
+
+
+def stamp_onnx_source(onnx_zip: Path, model_zip: Path) -> None:
+    """Point ``manifest.source`` of ``onnx_zip`` at ``model_zip`` (name + SHA-256).
+
+    Stamping the version rewrites ``model.zip``, so the checksum recorded at
+    export time no longer identifies the released archive; re-stamp it from
+    the staged copy that actually gets uploaded.
+    """
+    _update_manifest(
+        onnx_zip,
+        source={
+            "package": model_zip.name,
+            "sha256": hashlib.sha256(model_zip.read_bytes()).hexdigest(),
+        },
+    )
 
 
 def fetch(
@@ -113,17 +135,21 @@ def publish(
     ``create_tag`` raises (no silent overwrite).
     """
     hf = api or HfApi()
-    uploads = [(file_path, MODEL_FILENAME)]
-    if onnx_path is not None:
-        uploads.append((onnx_path, ONNX_MODEL_FILENAME))
     with tempfile.TemporaryDirectory() as td:
-        for src, name in uploads:
-            staged = Path(td) / name
-            shutil.copyfile(src, staged)
-            stamp_model_version(staged, version)
+        staged_model = Path(td) / MODEL_FILENAME
+        shutil.copyfile(file_path, staged_model)
+        stamp_model_version(staged_model, version)
+        uploads = [staged_model]
+        if onnx_path is not None:
+            staged_onnx = Path(td) / ONNX_MODEL_FILENAME
+            shutil.copyfile(onnx_path, staged_onnx)
+            stamp_model_version(staged_onnx, version)
+            stamp_onnx_source(staged_onnx, staged_model)
+            uploads.append(staged_onnx)
+        for staged in uploads:
             hf.upload_file(
                 path_or_fileobj=str(staged),
-                path_in_repo=name,
+                path_in_repo=staged.name,
                 repo_id=repo,
                 repo_type="model",
             )
