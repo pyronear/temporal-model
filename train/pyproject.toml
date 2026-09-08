@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "temporal-model-train"
 version = "0.1.0"
 description = "DVC training pipeline for the temporal smoke classifier"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.13"
 dependencies = [
     "temporal-model-core[torch]",
     "pyyaml>=6.0",
