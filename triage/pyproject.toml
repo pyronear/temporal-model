@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Triage the pyro-annotator unannotated backlog: pull sequences read-only, score them with the temporal model, split at a threshold into an 'unlabel' worklist and a local-review viewer set"
 requires-python = ">=3.11"
 dependencies = [
-    "temporal-model-core",
+    "temporal-model-core[torch]",
     "pydantic>=2.7",
     "requests>=2.31",
     "pyyaml>=6",
