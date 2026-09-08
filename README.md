@@ -47,6 +47,10 @@ make fetch-model   # download the released model.zip from HuggingFace (no creds)
 make serve         # API + MinIO via docker compose, http://localhost:8000 (GET /health)
 ```
 
+`make export-onnx` derives the torch-free `api/models/model_onnx.zip` from
+that `model.zip` (`make fetch-model-onnx` downloads the released one). See
+`core/README.md` for the `[torch]` / `[onnx]` extras.
+
 `serve` is equivalent to `cd api && docker compose up --build` and refuses to
 start until `api/models/model.zip` exists, so run `make fetch-model` first (it
 pulls v0.1.0 from the public HuggingFace repo; override with

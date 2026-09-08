@@ -28,6 +28,19 @@ cd api && uv run python -m temporal_model.api.release \
 and tags `vX.Y.Z` on the HF repo (immutable — re-publishing an existing version
 fails). Commit the `api/MODEL_VERSION` change.
 
+Ship the torch-free runtime artifact with it: export `model_onnx.zip` from the
+same `model.zip` (the export checks torch/ONNX parity and records the source
+SHA-256 in its manifest) and pass it to `publish` so both land under one tag:
+
+```bash
+cd core && uv run temporal-export-onnx \
+    --model path/to/model.zip --output path/to/model_onnx.zip
+cd api && uv run python -m temporal_model.api.release \
+    publish --version X.Y.Z --file path/to/model.zip --onnx-file path/to/model_onnx.zip
+```
+
+Consumers fetch it with `release fetch --onnx` (or `make fetch-model-onnx`).
+
 ### 2. Push the git tag
 
 ```bash

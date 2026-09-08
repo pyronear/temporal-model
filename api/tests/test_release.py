@@ -107,3 +107,46 @@ def test_publish_stamps_uploads_zip_and_card_and_tags(tmp_path: Path) -> None:
     # tagged v0.3.0
     tag = api.create_tag.call_args.kwargs
     assert tag["tag"] == "v0.3.0" and tag["repo_id"] == "org/r"
+
+
+def test_fetch_onnx_downloads_the_onnx_artifact(tmp_path: Path) -> None:
+    seen = {}
+
+    def fake_dl(*, repo_id, filename, revision):
+        seen.update(repo_id=repo_id, filename=filename, revision=revision)
+        return str(_make_zip(tmp_path / "dl.zip", {"model_version": "0.2.0"}))
+
+    release.fetch(
+        "0.2.0",
+        tmp_path / "o.zip",
+        filename=release.ONNX_MODEL_FILENAME,
+        repo="org/r",
+        _downloader=fake_dl,
+    )
+    assert seen == {
+        "repo_id": "org/r",
+        "filename": "model_onnx.zip",
+        "revision": "v0.2.0",
+    }
+
+
+def test_publish_with_onnx_uploads_both_stamped_archives(tmp_path: Path) -> None:
+    z = _make_zip(tmp_path / "m.zip", {"variant": "vit"})
+    onnx_z = _make_zip(tmp_path / "m_onnx.zip", {"format_version": 1})
+    api = MagicMock()
+    stamped = {}
+
+    def capture(**kw):
+        if kw["path_in_repo"].endswith(".zip"):
+            stamped[kw["path_in_repo"]] = release.read_model_version(
+                Path(kw["path_or_fileobj"])
+            )
+
+    api.upload_file.side_effect = capture
+    release.publish("0.3.0", z, onnx_path=onnx_z, repo="org/r", api=api)
+
+    assert stamped == {"model.zip": "0.3.0", "model_onnx.zip": "0.3.0"}
+    assert release.read_model_version(onnx_z) is None
+    uploaded = {c.kwargs["path_in_repo"] for c in api.upload_file.call_args_list}
+    assert uploaded == {"model.zip", "model_onnx.zip", "README.md"}
+    assert api.create_tag.call_count == 1

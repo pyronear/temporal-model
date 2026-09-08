@@ -18,8 +18,9 @@ YOLO detector proposes boxes, boxes are linked across frames into temporal
 head, and a logistic calibrator turns the tube logits into a calibrated
 probability and a keep/discard decision.
 
-This repo ships a single self-contained **`model.zip`**, versioned by HuggingFace
-revision/tag (`v<version>`). Each release bundles everything needed to run:
+This repo ships a self-contained **`model.zip`**, versioned by HuggingFace
+revision/tag (`v<version>`), plus a torch-free **`model_onnx.zip`** derived from
+it (see *ONNX runtime* below). Each `model.zip` bundles everything needed to run:
 
 | file | purpose |
 |---|---|
@@ -31,12 +32,50 @@ revision/tag (`v<version>`). Each release bundles everything needed to run:
 
 The model runs YOLO **itself** — you pass only raw frames, no detections.
 
+## ONNX runtime (no torch)
+
+`model_onnx.zip` carries the same classifier exported to ONNX (fixed input
+`patches[1, 20, 3, 224, 224]` + `mask[1, 20]` → `logit[1]`), the inference
+config and the calibrator, but **no YOLO**: you supply the per-frame detections
+(e.g. from a detector already running on the device). It runs on numpy + pillow
++ onnxruntime only — the intended runtime for edge devices such as a
+Raspberry Pi:
+
+```bash
+pip install "temporal-model-core[onnx] @ git+https://github.com/pyronear/temporal-model.git#subdirectory=core"
+```
+
+```python
+from pathlib import Path
+
+from huggingface_hub import hf_hub_download
+from temporal_model.core import Detection, FrameDetections
+from temporal_model.core.onnx_model import OnnxTemporalModel
+
+onnx_zip = hf_hub_download("pyronear/temporal-model", "model_onnx.zip", revision="v{{VERSION}}")
+model = OnnxTemporalModel.from_package(Path(onnx_zip))
+
+frames = model.load_sequence(sorted(Path("my_sequence").glob("*.jpg")))
+# One FrameDetections per frame, keyed by frame_id, boxes as normalized (cx, cy, w, h).
+detections = {
+    f.frame_id: FrameDetections(
+        frame_idx=i, frame_id=f.frame_id, timestamp=f.timestamp,
+        detections=[Detection(class_id=0, cx=0.5, cy=0.4, w=0.05, h=0.03, confidence=0.6)],
+    )
+    for i, f in enumerate(frames)
+}
+out = model.predict(frames, frame_detections=detections)
+```
+
+The manifest of `model_onnx.zip` records the SHA-256 of the `model.zip` it was
+exported from and the measured torch/ONNX logit difference.
+
 ## Usage
 
 Install the inference package (`temporal_model.core`):
 
 ```bash
-pip install "git+https://github.com/pyronear/temporal-model.git#subdirectory=core"
+pip install "temporal-model-core[torch] @ git+https://github.com/pyronear/temporal-model.git#subdirectory=core"
 ```
 
 Download a versioned `model.zip` and run it on a **temporally ordered** sequence

@@ -17,7 +17,12 @@ Core building blocks of the bbox-tube temporal smoke classifier. Import as
   `TemporalSmokeClassifier` (one logit per tube).
 - `inference.py` — the per-stage inference pipeline (pad → YOLO → tubes → crop →
   score → first-crossing trigger).
-- `model.py` — `BboxTubeTemporalModel`, the `TemporalModel` implementation.
+- `pipeline.py` — `TubePipelineModel`, the backend-agnostic `predict()` (torch-free).
+- `model.py` — `BboxTubeTemporalModel`, the torch + YOLO backend.
+- `onnx_model.py` — `OnnxTemporalModel`, the onnxruntime backend for `model_onnx.zip`
+  (supplied detections only, no torch on its import path).
+- `export_onnx.py` — `temporal-export-onnx`: derive `model_onnx.zip` from a `model.zip`
+  and verify torch/ONNX parity.
 - `package.py` — `model.zip` build/load (YOLO + classifier + calibrator + config)
   and `load_yolo`.
 - `logistic_calibrator.py` — runtime logistic calibrator (pure numpy) and
@@ -31,7 +36,16 @@ The classifier is **ViT-only** (transformer head on a timm ViT backbone, e.g.
 `vit_small_patch14_dinov2.lvd142m`); the earlier mean-pool/GRU heads and
 resnet/convnext backbones are intentionally not carried over.
 
+## Installing
+
+The base package is torch-free (numpy, pillow, pydantic, pyyaml). Pick an extra:
+
+- `temporal-model-core[torch]` — training, packaging, `BboxTubeTemporalModel`,
+  the ONNX export (torch, timm, ultralytics, onnx, onnxscript).
+- `temporal-model-core[onnx]` — `OnnxTemporalModel` on `model_onnx.zip`
+  (onnxruntime only; edge devices).
+
 ```bash
-make install
+make install   # dev environment: both extras
 make test
 ```

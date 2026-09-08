@@ -5,6 +5,10 @@ revision/tag ``v<version>`` per release. ``publish`` stamps the version into the
 manifest and uploads + tags; ``fetch`` downloads a revision and asserts the
 version. Runs identically locally (maintainer HF token for publish) and in CI
 (public repo, no token for fetch).
+
+The torch-free ``model_onnx.zip`` (see ``temporal_model.core.export_onnx``)
+travels with the same release: ``publish --onnx-file`` uploads it under the
+same tag and ``fetch --onnx`` downloads it instead of ``model.zip``.
 """
 
 import argparse
@@ -19,6 +23,7 @@ from huggingface_hub import HfApi, hf_hub_download
 
 RELEASE_REPO = "pyronear/temporal-model"
 MODEL_FILENAME = "model.zip"
+ONNX_MODEL_FILENAME = "model_onnx.zip"
 MANIFEST_FILENAME = "manifest.yaml"
 CARD_TEMPLATE = "model_card.md"
 CARD_FILENAME = "README.md"
@@ -63,16 +68,20 @@ def fetch(
     version: str,
     output_path: Path,
     *,
+    filename: str = MODEL_FILENAME,
     repo: str = RELEASE_REPO,
     _downloader=hf_hub_download,
 ) -> Path:
-    """Download ``model.zip`` at HF revision ``v<version>``, assert version, write it.
+    """Download ``filename`` at HF revision ``v<version>``, assert version, write it.
+
+    ``filename`` is ``model.zip`` (default) or ``model_onnx.zip``; both carry
+    a ``manifest.yaml`` with ``model_version``.
 
     Raises:
         ValueError: if the downloaded manifest's ``model_version`` != ``version``.
     """
     downloaded = Path(
-        _downloader(repo_id=repo, filename=MODEL_FILENAME, revision=_tag(version))
+        _downloader(repo_id=repo, filename=filename, revision=_tag(version))
     )
     actual = read_model_version(downloaded)
     if actual != version:
@@ -89,29 +98,35 @@ def publish(
     version: str,
     file_path: Path,
     *,
+    onnx_path: Path | None = None,
     repo: str = RELEASE_REPO,
     api: HfApi | None = None,
 ) -> None:
-    """Stamp the version into the manifest, upload ``model.zip`` + the rendered
-    model card, then tag ``v<version>``.
+    """Stamp the version into the manifest, upload ``model.zip`` (and
+    ``model_onnx.zip`` when ``onnx_path`` is given) + the rendered model card,
+    then tag ``v<version>``.
 
-    The caller's ``file_path`` is **not** modified: the version is stamped into a
+    The caller's files are **not** modified: the version is stamped into a
     temporary copy, which is what gets uploaded. The model card (README.md) is
     rendered with this version so the repo always advertises the latest release.
     Versions are immutable — if the ``v<version>`` tag already exists,
     ``create_tag`` raises (no silent overwrite).
     """
     hf = api or HfApi()
+    uploads = [(file_path, MODEL_FILENAME)]
+    if onnx_path is not None:
+        uploads.append((onnx_path, ONNX_MODEL_FILENAME))
     with tempfile.TemporaryDirectory() as td:
-        staged = Path(td) / MODEL_FILENAME
-        shutil.copyfile(file_path, staged)
-        stamp_model_version(staged, version)
-        hf.upload_file(
-            path_or_fileobj=str(staged),
-            path_in_repo=MODEL_FILENAME,
-            repo_id=repo,
-            repo_type="model",
-        )
+        for src, name in uploads:
+            staged = Path(td) / name
+            shutil.copyfile(src, staged)
+            stamp_model_version(staged, version)
+            hf.upload_file(
+                path_or_fileobj=str(staged),
+                path_in_repo=name,
+                repo_id=repo,
+                repo_type="model",
+            )
     hf.upload_file(
         path_or_fileobj=render_model_card(version).encode("utf-8"),
         path_in_repo=CARD_FILENAME,
@@ -129,17 +144,28 @@ def main() -> None:
     f = sub.add_parser("fetch", help="download model.zip for a version from HF")
     f.add_argument("--version", required=True)
     f.add_argument("--output", type=Path, required=True)
+    f.add_argument(
+        "--onnx",
+        action="store_true",
+        help=f"download {ONNX_MODEL_FILENAME} instead of {MODEL_FILENAME}",
+    )
 
     p = sub.add_parser("publish", help="stamp + upload + tag a model.zip to HF")
     p.add_argument("--version", required=True)
     p.add_argument("--file", type=Path, required=True)
+    p.add_argument(
+        "--onnx-file",
+        type=Path,
+        help=f"also upload this {ONNX_MODEL_FILENAME} under the same tag",
+    )
 
     args = parser.parse_args()
     if args.cmd == "fetch":
-        out = fetch(args.version, args.output, repo=args.repo)
-        print(f"fetched {args.repo}@{_tag(args.version)} -> {out}")
+        filename = ONNX_MODEL_FILENAME if args.onnx else MODEL_FILENAME
+        out = fetch(args.version, args.output, filename=filename, repo=args.repo)
+        print(f"fetched {args.repo}@{_tag(args.version)}/{filename} -> {out}")
     else:
-        publish(args.version, args.file, repo=args.repo)
+        publish(args.version, args.file, onnx_path=args.onnx_file, repo=args.repo)
         print(f"published {args.file} -> {args.repo}@{_tag(args.version)}")
 
 
