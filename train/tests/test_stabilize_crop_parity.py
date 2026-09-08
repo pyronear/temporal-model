@@ -132,4 +132,6 @@ def test_stabilize_crop_parity_offline_vs_inference_gappy_tube(tmp_path):
     for slot in range(3):
         png = out_dir / seq_id / f"frame_{slot:02d}.png"
         offline = (to_tensor(Image.open(png).convert("RGB")) - mean_t) / std_t
-        assert torch.allclose(patches[slot], offline, atol=1e-6), f"slot {slot} differs"
+        assert torch.allclose(torch.from_numpy(patches[slot]), offline, atol=1e-6), (
+            f"slot {slot} differs"
+        )
