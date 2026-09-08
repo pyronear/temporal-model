@@ -57,13 +57,13 @@ stages:
       size: 1422
     - path: data/01_raw/datasets/val
       hash: md5
-      md5: 70be9b055a17d2c7d9b7798985ec8b06.dir
-      size: 573279888
-      nfiles: 9424
+      md5: 72d0b36cb36b55e9c038674eb5fb19a5.dir
+      size: 595988785
+      nfiles: 9706
     - path: data/06_models/vit_dinov2_finetune/model.zip
       hash: md5
-      md5: 171a17606b8e6592365d94872bd8e5d4
-      size: 162765155
+      md5: 39d7d39141dddf1356dbd860304dda8d
+      size: 162765158
     - path: src/temporal_model/eval/eval_plots.py
       hash: md5
       md5: f76a38b124a936129d9e0cc6910b9e33
@@ -91,55 +91,55 @@ stages:
     outs:
     - path: data/08_reporting/val/vit_dinov2_finetune/confusion_matrix.png
       hash: md5
-      md5: df412b7afe5169fa12f0c411a87bca7c
-      size: 23416
+      md5: 77d1351572b9fb32f5726cb48d48bd58
+      size: 22992
     - path: 
         data/08_reporting/val/vit_dinov2_finetune/confusion_matrix_normalized.png
       hash: md5
-      md5: d69589f775c8cd081bd0fa83f922790f
-      size: 24410
+      md5: 592b93bc0e15a5829aab9403bcd4be9b
+      size: 24490
     - path: data/08_reporting/val/vit_dinov2_finetune/details
       hash: md5
-      md5: e642598bbfc0d2924aa11e4da05cfb3a.dir
-      size: 1200117
-      nfiles: 362
+      md5: df2a42ea4ae6b3779a9e4e3dc4908e6f.dir
+      size: 1296461
+      nfiles: 376
     - path: data/08_reporting/val/vit_dinov2_finetune/dropped.json
       hash: md5
       md5: d751713988987e9331980363e24189ce
       size: 2
     - path: data/08_reporting/val/vit_dinov2_finetune/metrics.json
       hash: md5
-      md5: 31a036aaa8b1b27ac7728afc4f675a53
-      size: 285
+      md5: 5d3792caf50b3a04e4c8961e4fb41397
+      size: 287
     - path: data/08_reporting/val/vit_dinov2_finetune/model_config.json
       hash: md5
-      md5: 7efe61e4a474961f08ff2cc09d3e25b4
-      size: 2443
+      md5: dc291c35bd8609ac4c96381cc436a5b1
+      size: 2446
     - path: data/08_reporting/val/vit_dinov2_finetune/pr_curve.png
       hash: md5
-      md5: 4aa4b35ea298efc94771b944eef8c573
-      size: 20425
+      md5: ae9c3d7cd353b0651a00897f7cc2cf59
+      size: 21427
     - path: data/08_reporting/val/vit_dinov2_finetune/predictions.json
       hash: md5
-      md5: e37acaa71f6e5fd9d87c5b889b228764
-      size: 1228661
+      md5: 67caf4133d75d9eb84d69b2f55c5e1af
+      size: 1326610
     - path: data/08_reporting/val/vit_dinov2_finetune/results.json
       hash: md5
-      md5: 64cc108e7f59e46e4bfa7a5c42660dbe
-      size: 133058
+      md5: 5d96c9ffec0730e3a92635771a4f56fc
+      size: 138309
     - path: data/08_reporting/val/vit_dinov2_finetune/results.parquet
       hash: md5
-      md5: 7b9b702ea9eedd65f5cc06ba711462b9
-      size: 18922
+      md5: 047783317a2a45ca83bf3ec4cc6be652
+      size: 19533
     - path: data/08_reporting/val/vit_dinov2_finetune/roc_curve.png
       hash: md5
-      md5: 7ddcfd0b392288d6c9d47de4d5aa1425
-      size: 30586
+      md5: 321a56f13ac9a19e0d8c9238dcf33cbd
+      size: 30885
     - path: data/08_reporting/val/vit_dinov2_finetune/sequences
       hash: md5
-      md5: f228854e184c03f9ca9cdc452646b283.dir
-      size: 776881
-      nfiles: 362
+      md5: af206b44ac85b3043a16d88aabecdd8c.dir
+      size: 798655
+      nfiles: 376
   evaluate@train:
     cmd: uv run python -m temporal_model.eval.evaluate --model-zip 
       data/06_models/vit_dinov2_finetune/model.zip --sequences-dir 
@@ -197,13 +197,13 @@ stages:
       size: 1422
     - path: data/01_raw/datasets/train
       hash: md5
-      md5: 9b79a31956b8f8e248eb30dc412926c8.dir
-      size: 5525878070
-      nfiles: 90798
+      md5: 9d439215c7e0749d043b0986b80b8c36.dir
+      size: 5829774690
+      nfiles: 94640
     - path: data/06_models/vit_dinov2_finetune/model.zip
       hash: md5
-      md5: 171a17606b8e6592365d94872bd8e5d4
-      size: 162765155
+      md5: 39d7d39141dddf1356dbd860304dda8d
+      size: 162765158
     - path: src/temporal_model/eval/eval_plots.py
       hash: md5
       md5: f76a38b124a936129d9e0cc6910b9e33
@@ -231,55 +231,55 @@ stages:
     outs:
     - path: data/08_reporting/train/vit_dinov2_finetune/confusion_matrix.png
       hash: md5
-      md5: 8c7e845b97f19127a72cb30d8e5d6d1e
-      size: 26716
+      md5: 9c3a717d8253b714f8ed6f9f1ad398ec
+      size: 26791
     - path: 
         data/08_reporting/train/vit_dinov2_finetune/confusion_matrix_normalized.png
       hash: md5
-      md5: 918905286063ba03e1a4fc1017014989
-      size: 24629
+      md5: c56ab3e0e71f7154f354107bedf6c8ab
+      size: 24740
     - path: data/08_reporting/train/vit_dinov2_finetune/details
       hash: md5
-      md5: f3c11f657256f0c296f171fdc2d67ebd.dir
-      size: 12638239
-      nfiles: 3431
+      md5: 2265b740e92ccc282adb44e795d44e51.dir
+      size: 13370204
+      nfiles: 3542
     - path: data/08_reporting/train/vit_dinov2_finetune/dropped.json
       hash: md5
       md5: d751713988987e9331980363e24189ce
       size: 2
     - path: data/08_reporting/train/vit_dinov2_finetune/metrics.json
       hash: md5
-      md5: 709561b9ec8b40366bc9ffae44644224
-      size: 293
+      md5: 7709095e62195104bb4b6e825a2d5d13
+      size: 292
     - path: data/08_reporting/train/vit_dinov2_finetune/model_config.json
       hash: md5
-      md5: 7efe61e4a474961f08ff2cc09d3e25b4
-      size: 2443
+      md5: dc291c35bd8609ac4c96381cc436a5b1
+      size: 2446
     - path: data/08_reporting/train/vit_dinov2_finetune/pr_curve.png
       hash: md5
-      md5: fa22a164ca7e5f1a512b3b913513a1a5
-      size: 21402
+      md5: 41e525f92cf5b03131565049b0674da7
+      size: 22032
     - path: data/08_reporting/train/vit_dinov2_finetune/predictions.json
       hash: md5
-      md5: 5beaac583a9adef7ed71b4cc50eb2011
-      size: 12924459
+      md5: a5b8d44b1101a2ff439a0e961ca864f3
+      size: 13665051
     - path: data/08_reporting/train/vit_dinov2_finetune/results.json
       hash: md5
-      md5: ca2523c4e4ee155dc043f7b21b02593a
-      size: 1271924
+      md5: 4f281d31045aff7959bac014af37f371
+      size: 1313096
     - path: data/08_reporting/train/vit_dinov2_finetune/results.parquet
       hash: md5
-      md5: f1d3d647336342caaf4329992810c703
-      size: 101645
+      md5: d123ef0a78e83609c80a81e4c4e527f7
+      size: 105418
     - path: data/08_reporting/train/vit_dinov2_finetune/roc_curve.png
       hash: md5
-      md5: 8c15faee67d0f18a8f1bd104bad8cb7e
-      size: 31473
+      md5: 4bc3519167fbd6ccccf5a953296881b2
+      size: 32089
     - path: data/08_reporting/train/vit_dinov2_finetune/sequences
       hash: md5
-      md5: 5b8a765c9190e382048d15f92437c0b5.dir
-      size: 7565077
-      nfiles: 3431
+      md5: a10b47fc6f3bf393678dafacccd3deeb.dir
+      size: 7864293
+      nfiles: 3542
   evaluate_pyro_annotator:
     cmd: uv run python -m temporal_model.eval.evaluate --model-zip 
       data/06_models/vit_dinov2_finetune/model.zip --sequences-dir 
@@ -318,8 +318,8 @@ stages:
       nfiles: 5083
     - path: data/06_models/vit_dinov2_finetune/model.zip
       hash: md5
-      md5: 171a17606b8e6592365d94872bd8e5d4
-      size: 162765155
+      md5: 39d7d39141dddf1356dbd860304dda8d
+      size: 162765158
     - path: src/temporal_model/eval/eval_plots.py
       hash: md5
       md5: f76a38b124a936129d9e0cc6910b9e33
@@ -347,8 +347,8 @@ stages:
     outs:
     - path: data/08_reporting/pyro-annotator/vit_dinov2_finetune/details
       hash: md5
-      md5: 72d64c65823d5866098ba1b9c1049ae9.dir
-      size: 1465380
+      md5: 4686d19d0f496822c31267751292212a.dir
+      size: 1465642
       nfiles: 332
     - path: data/08_reporting/pyro-annotator/vit_dinov2_finetune/dropped.json
       hash: md5
@@ -356,26 +356,26 @@ stages:
       size: 2
     - path: data/08_reporting/pyro-annotator/vit_dinov2_finetune/metrics.json
       hash: md5
-      md5: e083732156568885af98a131c19296c3
-      size: 297
+      md5: 8252f7d993360c02dc74e14b76e436ef
+      size: 296
     - path: 
         data/08_reporting/pyro-annotator/vit_dinov2_finetune/model_config.json
       hash: md5
-      md5: 7efe61e4a474961f08ff2cc09d3e25b4
-      size: 2443
+      md5: dc291c35bd8609ac4c96381cc436a5b1
+      size: 2446
     - path: 
         data/08_reporting/pyro-annotator/vit_dinov2_finetune/predictions.json
       hash: md5
-      md5: b5c5fbde4eab947f16b045d5d4c980c0
-      size: 1441405
+      md5: 0ca4217087bc0d54f44d95a3cb575111
+      size: 1441769
     - path: data/08_reporting/pyro-annotator/vit_dinov2_finetune/results.json
       hash: md5
-      md5: 9559a1df9c9a2f4c1d71be829351bc1a
-      size: 131602
+      md5: e549b53056affc0898f39956c6868fcb
+      size: 131950
     - path: data/08_reporting/pyro-annotator/vit_dinov2_finetune/results.parquet
       hash: md5
-      md5: 120fded8a4a5bbeeec235404c969f69f
-      size: 21089
+      md5: 3e0b16c0a147b713a190bf4d5a1a98e8
+      size: 21014
     - path: data/08_reporting/pyro-annotator/vit_dinov2_finetune/sequences
       hash: md5
       md5: 7839c81ea976f28f1d6c337f20257c11.dir
