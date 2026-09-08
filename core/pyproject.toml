@@ -19,6 +19,9 @@ dependencies = [
     "huggingface-hub>=0.23",
 ]
 
+[project.scripts]
+temporal-export-onnx = "temporal_model.core.export_onnx:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/temporal_model"]
 

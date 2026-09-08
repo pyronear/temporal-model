@@ -42,8 +42,12 @@ from .types import FrameDetections
 
 __all__ = [
     "TubePipelineModel",
+    "UncalibratedModelError",
     "DEFAULT_AGGREGATION",
     "DEFAULT_LOGISTIC_THRESHOLD",
+    "aggregation_of",
+    "is_calibrated",
+    "require_calibrated",
 ]
 
 _PAD_STRATEGIES = {
@@ -53,6 +57,35 @@ _PAD_STRATEGIES = {
 
 DEFAULT_AGGREGATION = "max_logit"
 DEFAULT_LOGISTIC_THRESHOLD = 0.5
+
+
+class UncalibratedModelError(ValueError):
+    """Raised when a model package is not calibrated and the caller did not opt out."""
+
+
+def aggregation_of(config: dict[str, Any]) -> str:
+    """Decision aggregation rule from a package config (defaults to max_logit)."""
+    return config.get("decision", {}).get("aggregation", DEFAULT_AGGREGATION)
+
+
+def is_calibrated(calibrator: LogisticCalibrator | None, aggregation: str) -> bool:
+    """Calibrated iff a calibrator is bundled AND the decision is logistic."""
+    return calibrator is not None and aggregation == "logistic"
+
+
+def require_calibrated(
+    calibrator: LogisticCalibrator | None,
+    aggregation: str,
+    *,
+    context: str,
+) -> None:
+    """Raise :class:`UncalibratedModelError` unless the package is calibrated."""
+    if not is_calibrated(calibrator, aggregation):
+        raise UncalibratedModelError(
+            f"{context}: model is not calibrated "
+            f"(calibrator={'present' if calibrator is not None else 'missing'}, "
+            f"aggregation={aggregation!r}); pass allow_uncalibrated=True to override"
+        )
 
 
 class TubePipelineModel(TemporalModel):

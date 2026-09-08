@@ -20,7 +20,13 @@ import yaml
 
 from .detector import load_detector
 from .logistic_calibrator import LogisticCalibrator
-from .pipeline import DEFAULT_AGGREGATION
+from .pipeline import (
+    DEFAULT_AGGREGATION,
+    UncalibratedModelError,
+    aggregation_of,
+    is_calibrated,
+    require_calibrated,
+)
 from .temporal_classifier import TemporalSmokeClassifier
 
 __all__ = [
@@ -43,41 +49,12 @@ LOGISTIC_CALIBRATOR_FILENAME = "logistic_calibrator.json"
 DEFAULT_EXTRACT_DIR = Path(".cache/temporal_model_core")
 
 
-class UncalibratedModelError(ValueError):
-    """Raised when a model package is not calibrated and the caller did not opt out."""
-
-
-def _aggregation_of(config: dict[str, Any]) -> str:
-    """Decision aggregation rule from a package config (defaults to max_logit)."""
-    return config.get("decision", {}).get("aggregation", DEFAULT_AGGREGATION)
-
-
-def is_calibrated(calibrator: LogisticCalibrator | None, aggregation: str) -> bool:
-    """Calibrated iff a calibrator is bundled AND the decision is logistic."""
-    return calibrator is not None and aggregation == "logistic"
-
-
-def require_calibrated(
-    calibrator: LogisticCalibrator | None,
-    aggregation: str,
-    *,
-    context: str,
-) -> None:
-    """Raise :class:`UncalibratedModelError` unless the package is calibrated."""
-    if not is_calibrated(calibrator, aggregation):
-        raise UncalibratedModelError(
-            f"{context}: model is not calibrated "
-            f"(calibrator={'present' if calibrator is not None else 'missing'}, "
-            f"aggregation={aggregation!r}); pass allow_uncalibrated=True to override"
-        )
-
-
 @dataclass
 class ModelPackage:
     """A loaded model package: classifier, YOLO model, and full config."""
 
     classifier: Any  # TemporalSmokeClassifier; Any avoids import cycles in this module
-    yolo_model: Any  # ultralytics.YOLO; same reason
+    yolo_model: Any  # ultralytics.YOLO; same reason. None when loaded without detector
     config: dict[str, Any]
     calibrator: LogisticCalibrator | None = None
 
@@ -149,7 +126,7 @@ def build_model_package(
         )
 
     if not allow_uncalibrated:
-        aggregation = _aggregation_of(config)
+        aggregation = aggregation_of(config)
         require_calibrated(calibrator, aggregation, context="build_model_package")
 
     manifest = {
@@ -259,6 +236,7 @@ def load_model_package(
     extract_dir: Path = DEFAULT_EXTRACT_DIR,
     *,
     allow_uncalibrated: bool = False,
+    with_detector: bool = True,
 ) -> ModelPackage:
     """Load a packaged model archive.
 
@@ -267,6 +245,9 @@ def load_model_package(
         extract_dir: Where to extract YOLO weights and classifier ckpt.
         allow_uncalibrated: When False (default), refuse to load a package
             that is not calibrated (no calibrator or non-logistic decision).
+        with_detector: When False, skip loading the YOLO companion
+            (``yolo_model`` is ``None``); for classifier-only consumers such
+            as the ONNX export.
 
     Raises:
         FileNotFoundError: if ``package_path`` does not exist.
@@ -313,10 +294,10 @@ def load_model_package(
             calibrator.verify_sanity_checks()
 
     if not allow_uncalibrated:
-        aggregation = _aggregation_of(config)
+        aggregation = aggregation_of(config)
         require_calibrated(calibrator, aggregation, context="load_model_package")
 
-    yolo_model = load_yolo(extract_dir / yolo_name)
+    yolo_model = load_yolo(extract_dir / yolo_name) if with_detector else None
     classifier = _load_classifier(extract_dir / ckpt_name, config["classifier"])
     return ModelPackage(
         classifier=classifier,
