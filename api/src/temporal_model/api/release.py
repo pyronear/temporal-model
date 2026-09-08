@@ -70,6 +70,32 @@ def stamp_model_version(zip_path: Path, version: str) -> None:
     _update_manifest(zip_path, model_version=version)
 
 
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def read_onnx_source_sha256(onnx_zip: Path) -> str | None:
+    """Return ``manifest.source.sha256`` of a ``model_onnx.zip`` (None if absent)."""
+    with zipfile.ZipFile(onnx_zip) as zf:
+        manifest = yaml.safe_load(zf.read(MANIFEST_FILENAME))
+    return (manifest.get("source") or {}).get("sha256")
+
+
+def verify_onnx_source(onnx_zip: Path, model_zip: Path) -> None:
+    """Refuse to pair an ONNX archive with a ``model.zip`` it was not exported from.
+
+    Raises:
+        ValueError: if the ONNX manifest's source hash differs from ``model_zip``'s.
+    """
+    recorded = read_onnx_source_sha256(onnx_zip)
+    actual = _sha256(model_zip)
+    if recorded != actual:
+        raise ValueError(
+            f"{onnx_zip.name} was exported from a model.zip with sha256 "
+            f"{recorded!r}, but {model_zip.name} has {actual!r}"
+        )
+
+
 def stamp_onnx_source(onnx_zip: Path, model_zip: Path) -> None:
     """Point ``manifest.source`` of ``onnx_zip`` at ``model_zip`` (name + SHA-256).
 
@@ -79,10 +105,7 @@ def stamp_onnx_source(onnx_zip: Path, model_zip: Path) -> None:
     """
     _update_manifest(
         onnx_zip,
-        source={
-            "package": model_zip.name,
-            "sha256": hashlib.sha256(model_zip.read_bytes()).hexdigest(),
-        },
+        source={"package": model_zip.name, "sha256": _sha256(model_zip)},
     )
 
 
@@ -133,8 +156,13 @@ def publish(
     rendered with this version so the repo always advertises the latest release.
     Versions are immutable — if the ``v<version>`` tag already exists,
     ``create_tag`` raises (no silent overwrite).
+
+    Raises:
+        ValueError: if ``onnx_path`` was not exported from ``file_path``.
     """
     hf = api or HfApi()
+    if onnx_path is not None:
+        verify_onnx_source(onnx_path, file_path)
     with tempfile.TemporaryDirectory() as td:
         staged_model = Path(td) / MODEL_FILENAME
         shutil.copyfile(file_path, staged_model)

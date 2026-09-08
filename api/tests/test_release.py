@@ -133,9 +133,10 @@ def test_fetch_onnx_downloads_the_onnx_artifact(tmp_path: Path) -> None:
 
 def test_publish_with_onnx_uploads_both_stamped_archives(tmp_path: Path) -> None:
     z = _make_zip(tmp_path / "m.zip", {"variant": "vit"})
+    src_sha = hashlib.sha256(z.read_bytes()).hexdigest()
     onnx_z = _make_zip(
         tmp_path / "m_onnx.zip",
-        {"format_version": 1, "source": {"package": "m.zip", "sha256": "stale"}},
+        {"format_version": 1, "source": {"package": "m.zip", "sha256": src_sha}},
     )
     api = MagicMock()
     stamped = {}
@@ -163,3 +164,16 @@ def test_publish_with_onnx_uploads_both_stamped_archives(tmp_path: Path) -> None
     uploaded = {c.kwargs["path_in_repo"] for c in api.upload_file.call_args_list}
     assert uploaded == {"model.zip", "model_onnx.zip", "README.md"}
     assert api.create_tag.call_count == 1
+
+
+def test_publish_refuses_onnx_from_another_model(tmp_path: Path) -> None:
+    z = _make_zip(tmp_path / "m.zip", {"variant": "vit"})
+    onnx_z = _make_zip(
+        tmp_path / "m_onnx.zip",
+        {"format_version": 1, "source": {"package": "m.zip", "sha256": "0" * 64}},
+    )
+    api = MagicMock()
+    with pytest.raises(ValueError, match="exported from a model.zip"):
+        release.publish("0.3.0", z, onnx_path=onnx_z, repo="org/r", api=api)
+    api.upload_file.assert_not_called()
+    api.create_tag.assert_not_called()
