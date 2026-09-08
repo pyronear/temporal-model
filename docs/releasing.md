@@ -33,13 +33,16 @@ same `model.zip` (the export checks torch/ONNX parity and records the source
 SHA-256 in its manifest) and pass it to `publish` so both land under one tag:
 
 ```bash
-cd core && uv run temporal-export-onnx \
-    --model path/to/model.zip --output path/to/model_onnx.zip
-cd api && uv run python -m temporal_model.api.release \
-    publish --version X.Y.Z --file path/to/model.zip --onnx-file path/to/model_onnx.zip
+# from the repo root; MODEL=/abs/path/to/model.zip, ONNX=/abs/path/to/model_onnx.zip
+uv run --project core temporal-export-onnx --model "$MODEL" --output "$ONNX"
+uv run --project api python -m temporal_model.api.release \
+    publish --version X.Y.Z --file "$MODEL" --onnx-file "$ONNX"
 ```
 
-Consumers fetch it with `release fetch --onnx` (or `make fetch-model-onnx`).
+`publish` refuses an `--onnx-file` whose manifest was not exported from that
+exact `model.zip`, then re-stamps its source hash from the uploaded (version
+stamped) copy. Consumers fetch it with `release fetch --onnx` (or
+`make fetch-model-onnx`).
 
 ### 2. Push the git tag
 

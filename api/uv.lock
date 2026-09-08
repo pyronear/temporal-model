@@ -1359,7 +1359,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.6" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "timm", marker = "extra == 'torch'", specifier = ">=1.0" },
-    { name = "torch", marker = "extra == 'torch'", specifier = ">=2.2" },
+    { name = "torch", marker = "extra == 'torch'", specifier = ">=2.5" },
     { name = "ultralytics", marker = "extra == 'torch'", specifier = ">=8.3" },
 ]
 provides-extras = ["torch", "onnx"]
