@@ -15,12 +15,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import torch
 import yaml
 
 from .detector import load_detector
 from .logistic_calibrator import LogisticCalibrator
+from .pipeline import DEFAULT_AGGREGATION
 from .temporal_classifier import TemporalSmokeClassifier
 
 __all__ = [
@@ -41,7 +41,6 @@ CLASSIFIER_CKPT_FILENAME = "classifier.ckpt"
 CONFIG_FILENAME = "config.yaml"
 LOGISTIC_CALIBRATOR_FILENAME = "logistic_calibrator.json"
 DEFAULT_EXTRACT_DIR = Path(".cache/temporal_model_core")
-DEFAULT_AGGREGATION = "max_logit"
 
 
 class UncalibratedModelError(ValueError):
@@ -308,12 +307,8 @@ def load_model_package(
         if calibrator_name is not None:
             if calibrator_name not in names:
                 raise KeyError(f"Archive missing {calibrator_name}")
-            payload = json.loads(zf.read(calibrator_name))
-            calibrator = LogisticCalibrator(
-                features=list(payload["features"]),
-                coefficients=np.asarray(payload["coefficients"], dtype=float),
-                intercept=float(payload["intercept"]),
-                sanity_checks=list(payload.get("sanity_checks", [])),
+            calibrator = LogisticCalibrator.from_dict(
+                json.loads(zf.read(calibrator_name))
             )
             calibrator.verify_sanity_checks()
 
