@@ -27,19 +27,21 @@ def _sync_fn_for(device: Any) -> Callable[[], None] | None:
 
     Async accelerators must be synchronised at stage boundaries for honest
     timing — CUDA and MPS both qualify; CPU needs nothing. ``device`` is a
-    device string or a ``torch.device``; torch is only imported when an
-    accelerator is requested so the timer stays usable in torch-free runtimes.
+    device string or a ``torch.device``. When torch is installed it normalizes
+    and validates the value (a typo like ``"gpu"`` raises here instead of
+    silently producing unsynchronized timings); in torch-free runtimes there
+    is no accelerator to sync, so any device is a no-op.
     """
     if device is None:
         return None
-    dev_type = (device if isinstance(device, str) else device.type).split(":")[0]
+    try:
+        import torch  # noqa: PLC0415  # keep the timer usable in torch-free runtimes
+    except ModuleNotFoundError:
+        return None  # no torch, no async accelerator to sync
+    dev_type = torch.device(device).type
     if dev_type == "cuda":
-        import torch  # noqa: PLC0415
-
         return torch.cuda.synchronize
     if dev_type == "mps":
-        import torch  # noqa: PLC0415
-
         return torch.mps.synchronize
     return None
 

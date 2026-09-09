@@ -8,6 +8,7 @@ pipeline with the exported classifier. There is no bundled detector: callers
 
 This module must stay importable with only the ``onnx`` extra installed —
 no torch, timm or ultralytics anywhere on its import path.
+Design: ``docs/specs/2026-09-09-onnx-export-design.md``.
 """
 
 import json
@@ -20,12 +21,18 @@ import numpy as np
 import yaml
 
 from .logistic_calibrator import LogisticCalibrator
-from .pipeline import TubePipelineModel, aggregation_of, require_calibrated
+from .pipeline import (
+    TubePipelineModel,
+    UncalibratedModelError,
+    aggregation_of,
+    require_calibrated,
+)
 
 __all__ = [
     "ONNX_MODEL_FILENAME",
     "OnnxPackage",
     "OnnxTemporalModel",
+    "UncalibratedModelError",  # torch-free import path for [onnx]-only installs
     "load_onnx_package",
 ]
 
@@ -99,7 +106,10 @@ def load_onnx_package(
             calibrator, aggregation_of(config), context="load_onnx_package"
         )
 
-    session = ort.InferenceSession(model_bytes, providers=providers or _CPU_PROVIDERS)
+    session = ort.InferenceSession(
+        model_bytes,
+        providers=providers if providers is not None else _CPU_PROVIDERS,
+    )
     return OnnxPackage(
         session=session, config=config, calibrator=calibrator, manifest=manifest
     )
@@ -132,15 +142,8 @@ class OnnxTemporalModel(TubePipelineModel):
         return cls(session=pkg.session, config=pkg.config, calibrator=pkg.calibrator)
 
     def _score(self, patches: np.ndarray, mask: np.ndarray) -> np.ndarray:
-        """Score tubes one at a time: the exported graph has a fixed batch of 1."""
-        logits = [
-            self._session.run(
-                [OUTPUT_LOGIT],
-                {
-                    INPUT_PATCHES: np.ascontiguousarray(patches[i : i + 1]),
-                    INPUT_MASK: np.ascontiguousarray(mask[i : i + 1]),
-                },
-            )[0][0]
-            for i in range(patches.shape[0])
-        ]
+        """Score all tubes in one run: the exported graph has a dynamic batch axis."""
+        (logits,) = self._session.run(
+            [OUTPUT_LOGIT], {INPUT_PATCHES: patches, INPUT_MASK: mask}
+        )
         return np.asarray(logits, dtype=np.float32)

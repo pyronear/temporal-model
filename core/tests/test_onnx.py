@@ -21,12 +21,12 @@ from temporal_model.core.model import BboxTubeTemporalModel
 from temporal_model.core.onnx_model import (
     CLASSIFIER_ONNX_FILENAME,
     OnnxTemporalModel,
+    UncalibratedModelError,  # via onnx_model: the torch-free import path
     load_onnx_package,
 )
 from temporal_model.core.package import (
     CONFIG_FILENAME,
     MANIFEST_FILENAME,
-    UncalibratedModelError,
     build_model_package,
 )
 from temporal_model.core.protocol import Frame
@@ -105,7 +105,7 @@ def model_zip(tmp_path_factory: pytest.TempPathFactory, classifier) -> Path:
 @pytest.fixture(scope="module")
 def onnx_zip(tmp_path_factory: pytest.TempPathFactory, model_zip: Path) -> Path:
     out = tmp_path_factory.mktemp("onnx") / "model_onnx.zip"
-    return build_onnx_package(model_zip, out)
+    return build_onnx_package(model_zip, out, allow_uncalibrated=True)
 
 
 def _frames() -> list[Frame]:
@@ -122,10 +122,18 @@ def _gt_detections() -> dict:
 def test_export_matches_torch_on_every_mask_pattern(classifier, tmp_path: Path):
     out = tmp_path / "clf.onnx"
     spec = export_classifier(classifier, out, max_frames=5, patch_size=224)
-    assert spec["inputs"]["patches"]["shape"] == [1, 5, 3, 224, 224]
-    assert spec["inputs"]["mask"]["shape"] == [1, 5]
+    assert spec["inputs"]["patches"]["shape"] == ["batch", 5, 3, 224, 224]
+    assert spec["inputs"]["mask"]["shape"] == ["batch", 5]
     worst = verify_export(classifier, out, max_frames=5, patch_size=224, atol=1e-4)
     assert worst <= 1e-4
+    # Export and verify work on deep copies: the caller's model keeps its
+    # as-served configuration (fused attention intact).
+    assert all(m.fused_attn for m in classifier.modules() if hasattr(m, "fused_attn"))
+
+
+def test_uncalibrated_model_zip_is_refused_at_export(model_zip: Path, tmp_path: Path):
+    with pytest.raises(UncalibratedModelError):
+        build_onnx_package(model_zip, tmp_path / "model_onnx.zip")
 
 
 def test_onnx_package_contents_and_manifest(model_zip: Path, onnx_zip: Path):

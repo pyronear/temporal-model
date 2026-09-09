@@ -16,33 +16,26 @@ A release can move the code version while leaving the model version untouched.
 
 ### 1. (Only if the model changed) publish the new model
 
-Bump the pin and publish `model.zip` to HuggingFace (needs a **write** HF token):
-
-```bash
-echo "X.Y.Z" > api/MODEL_VERSION   # the new model version
-cd api && uv run python -m temporal_model.api.release \
-    publish --version X.Y.Z --file path/to/model.zip
-```
-
-`publish` stamps the version into the manifest, uploads the zip + model card,
-and tags `vX.Y.Z` on the HF repo (immutable — re-publishing an existing version
-fails). Commit the `api/MODEL_VERSION` change.
-
-Ship the torch-free runtime artifact with it: export `model_onnx.zip` from the
-same `model.zip` (the export checks torch/ONNX parity and records the source
-SHA-256 in its manifest) and pass it to `publish` so both land under one tag:
+Bump the pin, export the torch-free runtime artifact from the same `model.zip`
+(the export checks torch/ONNX parity and records the source SHA-256 in its
+manifest), then publish **both in one `publish` call** — the `vX.Y.Z` tag is
+immutable, so a second `publish` for the same version fails and cannot add the
+ONNX archive after the fact (needs a **write** HF token):
 
 ```bash
 # from the repo root; MODEL=/abs/path/to/model.zip, ONNX=/abs/path/to/model_onnx.zip
+echo "X.Y.Z" > api/MODEL_VERSION   # the new model version
 uv run --project core temporal-export-onnx --model "$MODEL" --output "$ONNX"
 uv run --project api python -m temporal_model.api.release \
     publish --version X.Y.Z --file "$MODEL" --onnx-file "$ONNX"
 ```
 
-`publish` refuses an `--onnx-file` whose manifest was not exported from that
-exact `model.zip`, then re-stamps its source hash from the uploaded (version
-stamped) copy. Consumers fetch it with `release fetch --onnx` (or
-`make fetch-model-onnx`).
+`publish` stamps the version into both manifests, uploads the zips + model
+card, and tags `vX.Y.Z` on the HF repo (immutable — re-publishing an existing
+version fails). It refuses an `--onnx-file` whose manifest was not exported
+from that exact `model.zip`, then re-stamps its source hash from the uploaded
+(version-stamped) copy. Commit the `api/MODEL_VERSION` change. Consumers fetch
+the ONNX artifact with `release fetch --onnx` (or `make fetch-model-onnx`).
 
 ### 2. Push the git tag
 

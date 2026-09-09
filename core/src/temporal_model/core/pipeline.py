@@ -6,6 +6,7 @@ and tube scoring (:meth:`TubePipelineModel._score`). Backends subclass it —
 :class:`~temporal_model.core.model.BboxTubeTemporalModel` (torch + YOLO) and
 :class:`~temporal_model.core.onnx_model.OnnxTemporalModel` (onnxruntime,
 supplied detections only). This module must stay importable without torch.
+Design: ``docs/specs/2026-09-09-onnx-export-design.md``.
 """
 
 from dataclasses import replace

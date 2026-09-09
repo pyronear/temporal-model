@@ -7,15 +7,17 @@ tag. Contents:
 
 - ``manifest.yaml`` — format version, file pointers, source ``model.zip``
   identity (SHA-256) and the ONNX I/O contract (names, shapes, dtypes, opset).
-- ``classifier.onnx`` — the classifier with fixed shapes
-  ``patches[1, max_frames, 3, P, P]`` + ``mask[1, max_frames]`` → ``logit[1]``.
+- ``classifier.onnx`` — the classifier with a dynamic batch axis:
+  ``patches[N, max_frames, 3, P, P]`` + ``mask[N, max_frames]`` → ``logit[N]``.
 - ``config.yaml`` and ``logistic_calibrator.json`` — copied verbatim from the
   source package.
 
 Requires the ``torch`` extra (``torch``, ``timm``, ``onnx``, ``onnxscript``).
+Design: ``docs/specs/2026-09-09-onnx-export-design.md``.
 """
 
 import argparse
+import copy
 import hashlib
 import zipfile
 from pathlib import Path
@@ -32,6 +34,9 @@ from .onnx_model import (
     INPUT_PATCHES,
     ONNX_FORMAT_VERSION,
     OUTPUT_LOGIT,
+)
+from .onnx_model import (
+    MANIFEST_FILENAME as ONNX_MANIFEST_FILENAME,
 )
 from .package import (
     CONFIG_FILENAME,
@@ -50,10 +55,15 @@ DEFAULT_ATOL = 1e-4
 _MASK_PATTERNS = ("all", "tail_padded", "single", "interleaved")
 
 
+def _file_sha256(path: Path) -> str:
+    with path.open("rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
+
+
 def _mask_pattern(name: str, max_frames: int) -> np.ndarray:
     mask = np.ones(max_frames, dtype=bool)
     if name == "tail_padded":
-        mask[max_frames // 2 :] = False
+        mask[max(1, max_frames // 2) :] = False
     elif name == "single":
         mask[1:] = False
     elif name == "interleaved":
@@ -66,12 +76,12 @@ def _io_spec(max_frames: int, patch_size: int) -> dict[str, Any]:
         "opset": OPSET_VERSION,
         "inputs": {
             INPUT_PATCHES: {
-                "shape": [1, max_frames, 3, patch_size, patch_size],
+                "shape": ["batch", max_frames, 3, patch_size, patch_size],
                 "dtype": "float32",
             },
-            INPUT_MASK: {"shape": [1, max_frames], "dtype": "bool"},
+            INPUT_MASK: {"shape": ["batch", max_frames], "dtype": "bool"},
         },
-        "outputs": {OUTPUT_LOGIT: {"shape": [1], "dtype": "float32"}},
+        "outputs": {OUTPUT_LOGIT: {"shape": ["batch"], "dtype": "float32"}},
     }
 
 
@@ -82,19 +92,23 @@ def export_classifier(
     max_frames: int,
     patch_size: int,
 ) -> dict[str, Any]:
-    """Export ``classifier`` to ``output_path`` with fixed shapes; return the I/O spec.
+    """Export ``classifier`` to ``output_path``; return the I/O spec.
 
-    Exports on CPU in eval mode with fused attention disabled (timm's fused
-    kernels and the ``nn.TransformerEncoder`` fast path do not trace
-    portably). Runs the ONNX checker on the result.
+    The batch axis is dynamic (one ``session.run`` scores all tubes); the
+    frame/patch axes are fixed. Exports a deep copy on CPU in eval mode with
+    fused attention disabled (timm's fused kernels and the
+    ``nn.TransformerEncoder`` fast path do not trace portably) — the caller's
+    module is never touched. Runs the ONNX checker on the result.
     """
-    classifier = classifier.cpu().eval()
+    classifier = copy.deepcopy(classifier).cpu().eval()
     for module in classifier.modules():
         if hasattr(module, "fused_attn"):
             module.fused_attn = False
 
-    patches = torch.zeros(1, max_frames, 3, patch_size, patch_size)
-    mask = torch.ones(1, max_frames, dtype=torch.bool)
+    # Batch-2 example input: a batch-1 example lets the tracer fold the size-1
+    # batch dim into reshapes, specializing the graph so batch > 1 fails at run.
+    patches = torch.zeros(2, max_frames, 3, patch_size, patch_size)
+    mask = torch.ones(2, max_frames, dtype=torch.bool)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     torch.onnx.export(
         classifier,
@@ -104,6 +118,7 @@ def export_classifier(
         output_names=[OUTPUT_LOGIT],
         opset_version=OPSET_VERSION,
         dynamo=True,
+        dynamic_shapes={INPUT_PATCHES: {0: "batch"}, INPUT_MASK: {0: "batch"}},
         external_data=False,  # single self-contained file, loadable from bytes
     )
     onnx.checker.check_model(str(output_path))
@@ -121,20 +136,30 @@ def verify_export(
 ) -> float:
     """Compare torch vs onnxruntime logits on random patches; return the max abs diff.
 
+    The torch reference is a deep copy in its as-served configuration (fused
+    attention untouched), so parity is measured against the production torch
+    path, not the export-friendly variant. Each mask pattern is checked at
+    batch 1, then all patterns together as one batch to exercise the dynamic
+    batch axis.
+
     Raises:
-        ValueError: if any mask pattern disagrees by more than ``atol``.
+        ValueError: if any mask pattern (or the batched pass) disagrees by
+            more than ``atol``.
     """
     import onnxruntime as ort  # noqa: PLC0415  # runtime-only dependency
 
     session = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
-    classifier = classifier.cpu().eval()
+    classifier = copy.deepcopy(classifier).cpu().eval()
     rng = np.random.default_rng(seed)
+    xs, ms = [], []
     worst = 0.0
     for name in _MASK_PATTERNS:
         x = rng.standard_normal((1, max_frames, 3, patch_size, patch_size)).astype(
             np.float32
         )
         m = _mask_pattern(name, max_frames)[None]
+        xs.append(x)
+        ms.append(m)
         with torch.no_grad():
             ref = classifier(torch.from_numpy(x), torch.from_numpy(m)).numpy()
         got = session.run([OUTPUT_LOGIT], {INPUT_PATCHES: x, INPUT_MASK: m})[0]
@@ -145,6 +170,18 @@ def verify_export(
                 f"ONNX parity failed on mask pattern {name!r}: "
                 f"|torch - onnx| = {diff:.3g} > atol {atol:.3g}"
             )
+
+    x_batch, m_batch = np.concatenate(xs), np.concatenate(ms)
+    with torch.no_grad():
+        ref = classifier(torch.from_numpy(x_batch), torch.from_numpy(m_batch)).numpy()
+    got = session.run([OUTPUT_LOGIT], {INPUT_PATCHES: x_batch, INPUT_MASK: m_batch})[0]
+    diff = float(np.abs(ref - got).max())
+    worst = max(worst, diff)
+    if diff > atol:
+        raise ValueError(
+            f"ONNX parity failed on the batched pass: "
+            f"|torch - onnx| = {diff:.3g} > atol {atol:.3g}"
+        )
     return worst
 
 
@@ -153,9 +190,19 @@ def build_onnx_package(
     output_path: Path,
     *,
     atol: float = DEFAULT_ATOL,
+    allow_uncalibrated: bool = False,
 ) -> Path:
-    """Derive ``model_onnx.zip`` from a ``model.zip``; verify parity along the way."""
-    pkg = load_model_package(model_zip, allow_uncalibrated=True, with_detector=False)
+    """Derive ``model_onnx.zip`` from a ``model.zip``; verify parity along the way.
+
+    Raises:
+        UncalibratedModelError: if ``model_zip`` is uncalibrated and
+            ``allow_uncalibrated`` is False — refusing at export keeps an
+            uncalibrated artifact from being published under an immutable tag
+            and only failing on the edge device.
+    """
+    pkg = load_model_package(
+        model_zip, allow_uncalibrated=allow_uncalibrated, with_detector=False
+    )
     max_frames = int(pkg.classifier_cfg["max_frames"])
     patch_size = int(pkg.model_input["patch_size"])
 
@@ -185,7 +232,7 @@ def build_onnx_package(
             "config": CONFIG_FILENAME,
             "source": {
                 "package": model_zip.name,
-                "sha256": hashlib.sha256(model_zip.read_bytes()).hexdigest(),
+                "sha256": _file_sha256(model_zip),
             },
             "onnx": io_spec,
         }
@@ -197,7 +244,7 @@ def build_onnx_package(
 
         with zipfile.ZipFile(output_path, "w", compression=zipfile.ZIP_STORED) as zf:
             zf.writestr(
-                MANIFEST_FILENAME, yaml.dump(manifest, default_flow_style=False)
+                ONNX_MANIFEST_FILENAME, yaml.dump(manifest, default_flow_style=False)
             )
             zf.write(onnx_path, CLASSIFIER_ONNX_FILENAME)
             zf.writestr(CONFIG_FILENAME, config_bytes)
@@ -220,8 +267,18 @@ def main() -> None:
         default=DEFAULT_ATOL,
         help="max |torch - onnx| logit difference tolerated by the parity check",
     )
+    parser.add_argument(
+        "--allow-uncalibrated",
+        action="store_true",
+        help="export even if the source model.zip is not calibrated",
+    )
     args = parser.parse_args()
-    out = build_onnx_package(args.model, args.output, atol=args.atol)
+    out = build_onnx_package(
+        args.model,
+        args.output,
+        atol=args.atol,
+        allow_uncalibrated=args.allow_uncalibrated,
+    )
     print(f"exported {args.model} -> {out}")
 
 

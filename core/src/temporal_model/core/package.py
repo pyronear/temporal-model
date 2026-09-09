@@ -279,7 +279,8 @@ def load_model_package(
                 raise KeyError(f"Archive missing {n}")
 
         extract_dir.mkdir(parents=True, exist_ok=True)
-        zf.extract(yolo_name, extract_dir)
+        if with_detector:
+            zf.extract(yolo_name, extract_dir)
         zf.extract(ckpt_name, extract_dir)
         config = yaml.safe_load(zf.read(config_name))
 

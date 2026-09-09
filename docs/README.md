@@ -265,7 +265,8 @@ encoding the static scene stay nearly constant down each column, so whatever
 *varies* along the time axis is the plume. Attending over that, the head
 scores this tube at logit **+10.4** — unambiguously smoke.
 
-All tubes are scored in one batched forward pass (`score_tubes`).
+All tubes are scored in one batched forward pass (the backend's `_score`
+hook — torch or onnxruntime).
 
 ## Step 6 — Decide: calibrated probability and the trigger
 
@@ -357,12 +358,12 @@ The monorepo packages map onto the lifecycle:
 
 | Step | Entry point | File |
 |---|---|---|
-| Orchestration | `BboxTubeTemporalModel.predict` | [core/.../model.py](../core/src/temporal_model/core/model.py) |
+| Orchestration | `TubePipelineModel.predict` (backends: `BboxTubeTemporalModel`, `OnnxTemporalModel`) | [core/.../pipeline.py](../core/src/temporal_model/core/pipeline.py), [core/.../model.py](../core/src/temporal_model/core/model.py), [core/.../onnx_model.py](../core/src/temporal_model/core/onnx_model.py) |
 | 1 · Pad | `pad_frames_symmetrically` / `pad_frames_uniform` | [core/.../inference.py](../core/src/temporal_model/core/inference.py) |
 | 2 · Detect | `run_yolo_on_frames` | [core/.../inference.py](../core/src/temporal_model/core/inference.py) |
 | 3 · Link | `build_tubes`, `merge_colocated_tubes`, `interpolate_gaps` | [core/.../tubes.py](../core/src/temporal_model/core/tubes.py) |
 | 4 · Crop | `crop_tube_patches`, `tube_window` | [core/.../inference.py](../core/src/temporal_model/core/inference.py), [core/.../stabilize.py](../core/src/temporal_model/core/stabilize.py) |
-| 5 · Score | `TemporalSmokeClassifier`, `score_tubes` | [core/.../temporal_classifier.py](../core/src/temporal_model/core/temporal_classifier.py) |
+| 5 · Score | `TemporalSmokeClassifier`, `TubePipelineModel._score` | [core/.../temporal_classifier.py](../core/src/temporal_model/core/temporal_classifier.py), [core/.../pipeline.py](../core/src/temporal_model/core/pipeline.py) |
 | 6 · Decide | `make_decision_fn`, `LogisticCalibrator`, `find_first_crossing_trigger` | [core/.../inference.py](../core/src/temporal_model/core/inference.py), [core/.../logistic_calibrator.py](../core/src/temporal_model/core/logistic_calibrator.py) |
 | Packaging | `build_model_package` / `load_model_package` | [core/.../package.py](../core/src/temporal_model/core/package.py) |
 

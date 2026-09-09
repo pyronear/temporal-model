@@ -22,9 +22,12 @@ from pathlib import Path
 import yaml
 from huggingface_hub import HfApi, hf_hub_download
 
+from temporal_model.core.onnx_model import (
+    ONNX_MODEL_FILENAME,  # noqa: F401  # one name for publish/fetch/export
+)
+
 RELEASE_REPO = "pyronear/temporal-model"
 MODEL_FILENAME = "model.zip"
-ONNX_MODEL_FILENAME = "model_onnx.zip"
 MANIFEST_FILENAME = "manifest.yaml"
 CARD_TEMPLATE = "model_card.md"
 CARD_FILENAME = "README.md"
@@ -71,7 +74,8 @@ def stamp_model_version(zip_path: Path, version: str) -> None:
 
 
 def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    with path.open("rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
 
 
 def read_onnx_source_sha256(onnx_zip: Path) -> str | None:
@@ -94,19 +98,6 @@ def verify_onnx_source(onnx_zip: Path, model_zip: Path) -> None:
             f"{onnx_zip.name} was exported from a model.zip with sha256 "
             f"{recorded!r}, but {model_zip.name} has {actual!r}"
         )
-
-
-def stamp_onnx_source(onnx_zip: Path, model_zip: Path) -> None:
-    """Point ``manifest.source`` of ``onnx_zip`` at ``model_zip`` (name + SHA-256).
-
-    Stamping the version rewrites ``model.zip``, so the checksum recorded at
-    export time no longer identifies the released archive; re-stamp it from
-    the staged copy that actually gets uploaded.
-    """
-    _update_manifest(
-        onnx_zip,
-        source={"package": model_zip.name, "sha256": _sha256(model_zip)},
-    )
 
 
 def fetch(
@@ -171,8 +162,15 @@ def publish(
         if onnx_path is not None:
             staged_onnx = Path(td) / ONNX_MODEL_FILENAME
             shutil.copyfile(onnx_path, staged_onnx)
-            stamp_model_version(staged_onnx, version)
-            stamp_onnx_source(staged_onnx, staged_model)
+            # One rewrite for both stamps (_update_manifest rebuilds the whole
+            # archive each call). The source hash must be re-stamped from the
+            # staged model.zip: version-stamping rewrote it, so the checksum
+            # recorded at export time no longer identifies the released archive.
+            _update_manifest(
+                staged_onnx,
+                model_version=version,
+                source={"package": staged_model.name, "sha256": _sha256(staged_model)},
+            )
             uploads.append(staged_onnx)
         for staged in uploads:
             hf.upload_file(

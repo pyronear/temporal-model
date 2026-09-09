@@ -2465,7 +2465,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.6" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "timm", marker = "extra == 'torch'", specifier = ">=1.0" },
-    { name = "torch", marker = "extra == 'torch'", specifier = ">=2.5" },
+    { name = "torch", marker = "extra == 'torch'", specifier = ">=2.6" },
     { name = "ultralytics", marker = "extra == 'torch'", specifier = ">=8.3" },
 ]
 provides-extras = ["torch", "onnx"]
@@ -2475,6 +2475,7 @@ dev = [
     { name = "pytest", specifier = ">=8.0" },
     { name = "ruff", specifier = ">=0.9" },
     { name = "temporal-model-core", extras = ["torch", "onnx"] },
+    { name = "torchvision", specifier = ">=0.17" },
 ]
 
 [[package]]
