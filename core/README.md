@@ -49,3 +49,75 @@ The base package is torch-free (numpy, pillow, pydantic, pyyaml). Pick an extra:
 make install   # dev environment: both extras
 make test
 ```
+
+## Running the model
+
+Both backends run the same pipeline and produce the same logits (parity is
+checked at export, `atol=1e-4`); pick one by machine, not by feature.
+
+### ONNX, torch-free (edge devices)
+
+The ONNX backend bundles no YOLO: supply the per-frame detections from the
+detector already running on the device, boxes as normalized `(cx, cy, w, h)`.
+
+```bash
+pip install "temporal-model-core[onnx] @ git+https://github.com/pyronear/temporal-model.git#subdirectory=core"
+```
+
+```python
+from pathlib import Path
+
+from huggingface_hub import hf_hub_download
+from temporal_model.core import Detection, FrameDetections
+from temporal_model.core.onnx_model import OnnxTemporalModel
+
+onnx_zip = hf_hub_download("pyronear/temporal-model", "model_onnx.zip", revision="v0.4.0")
+model = OnnxTemporalModel.from_package(Path(onnx_zip))
+
+# Temporally ordered frames (filename order is time order).
+frames = model.load_sequence(sorted(Path("my_sequence").glob("*.jpg")))
+
+# One FrameDetections per frame, keyed by frame_id.
+detections = {
+    f.frame_id: FrameDetections(
+        frame_idx=i, frame_id=f.frame_id, timestamp=f.timestamp,
+        detections=[Detection(class_id=0, cx=0.5, cy=0.4, w=0.05, h=0.03, confidence=0.6)],
+    )
+    for i, f in enumerate(frames)
+}
+
+out = model.predict(frames, frame_detections=detections)
+print("is_smoke:", out.is_positive)
+kept = out.details["tubes"]["kept"]
+probs = [t["probability"] for t in kept if t["probability"] is not None]
+print("smoke probability:", max(probs) if probs else 0.0)
+```
+
+To run the ONNX session on a GPU, install `onnxruntime-gpu` and pass
+`providers=["CUDAExecutionProvider", "CPUExecutionProvider"]` to
+`from_package`.
+
+### Torch + GPU (bundled YOLO)
+
+The torch backend runs its bundled YOLO itself — pass only the images.
+`device=None` auto-selects `cuda` → `mps` → `cpu`.
+
+```bash
+pip install "temporal-model-core[torch] @ git+https://github.com/pyronear/temporal-model.git#subdirectory=core"
+```
+
+```python
+from pathlib import Path
+
+from huggingface_hub import hf_hub_download
+from temporal_model.core.model import BboxTubeTemporalModel
+
+model_zip = hf_hub_download("pyronear/temporal-model", "model.zip", revision="v0.4.0")
+model = BboxTubeTemporalModel.from_package(Path(model_zip), device="cuda")
+
+out = model.predict_sequence(sorted(Path("my_sequence").glob("*.jpg")))
+print("is_smoke:", out.is_positive)
+kept = out.details["tubes"]["kept"]
+probs = [t["probability"] for t in kept if t["probability"] is not None]
+print("smoke probability:", max(probs) if probs else 0.0)
+```
