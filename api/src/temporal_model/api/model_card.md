@@ -34,8 +34,8 @@ The model runs YOLO **itself** — you pass only raw frames, no detections.
 
 ## ONNX runtime (no torch)
 
-`model_onnx.zip` carries the same classifier exported to ONNX (fixed input
-`patches[1, 20, 3, 224, 224]` + `mask[1, 20]` → `logit[1]`), the inference
+`model_onnx.zip` carries the same classifier exported to ONNX (dynamic batch:
+`patches[N, 20, 3, 224, 224]` + `mask[N, 20]` → `logit[N]`), the inference
 config and the calibrator, but **no YOLO**: you supply the per-frame detections
 (e.g. from a detector already running on the device). It runs on numpy + pillow
 + onnxruntime only — the intended runtime for edge devices such as a
