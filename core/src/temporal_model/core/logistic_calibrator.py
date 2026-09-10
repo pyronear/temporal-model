@@ -54,14 +54,17 @@ class LogisticCalibrator:
         path.write_text(json.dumps(payload, indent=2))
 
     @classmethod
-    def from_json(cls, path: Path) -> Self:
-        data = json.loads(path.read_text())
+    def from_dict(cls, data: dict) -> Self:
         return cls(
             features=list(data["features"]),
             coefficients=np.asarray(data["coefficients"], dtype=float),
             intercept=float(data["intercept"]),
             sanity_checks=list(data.get("sanity_checks", [])),
         )
+
+    @classmethod
+    def from_json(cls, path: Path) -> Self:
+        return cls.from_dict(json.loads(path.read_text()))
 
     def predict_proba(self, features_row: np.ndarray) -> float:
         """Probability of the positive class for one feature row.

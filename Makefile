@@ -5,9 +5,10 @@ PACKAGES := core train eval api benchmark monitor triage
 # decoupled (code can change without retraining).
 MODEL_VERSION ?= $(shell cat api/MODEL_VERSION)
 MODEL_ZIP := api/models/model.zip
+ONNX_ZIP := api/models/model_onnx.zip
 
 .DEFAULT_GOAL := help
-.PHONY: help install lint format test serve fetch-model
+.PHONY: help install lint format test serve fetch-model fetch-model-onnx export-onnx
 
 help: ## Show this help
 	@echo "Available targets:"
@@ -34,6 +35,14 @@ test: ## pytest every package
 fetch-model: ## download the released model.zip from HuggingFace (no creds)
 	cd api && uv run python -m temporal_model.api.release \
 	    fetch --version $(MODEL_VERSION) --output models/model.zip
+
+fetch-model-onnx: ## download the released model_onnx.zip from HuggingFace (no creds)
+	cd api && uv run python -m temporal_model.api.release \
+	    fetch --onnx --version $(MODEL_VERSION) --output models/model_onnx.zip
+
+export-onnx: ## derive $(ONNX_ZIP) from $(MODEL_ZIP) (torch-free runtime artifact)
+	@test -f $(MODEL_ZIP) || { echo "$(MODEL_ZIP) not found — run 'make fetch-model' first"; exit 1; }
+	cd core && uv run temporal-export-onnx --model ../$(MODEL_ZIP) --output ../$(ONNX_ZIP)
 
 serve: ## run the full API + MinIO stack locally (docker compose)
 	@test -f $(MODEL_ZIP) || { \

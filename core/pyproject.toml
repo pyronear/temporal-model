@@ -6,18 +6,31 @@ build-backend = "hatchling.build"
 name = "temporal-model-core"
 version = "0.1.0"
 description = "Core model, tube building, and inference for the temporal smoke classifier"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.13"
 dependencies = [
     "numpy>=1.26,<2",
     "pydantic>=2.6",
-    "torch>=2.2",
-    "torchvision>=0.17",
-    "timm>=1.0",
-    "ultralytics>=8.3",
     "pillow>=10.0",
     "pyyaml>=6.0",
     "huggingface-hub>=0.23",
 ]
+
+[project.optional-dependencies]
+# Training, packaging, the torch backend and the ONNX export (which verifies
+# the exported graph with onnxruntime, hence the [onnx] runtime deps too).
+torch = [
+    "torch>=2.6",  # torch.onnx.export(dynamo=True, external_data=...) needs >= 2.6
+    "timm>=1.0",
+    "ultralytics>=8.3",
+    "onnx>=1.16",
+    "onnxscript>=0.7",
+    "onnxruntime>=1.17",
+]
+# Torch-free inference on model_onnx.zip (edge devices).
+onnx = ["onnxruntime>=1.17"]
+
+[project.scripts]
+temporal-export-onnx = "temporal_model.core.export_onnx:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/temporal_model"]
@@ -26,6 +39,8 @@ packages = ["src/temporal_model"]
 dev = [
     "pytest>=8.0",
     "ruff>=0.9",
+    "temporal-model-core[torch,onnx]",
+    "torchvision>=0.17",  # test_model_parity's to_tensor oracle for the numpy preprocessing
 ]
 
 [tool.ruff]

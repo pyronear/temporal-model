@@ -9,9 +9,7 @@ from collections.abc import Callable
 from typing import Any
 
 import numpy as np
-import torch
 from PIL import Image
-from torchvision.transforms.functional import to_tensor
 
 from .crop import crop_and_resize, expand_bbox, norm_bbox_to_pixel_square
 from .logistic_calibrator import (
@@ -36,7 +34,6 @@ __all__ = [
     "run_yolo_on_frames",
     "filter_and_interpolate_tubes",
     "crop_tube_patches",
-    "score_tubes",
     "make_decision_fn",
     "find_first_crossing_trigger",
     "build_tubes_for_inference",
@@ -118,7 +115,7 @@ def run_yolo_on_frames(
     confidence_threshold: float,
     iou_nms: float,
     image_size: int,
-    device: str | torch.device | None = None,
+    device: Any = None,
 ) -> list[FrameDetections]:
     """Run YOLO once over all frames in a single batched call.
 
@@ -226,20 +223,24 @@ def crop_tube_patches(
     normalization_mean: list[float],
     normalization_std: list[float],
     stabilize: bool = True,
-) -> tuple[torch.Tensor, torch.Tensor]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Crop patches for a single tube, padded/truncated to ``max_frames``.
 
     Matches ``TubePatchDataset.__getitem__`` exactly: PIL→uint8 array,
     ``expand_bbox → norm_bbox_to_pixel_square → crop_and_resize``, then
-    ``to_tensor`` (CHW, float32, [0,1]), then mean/std normalization.
+    CHW float32 in [0, 1] (what ``torchvision``'s ``to_tensor`` produces),
+    then mean/std normalization. Every op stays in float32 so the torch and
+    ONNX backends see bit-identical inputs.
+
+    Returns ``(patches[max_frames, 3, P, P] float32, mask[max_frames] bool)``.
     """
     frame_by_idx = {i: f for i, f in enumerate(frames)}
 
     n = min(len(tube.entries), max_frames)
-    patches = torch.zeros(max_frames, 3, patch_size, patch_size, dtype=torch.float32)
-    mask = torch.zeros(max_frames, dtype=torch.bool)
-    mean_t = torch.tensor(normalization_mean).view(3, 1, 1)
-    std_t = torch.tensor(normalization_std).view(3, 1, 1)
+    patches = np.zeros((max_frames, 3, patch_size, patch_size), dtype=np.float32)
+    mask = np.zeros(max_frames, dtype=bool)
+    mean = np.asarray(normalization_mean, dtype=np.float32).reshape(3, 1, 1)
+    std = np.asarray(normalization_std, dtype=np.float32).reshape(3, 1, 1)
 
     window = tube_stabilized_window(tube.entries) if stabilize else None
 
@@ -258,35 +259,11 @@ def crop_tube_patches(
         )
         box = norm_bbox_to_pixel_square(cx, cy, w, h, img_w, img_h)
         patch_np = crop_and_resize(image, box, patch_size)
-        patch_t = to_tensor(Image.fromarray(patch_np))  # CHW float32 [0,1]
-        patches[slot] = (patch_t - mean_t) / std_t
+        patch = patch_np.transpose(2, 0, 1).astype(np.float32) / np.float32(255)
+        patches[slot] = (patch - mean) / std
         mask[slot] = True
 
     return patches, mask
-
-
-def score_tubes(
-    classifier: Any,
-    *,
-    patches_per_tube: list[torch.Tensor],
-    masks_per_tube: list[torch.Tensor],
-) -> torch.Tensor:
-    """Run one batched classifier forward over all tubes.
-
-    Args:
-        classifier: A callable ``(patches[N,T,3,H,W], mask[N,T]) -> logits[N]``.
-        patches_per_tube: One ``[T, 3, H, W]`` tensor per tube.
-        masks_per_tube: One ``[T]`` bool tensor per tube.
-
-    Returns:
-        ``Tensor[N]`` of logits (empty tensor if no tubes).
-    """
-    if not patches_per_tube:
-        return torch.zeros(0)
-    patches = torch.stack(patches_per_tube, dim=0)
-    mask = torch.stack(masks_per_tube, dim=0)
-    with torch.no_grad():
-        return classifier(patches, mask)
 
 
 def make_decision_fn(
@@ -326,11 +303,11 @@ def make_decision_fn(
 
 def find_first_crossing_trigger(
     *,
-    classifier: Any,
+    classifier: Callable[[np.ndarray, np.ndarray], Any],
     tubes: list[Tube],
-    patches_per_tube: list[torch.Tensor],
-    masks_per_tube: list[torch.Tensor],
-    full_logits: torch.Tensor,
+    patches_per_tube: list[np.ndarray],
+    masks_per_tube: list[np.ndarray],
+    full_logits: np.ndarray,
     aggregation: str = "max_logit",
     threshold: float,
     calibrator: LogisticCalibrator | None = None,
@@ -356,11 +333,12 @@ def find_first_crossing_trigger(
     classifier.
 
     Args:
-        classifier: Callable ``(patches[1,T,3,H,W], mask[1,T]) -> logits[1]``.
+        classifier: Callable ``(patches[1,T,3,H,W], mask[1,T]) -> logits[1]``
+            on numpy arrays (any backend).
         tubes: Kept tubes, aligned with ``full_logits``.
-        patches_per_tube: One ``[max_frames, 3, H, W]`` tensor per tube.
-        masks_per_tube: One ``[max_frames]`` bool tensor per tube.
-        full_logits: Output of :func:`score_tubes` on the full tubes.
+        patches_per_tube: One ``[max_frames, 3, H, W]`` float32 array per tube.
+        masks_per_tube: One ``[max_frames]`` bool array per tube.
+        full_logits: Full-tube logits, ``[N]``.
         aggregation: ``"max_logit"`` or ``"logistic"``.
         threshold: Raw logit threshold (``max_logit`` only).
         calibrator: Required when ``aggregation == "logistic"``.
@@ -393,7 +371,7 @@ def find_first_crossing_trigger(
     qualifying_indices: list[int] = [
         i
         for i, tube in enumerate(tubes)
-        if decides_positive(float(full_logits[i].item()), tube, n_tubes)
+        if decides_positive(float(full_logits[i]), tube, n_tubes)
     ]
     if not qualifying_indices:
         return False, None, None, {}
@@ -413,13 +391,12 @@ def find_first_crossing_trigger(
         crossed = False
         for L in range(min_prefix_length, full_len + 1):
             if full_len == L:
-                prefix_logit = float(full_logits[i].item())
+                prefix_logit = float(full_logits[i])
             else:
-                prefix_mask = mask_i.clone()
+                prefix_mask = mask_i.copy()
                 prefix_mask[L:] = False
-                with torch.no_grad():
-                    out = classifier(patches_i.unsqueeze(0), prefix_mask.unsqueeze(0))
-                prefix_logit = float(out[0].item())
+                out = classifier(patches_i[None], prefix_mask[None])
+                prefix_logit = float(out[0])
 
             prefix_entries = tube.entries[:L]
             prefix_tube = Tube(

@@ -12,8 +12,7 @@ run only while profiling is active.
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager, nullcontext
-
-import torch
+from typing import Any
 
 __all__ = ["STAGES", "StageTimer", "stage_ctx"]
 
@@ -23,17 +22,26 @@ __all__ = ["STAGES", "StageTimer", "stage_ctx"]
 STAGES = ("pad", "detector", "tubes", "crop", "classifier", "trigger_search")
 
 
-def _sync_fn_for(device: torch.device | None) -> Callable[[], None] | None:
+def _sync_fn_for(device: Any) -> Callable[[], None] | None:
     """Return the device-synchronise callable, or None for sync devices (CPU).
 
     Async accelerators must be synchronised at stage boundaries for honest
-    timing — CUDA and MPS both qualify; CPU needs nothing.
+    timing — CUDA and MPS both qualify; CPU needs nothing. ``device`` is a
+    device string or a ``torch.device``. When torch is installed it normalizes
+    and validates the value (a typo like ``"gpu"`` raises here instead of
+    silently producing unsynchronized timings); in torch-free runtimes there
+    is no accelerator to sync, so any device is a no-op.
     """
     if device is None:
         return None
-    if device.type == "cuda":
+    try:
+        import torch  # noqa: PLC0415  # keep the timer usable in torch-free runtimes
+    except ModuleNotFoundError:
+        return None  # no torch, no async accelerator to sync
+    dev_type = torch.device(device).type
+    if dev_type == "cuda":
         return torch.cuda.synchronize
-    if device.type == "mps":
+    if dev_type == "mps":
         return torch.mps.synchronize
     return None
 
@@ -41,9 +49,8 @@ def _sync_fn_for(device: torch.device | None) -> Callable[[], None] | None:
 class StageTimer:
     """Accumulates per-stage wall-clock durations in milliseconds."""
 
-    def __init__(self, device: str | torch.device | None = None) -> None:
-        dev = torch.device(device) if device is not None else None
-        self._sync = _sync_fn_for(dev)
+    def __init__(self, device: Any = None) -> None:
+        self._sync = _sync_fn_for(device)
         self._timings: dict[str, float] = {}
 
     @contextmanager
