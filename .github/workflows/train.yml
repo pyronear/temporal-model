@@ -101,7 +101,7 @@ jobs:
           uv run dvc pull \
             data/01_raw/datasets_full/train.dvc \
             data/01_raw/datasets_full/val.dvc \
-            data/06_models/detectors/yolo11s_nimble-narwhal_v6.0.0/yolo_weights.pt.dvc
+            data/06_models/detectors/yolo11s_swift-swallow_v8.2.0/yolo_weights.pt.dvc
           uv run dvc repro --pull
 
       - name: Push train artifacts to DVC remote

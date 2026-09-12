@@ -14,7 +14,10 @@ def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def test_fetch_verifies_hash_and_writes_output(tmp_path: Path) -> None:
+@pytest.mark.parametrize("revision", [None, "v8.2.0"])
+def test_fetch_verifies_hash_and_writes_output(
+    tmp_path: Path, revision: str | None
+) -> None:
     weights = b"pretend-yolo-weights"
     src = tmp_path / "best.pt"
     src.write_bytes(weights)
@@ -23,6 +26,7 @@ def test_fetch_verifies_hash_and_writes_output(tmp_path: Path) -> None:
         name="test-detector",
         source="hf:org/test-detector",
         sha256=_sha256_bytes(weights),
+        revision=revision,
     )
     out = tmp_path / "yolo_weights.pt"
 
@@ -32,7 +36,9 @@ def test_fetch_verifies_hash_and_writes_output(tmp_path: Path) -> None:
     ) as mock_dl:
         result = fetch_detector(out, det)
 
-    mock_dl.assert_called_once_with(repo_id="org/test-detector", filename="best.pt")
+    mock_dl.assert_called_once_with(
+        repo_id="org/test-detector", filename="best.pt", revision=revision
+    )
     assert result == out
     assert out.read_bytes() == weights
 
