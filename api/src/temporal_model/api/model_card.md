@@ -146,7 +146,7 @@ per-tube breakdown and decision config.
 
 Every `model.zip` manifest records how it was built — the training git SHA, the
 classifier backbone (`vit_small_patch14_dinov2.lvd142m`), and the exact companion
-detector (e.g. `pyronear/yolo11s_nimble-narwhal_v6.0.0`, verified by SHA-256). So
+detector (e.g. `pyronear/yolov11s` @ `v8.2.0`, verified by SHA-256). So
 a served model always traces back to its detector + training code.
 
 Source & pipeline: <https://github.com/pyronear/temporal-model>

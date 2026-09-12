@@ -57,9 +57,10 @@ provenance:
   backbone: vit_small_patch14_dinov2.lvd142m
   detector:                     # copied verbatim from core/detector.yaml (§3)
     type: yolo
-    name: yolo11s_nimble-narwhal_v6.0.0
-    source: hf:pyronear/yolo11s_nimble-narwhal_v6.0.0
-    sha256: 0bf3c7ee9f720c26613c30719fea32f47ed04fc384e443de72414d9f8148ac9d
+    name: yolo11s_swift-swallow_v8.2.0
+    source: hf:pyronear/yolov11s
+    revision: v8.2.0
+    sha256: 20cbcae36898dc5a5f2700ad603bde4d3b3b67ed62e64239b7b0e3fe6869827d
 ```
 
 All fields are **additive** — packages built before they existed still load, and
@@ -88,9 +89,10 @@ by hash.
 ```yaml
 detector:
   type: yolo
-  name: yolo11s_nimble-narwhal_v6.0.0
-  source: hf:pyronear/yolo11s_nimble-narwhal_v6.0.0   # downloads best.pt
-  sha256: 0bf3c7ee9f720c26613c30719fea32f47ed04fc384e443de72414d9f8148ac9d
+  name: yolo11s_swift-swallow_v8.2.0
+  source: hf:pyronear/yolov11s   # downloads best.pt
+  revision: v8.2.0               # HF tag; the repo's main branch moves
+  sha256: 20cbcae36898dc5a5f2700ad603bde4d3b3b67ed62e64239b7b0e3fe6869827d
 ```
 
 This is the **only** place the detector is named. `core.detector.load_detector()`
@@ -99,7 +101,8 @@ reads and validates it; packaging copies it verbatim into `provenance.detector`.
 **Bumping the detector = editing this one file** (a data change, reviewed as a
 one-line diff). `type` is generic so the schema survives a detector swap; `name`
 follows the pyronear HF convention (`<arch>_<codename>_v<ver>`); `source` is the HF
-repo id; `sha256` is the published weights hash and the tamper-evident anchor.
+repo id; `revision` is the HF tag to download (the repo's `main` moves with each
+release); `sha256` is the published weights hash and the tamper-evident anchor.
 
 ## 4. Fetching a (new) detector
 
@@ -110,19 +113,19 @@ you choose. It fails loudly on any mismatch.
 ```bash
 cd core
 uv run python -m temporal_model.core.fetch_detector \
-  --output ../train/data/06_models/detectors/yolo11s_nimble-narwhal_v6.0.0/yolo_weights.pt
+  --output ../train/data/06_models/detectors/yolo11s_swift-swallow_v8.2.0/yolo_weights.pt
 ```
 
 Output:
 
 ```
-Fetched yolo11s_nimble-narwhal_v6.0.0 -> .../yolo_weights.pt (sha256 0bf3c7ee… verified)
+Fetched yolo11s_swift-swallow_v8.2.0 -> .../yolo_weights.pt (sha256 20cbcae3… verified)
 ```
 
 **To switch to a new detector:**
 
-1. Edit `core/detector.yaml` — set `name`, `source`, and the new `sha256` (the
-   value published on the detector's HuggingFace model card).
+1. Edit `core/detector.yaml` — set `name`, `source`, `revision`, and the new
+   `sha256` (the value published on the detector's HuggingFace model card).
 2. Run `fetch_detector` (above) into a new
    `train/data/06_models/detectors/<new-name>/yolo_weights.pt`.
 3. Track it with DVC (§5).
@@ -198,7 +201,7 @@ sha256sum train/data/06_models/detectors/<name>/yolo_weights.pt
 ```
 
 This is how the currently-served detector was confirmed to be
-`yolo11s_nimble-narwhal_v6.0.0` (byte-identical to the HF release).
+`yolo11s_swift-swallow_v8.2.0` (byte-identical to the HF release).
 
 ## 7. What's deferred
 

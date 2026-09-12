@@ -121,7 +121,7 @@ stages:
       - ../core/src/temporal_model/core/sequences.py
       - ../core/src/temporal_model/core/detector.yaml
       - data/06_models/vit_dinov2_finetune/best_checkpoint.pt
-      - data/06_models/detectors/yolo11s_nimble-narwhal_v6.0.0/yolo_weights.pt
+      - data/06_models/detectors/yolo11s_swift-swallow_v8.2.0/yolo_weights.pt
       - data/05_model_input/val
       - data/01_raw/datasets/train
       - data/01_raw/datasets/val
