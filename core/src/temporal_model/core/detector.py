@@ -30,10 +30,12 @@ class Detector(BaseModel):
     name: str
     source: str
     sha256: str
+    # HF git revision (tag) to download; None follows the repo's default branch.
+    revision: str | None = None
 
     @property
     def repo_id(self) -> str:
-        """The HF repo id, e.g. ``pyronear/yolo11s_nimble-narwhal_v6.0.0``."""
+        """The HF repo id, e.g. ``pyronear/yolov11s``."""
         if not self.source.startswith(_HF_PREFIX):
             raise ValueError(
                 f"Unsupported detector source: {self.source!r} "
