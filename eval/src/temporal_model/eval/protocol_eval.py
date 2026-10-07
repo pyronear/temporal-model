@@ -93,6 +93,59 @@ def build_record(
     )
 
 
+def wilson_ci95(successes: int, n: int) -> list[float] | None:
+    """Wilson score 95% interval for a proportion; ``None`` when ``n == 0``."""
+    if n == 0:
+        return None
+    z = 1.96
+    p = successes / n
+    denom = 1 + z * z / n
+    center = (p + z * z / (2 * n)) / denom
+    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
+    return [round(max(center - half, 0.0), 4), round(min(center + half, 1.0), 4)]
+
+
+def fpr_at_recall(records: list[SequenceRecord], target: float = 0.95) -> float | None:
+    """Lowest FPR over score thresholds whose recall reaches ``target``.
+
+    A test-set threshold sweep on the sequence score, for ranking models —
+    not the deployed operating point. Each finite score is a candidate
+    threshold (``score >= t`` is positive, so tied scores move together, no
+    interpolation); ``-inf`` records (no tube) are never positive. ``None``
+    when no threshold reaches ``target`` or a class is missing.
+    """
+    pos = [r.score for r in records if r.label == "smoke"]
+    neg = [r.score for r in records if r.label == "fp"]
+    if not pos or not neg:
+        return None
+    best = None
+    for t in {s for s in pos if math.isfinite(s)}:
+        if sum(s >= t for s in pos) / len(pos) >= target:
+            fpr = sum(s >= t for s in neg) / len(neg)
+            best = fpr if best is None else min(best, fpr)
+    return None if best is None else round(best, 4)
+
+
+def detected_within_frames(
+    records: list[SequenceRecord], ks: tuple[int, ...] = (1, 3, 5)
+) -> dict[str, float | None]:
+    """Share of all smoke sequences alerted within their first k frames.
+
+    ``ttd_frames`` is zero-based, so "within k" is ``ttd_frames < k``. Missed
+    smoke counts as not detected, unlike the TTD mean/median, which only see
+    detected smoke and so reward a model for missing the hard ones.
+    """
+    ttds = [r.ttd_frames for r in records if r.label == "smoke"]
+    return {
+        str(k): (
+            round(sum(t is not None and t < k for t in ttds) / len(ttds), 4)
+            if ttds
+            else None
+        )
+        for k in ks
+    }
+
+
 def compute_metrics(model_name: str, records: list[SequenceRecord]) -> dict:
     """Aggregate leaderboard-style metrics + PR/ROC AUCs over records.
 
@@ -153,4 +206,8 @@ def compute_metrics(model_name: str, records: list[SequenceRecord]) -> dict:
         "median_ttd_frames": median_ttd,
         "pr_auc": round(pr_auc, 4),
         "roc_auc": round(roc_auc, 4),
+        "recall_ci95": wilson_ci95(tp, tp + fn),
+        "fpr_ci95": wilson_ci95(fp, n_neg),
+        "fpr_at_recall_95": fpr_at_recall(records, 0.95),
+        "detected_within_frames": detected_within_frames(records),
     }
