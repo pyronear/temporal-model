@@ -29,6 +29,8 @@ def test_detector_is_frozen() -> None:
 
 
 def test_repo_id_rejects_non_hf_source() -> None:
-    det = Detector(type="yolo", name="x", source="s3://bucket/x", sha256="ab")
+    det = Detector(
+        type="yolo", name="x", source="s3://bucket/x", sha256="ab", revision="v1"
+    )
     with pytest.raises(ValueError, match="Unsupported detector source"):
         _ = det.repo_id

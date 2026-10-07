@@ -200,7 +200,7 @@ sha256sum train/data/06_models/detectors/<name>/yolo_weights.pt
 # must equal core/detector.yaml's detector.sha256
 ```
 
-This is how the currently-served detector was confirmed to be
+This is how the configured detector was confirmed to be
 `yolo11s_swift-swallow_v8.2.0` (byte-identical to the HF release).
 
 ## 7. What's deferred

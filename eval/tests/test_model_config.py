@@ -8,8 +8,9 @@ format_version: 1
 provenance:
   backbone: vit_small_patch14_dinov2.lvd142m
   detector:
-    name: yolo11s_nimble-narwhal_v6.0.0
-    source: hf:pyronear/yolo11s_nimble-narwhal_v6.0.0
+    name: yolo11s_swift-swallow_v8.2.0
+    source: hf:pyronear/yolov11s
+    revision: v8.2.0
     type: yolo
   train_git_sha: 4b4d43ad77c401bab6d01d561b0aa2337f7ee031
 variant: vit_dinov2_finetune
@@ -51,7 +52,8 @@ def _make_zip(tmp_path: Path, *, with_calibrator: bool = True) -> Path:
 
 def test_read_model_config_merges_members(tmp_path):
     cfg = read_model_config(_make_zip(tmp_path))
-    assert cfg["detector"]["source"] == "hf:pyronear/yolo11s_nimble-narwhal_v6.0.0"
+    assert cfg["detector"]["source"] == "hf:pyronear/yolov11s"
+    assert cfg["detector"]["revision"] == "v8.2.0"
     assert cfg["variant"] == "vit_dinov2_finetune"
     assert cfg["train_git_sha"].startswith("4b4d43a")
     assert cfg["decision"]["aggregation"] == "logistic"

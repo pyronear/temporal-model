@@ -30,8 +30,8 @@ class Detector(BaseModel):
     name: str
     source: str
     sha256: str
-    # HF git revision (tag) to download; None follows the repo's default branch.
-    revision: str | None = None
+    # HF git revision (tag) to download. Required: the repo's main branch moves.
+    revision: str
 
     @property
     def repo_id(self) -> str:
