@@ -339,7 +339,10 @@ def render_model_config(source: str) -> None:  # pragma: no cover - Streamlit UI
     if not cfg:
         st.sidebar.caption("model config unavailable")
         return
-    detector = (cfg.get("detector") or {}).get("source", "—")
+    det = cfg.get("detector") or {}
+    detector = det.get("source", "—")
+    if det.get("revision"):
+        detector += f"@{det['revision']}"
     decision = cfg.get("decision") or {}
     model_input = cfg.get("model_input") or {}
     infer = cfg.get("infer") or {}

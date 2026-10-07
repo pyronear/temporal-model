@@ -20,6 +20,7 @@ def test_verify_detector_weights_passes_on_match(tmp_path: Path) -> None:
         name="x",
         source="hf:o/x",
         sha256=hashlib.sha256(b"weights").hexdigest(),
+        revision="v1",
     )
     verify_detector_weights(p, det)  # must not raise
 
@@ -27,7 +28,9 @@ def test_verify_detector_weights_passes_on_match(tmp_path: Path) -> None:
 def test_verify_detector_weights_raises_on_mismatch(tmp_path: Path) -> None:
     p = tmp_path / "yolo_weights.pt"
     p.write_bytes(b"weights")
-    det = Detector(type="yolo", name="x", source="hf:o/x", sha256="00" * 32)
+    det = Detector(
+        type="yolo", name="x", source="hf:o/x", sha256="00" * 32, revision="v1"
+    )
     with pytest.raises(ValueError, match="SHA-256 mismatch"):
         verify_detector_weights(p, det)
 

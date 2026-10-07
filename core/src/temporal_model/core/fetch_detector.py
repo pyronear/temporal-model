@@ -38,7 +38,11 @@ def fetch_detector(output_path: Path, detector: Detector | None = None) -> Path:
     """
     det = detector or load_detector()
     downloaded = Path(
-        hf_hub_download(repo_id=det.repo_id, filename=DETECTOR_WEIGHTS_FILENAME)
+        hf_hub_download(
+            repo_id=det.repo_id,
+            filename=DETECTOR_WEIGHTS_FILENAME,
+            revision=det.revision,
+        )
     )
     actual = _sha256(downloaded)
     if actual != det.sha256:
