@@ -117,22 +117,54 @@ jobs:
       - name: Refresh eval inputs
         working-directory: eval
         run: |
-          rsync -a --delete ../train/data/01_raw/datasets/ data/01_raw/datasets/
+          # Set main's model aside before replacing it: it is re-scored on
+          # this run's test set, since stored metrics from an older test
+          # version are not comparable once the dataset changes.
+          git fetch origin main --depth=1
+          git checkout origin/main -- data/06_models/vit_dinov2_finetune/model.zip.dvc
+          uv run dvc pull data/06_models/vit_dinov2_finetune/model.zip.dvc
+          mkdir -p data/06_models/baseline
+          cp data/06_models/vit_dinov2_finetune/model.zip data/06_models/baseline/model.zip
           make update-model
           # Forgetting the model refresh is silent (frozen import); prove the
           # eval copy is the model this run just built.
           cmp data/06_models/vit_dinov2_finetune/model.zip \
               ../train/data/06_models/vit_dinov2_finetune/model.zip
 
+      - name: Update test dataset pointer
+        if: env.DATASET_REV != ''
+        working-directory: eval
+        run: |
+          # Same release as the train imports: pyro-dataset guarantees no
+          # leakage only between splits of one revision.
+          uv run dvc update data/01_raw/sequential_test.dvc --rev "$DATASET_REV"
+          grep -q "rev: $DATASET_REV" data/01_raw/sequential_test.dvc
+
       - name: Run eval pipeline
         working-directory: eval
         run: |
-          uv run dvc pull data/01_raw/pyro-annotator.dvc
+          uv run dvc pull data/01_raw/sequential_test.dvc
           # Eval reporting outputs are cache: false — they never round-trip
           # through the DVC remote, so on a fresh runner an unchanged lock
           # still means missing metrics files (dvc skips the stage anyway).
           # Force: scoring must actually run on every training run.
           uv run dvc repro --force
+          # Baseline: main's model on the same test set, run with main's code.
+          # model.zip holds weights and config, not the inference code, so
+          # running it here would give it this branch's tube building and
+          # decision logic and hide a regression shared by both models.
+          # CI-only comparison, so outside dvc.yaml.
+          EVAL_DIR="$PWD"
+          BASELINE_SRC="$RUNNER_TEMP/baseline-src"
+          git worktree prune
+          git worktree add --detach "$BASELINE_SRC" origin/main
+          echo "BASELINE_SHA=$(git rev-parse --short origin/main)" >> "$GITHUB_ENV"
+          (cd "$BASELINE_SRC/eval" && uv sync && uv run python -m temporal_model.eval.evaluate \
+            --model-zip "$EVAL_DIR/data/06_models/baseline/model.zip" \
+            --sequences-dir "$EVAL_DIR/data/01_raw/sequential_test" \
+            --output-dir "$EVAL_DIR/data/08_reporting/test-baseline/vit_dinov2_finetune" \
+            --model-name vit_dinov2_finetune-test-baseline \
+            --source test-baseline)
 
       - name: Push eval artifacts to DVC remote
         working-directory: eval
@@ -146,10 +178,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           mkdir -p results
-          for src in train val pyro-annotator; do
-            cp "eval/data/08_reporting/$src/vit_dinov2_finetune/metrics.json" \
-               "results/$src.json"
-          done
+          cp eval/data/08_reporting/test/vit_dinov2_finetune/metrics.json \
+             results/test.json
 
           git checkout -b "$RESULT_BRANCH"
           git add \
@@ -157,6 +187,7 @@ jobs:
             train/data/01_raw/datasets_full/val.dvc \
             train/dvc.lock \
             eval/data/06_models/vit_dinov2_finetune/model.zip.dvc \
+            eval/data/01_raw/sequential_test.dvc \
             eval/dvc.lock \
             results/
           git commit -m "chore: training results from $GITHUB_REF_NAME [skip ci]"
@@ -181,20 +212,12 @@ jobs:
         run: |
           RESULT_BRANCH="result_${GITHUB_REF_NAME#train_}"
 
-          # Baseline = the results/ snapshots committed on main (absent on
-          # the first run; the report degrades to a no-baseline table).
-          git fetch origin main --depth=1 2>/dev/null || true
-          BASELINE_DIR=$(mktemp -d)
-          for src in train val pyro-annotator; do
-            git show "origin/main:results/$src.json" \
-              > "$BASELINE_DIR/$src.json" 2>/dev/null \
-              || rm -f "$BASELINE_DIR/$src.json"
-          done
-
+          # Baseline = main's model re-scored on the same test in this run.
           BODY=$(uv run --project eval python scripts/report-training-metrics.py \
-            --results-dir results \
-            --baseline-dir "$BASELINE_DIR" \
+            --current-dir eval/data/08_reporting/test/vit_dinov2_finetune \
+            --baseline-dir eval/data/08_reporting/test-baseline/vit_dinov2_finetune \
             --dataset-rev "${DATASET_REV:-unchanged}" \
+            --baseline-ref "$BASELINE_SHA" \
             --result-branch "$RESULT_BRANCH")
 
           PR_NUMBER=$(gh pr list --head "$RESULT_BRANCH" --base main \

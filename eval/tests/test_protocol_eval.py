@@ -8,6 +8,9 @@ from temporal_model.eval.protocol_eval import (
     SequenceRecord,
     build_record,
     compute_metrics,
+    detected_within_frames,
+    fpr_at_recall,
+    wilson_ci95,
 )
 
 
@@ -259,3 +262,59 @@ def test_compute_metrics_ignores_ttd_for_non_tp_records():
     # Only the one TP record's ttd should be counted
     assert m["mean_ttd_frames"] == 1.0
     assert m["median_ttd_frames"] == 1.0
+
+
+def test_wilson_ci95_known_values():
+    assert wilson_ci95(0, 0) is None
+    assert wilson_ci95(5, 190) == [0.0113, 0.0601]
+    lo, hi = wilson_ci95(10, 10)
+    assert lo < 1.0 and hi == 1.0, "never a zero-width interval at 100%"
+
+
+def test_fpr_at_recall_picks_the_lowest_fpr_reaching_the_target():
+    records = [
+        _rec("smoke", True, score=3.0),
+        _rec("smoke", True, score=2.0),
+        _rec("fp", True, score=2.5),
+        _rec("fp", False, score=1.0),
+    ]
+    # Recall 1.0 needs t <= 2.0, which also takes the 2.5 fp: FPR 0.5.
+    assert fpr_at_recall(records, 1.0) == 0.5
+    # Recall 0.5 is reached at t = 3.0 with no fp.
+    assert fpr_at_recall(records, 0.5) == 0.0
+
+
+def test_fpr_at_recall_is_none_when_unreachable_or_one_class():
+    no_tube = [_rec("smoke", False, score=-math.inf), _rec("fp", False, score=0.0)]
+    assert fpr_at_recall(no_tube, 0.95) is None, "a -inf smoke is never positive"
+    assert fpr_at_recall([_rec("smoke", True, score=1.0)], 0.95) is None
+
+
+def test_detected_within_frames_counts_misses_as_not_detected():
+    records = [
+        _rec("smoke", True, ttd=0),
+        _rec("smoke", True, ttd=2),
+        _rec("smoke", True, ttd=5),
+        _rec("smoke", False),
+        _rec("fp", True),
+    ]
+    assert detected_within_frames(records, (1, 3, 6)) == {
+        "1": 0.25,
+        "3": 0.5,
+        "6": 0.75,
+    }
+    assert detected_within_frames([_rec("fp", False)]) == {
+        "2": None,
+        "3": None,
+        "5": None,
+    }
+
+
+def test_compute_metrics_reports_the_new_fields():
+    m = compute_metrics(
+        "m", [_rec("smoke", True, score=1.0, ttd=0), _rec("fp", False, score=0.0)]
+    )
+    assert m["recall_ci95"] == wilson_ci95(1, 1)
+    assert m["fpr_ci95"] == wilson_ci95(0, 1)
+    assert m["fpr_at_recall_95"] == 0.0
+    assert m["detected_within_frames"]["2"] == 1.0

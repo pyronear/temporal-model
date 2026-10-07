@@ -4,7 +4,7 @@ Reads only ``data/08_reporting/<source>/vit_dinov2_finetune/{results.json,detail
 sequences/}`` plus the frame images those records point at; it never runs the model.
 Run with ``streamlit run src/temporal_model/eval/app.py`` (or ``make app``).
 
-Left pane selects the source (train / val / pyro-annotator). The main pane lists the
+Left pane selects the source (test by default). The main pane lists the
 source's sequences in an error-coloured, filterable table; selecting a row opens an
 autoplaying (pausable) frame viewer with the YOLO bboxes overlaid, the per-tube
 timeline, and each kept tube's stabilized crop synced to the current frame, plus the
@@ -387,10 +387,10 @@ def main() -> None:  # pragma: no cover - Streamlit UI
         return
 
     st.sidebar.header("Select")
-    # pyro-annotator first (default), then any other source alphabetically.
+    # test first (default), then any other source alphabetically.
     sources = sorted(
         df["source"].dropna().unique(),
-        key=lambda s: (s != "pyro-annotator", s),
+        key=lambda s: (s != "test", s),
     )
     source = st.sidebar.selectbox("source", sources, key="source")
     render_model_config(source)
