@@ -21,11 +21,7 @@ export async function GET() {
   }
   // test first, then alphabetical (mirrors the Streamlit default).
   sources.sort((a, b) =>
-    a === "test"
-      ? -1
-      : b === "test"
-        ? 1
-        : a.localeCompare(b),
+    a === "test" ? -1 : b === "test" ? 1 : a.localeCompare(b),
   );
   return NextResponse.json(sources);
 }
