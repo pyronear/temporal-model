@@ -5,9 +5,11 @@ Reads the metrics.json snapshots the train workflow copies into results/
 (one per eval source) and, when available, the baseline snapshots committed
 on main. Prints a Markdown PR body on stdout.
 
-The pyro-annotator source is the fixed testbed, so it gets the full
-old-vs-new comparison; train/val change with every dataset release, so they
-are reported as-is (calibration check only, see the retrain runbook).
+test (pyro-dataset's sequential_test) is the headline: it grows append-only
+across dataset releases, so every release's test set is a superset of the
+previous one. It and the pyro-annotator testbed get the full old-vs-new
+comparison; train/val change with every dataset release, so they are reported
+as-is (calibration check only, see the retrain runbook).
 """
 
 import argparse
@@ -15,10 +17,10 @@ import json
 import sys
 from pathlib import Path
 
-SOURCES = ("pyro-annotator", "train", "val")
+SOURCES = ("test", "pyro-annotator", "train", "val")
 
 # (label, metrics.json key, is_ratio) — ratios get 4 decimals, counts don't.
-PYRO_ANNOTATOR_ROWS = [
+TESTBED_ROWS = [
     ("False alerts (FP)", "fp", False),
     ("Missed smoke (FN)", "fn", False),
     ("Precision", "precision", True),
@@ -61,17 +63,22 @@ def load(path: Path) -> dict | None:
         return json.load(f)
 
 
-def pyro_annotator_section(curr: dict, base: dict | None) -> str:
+def testbed_section(title: str, curr: dict, base: dict | None) -> str:
     lines = [
-        "## pyro-annotator (fixed testbed, old vs new)",
+        f"## {title}",
         "",
         f"Sequences: {curr.get('num_sequences', 'n/a')}"
-        + ("" if base is None else " — baseline = results/ on main"),
+        + (
+            ""
+            if base is None
+            else " — baseline = results/ on main "
+            f"({base.get('num_sequences', 'n/a')} sequences)"
+        ),
         "",
         "| Metric | main | current | Δ |",
         "|--------|------|---------|---|",
     ]
-    for label, key, is_ratio in PYRO_ANNOTATOR_ROWS:
+    for label, key, is_ratio in TESTBED_ROWS:
         old = base.get(key) if base else None
         new = curr.get(key)
         lines.append(
@@ -125,7 +132,16 @@ def main() -> int:
     baseline = {src: load(args.baseline_dir / f"{src}.json") for src in SOURCES}
 
     sections = [
-        pyro_annotator_section(current["pyro-annotator"], baseline["pyro-annotator"]),
+        testbed_section(
+            "test (pyro-dataset sequential_test, old vs new)",
+            current["test"],
+            baseline["test"],
+        ),
+        testbed_section(
+            "pyro-annotator (fixed testbed, old vs new)",
+            current["pyro-annotator"],
+            baseline["pyro-annotator"],
+        ),
         splits_section(current["train"], current["val"]),
         f"**Branch:** `{args.result_branch}` | **Dataset rev:** `{args.dataset_rev}`",
     ]

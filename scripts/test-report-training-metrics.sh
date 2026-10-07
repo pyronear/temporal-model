@@ -24,6 +24,8 @@ cat > "$WORK/baseline/pyro-annotator.json" <<'JSON'
  "mean_ttd_frames": 2.6, "median_ttd_frames": 1,
  "pr_auc": 0.7294, "roc_auc": 0.9011}
 JSON
+cp "$WORK/results/pyro-annotator.json" "$WORK/results/test.json"
+cp "$WORK/baseline/pyro-annotator.json" "$WORK/baseline/test.json"
 for split in train val; do
   cat > "$WORK/results/$split.json" <<'JSON'
 {"num_sequences": 350, "tp": 167, "fp": 11, "fn": 8, "tn": 164,
@@ -43,6 +45,8 @@ echo "$BODY" | grep -qF "| Precision | 0.2739 | 0.3281 | +0.0542 |" \
   || { echo "FAIL: precision delta row"; echo "$BODY"; exit 1; }
 echo "$BODY" | grep -qF "**Dataset rev:** \`v4.1.0\`" \
   || { echo "FAIL: dataset rev footer"; echo "$BODY"; exit 1; }
+echo "$BODY" | grep -qF "## test (pyro-dataset sequential_test" \
+  || { echo "FAIL: test section"; echo "$BODY"; exit 1; }
 echo "$BODY" | grep -q "train (in-sample)" \
   || { echo "FAIL: train split row"; echo "$BODY"; exit 1; }
 
