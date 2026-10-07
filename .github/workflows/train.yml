@@ -149,14 +149,22 @@ jobs:
           # still means missing metrics files (dvc skips the stage anyway).
           # Force: scoring must actually run on every training run.
           uv run dvc repro --force
-          # Baseline: main's model on the same test set. CI-only comparison,
-          # so outside dvc.yaml.
-          uv run python -m temporal_model.eval.evaluate \
-            --model-zip data/06_models/baseline/model.zip \
-            --sequences-dir data/01_raw/sequential_test \
-            --output-dir data/08_reporting/test-baseline/vit_dinov2_finetune \
+          # Baseline: main's model on the same test set, run with main's code.
+          # model.zip holds weights and config, not the inference code, so
+          # running it here would give it this branch's tube building and
+          # decision logic and hide a regression shared by both models.
+          # CI-only comparison, so outside dvc.yaml.
+          EVAL_DIR="$PWD"
+          BASELINE_SRC="$RUNNER_TEMP/baseline-src"
+          git worktree prune
+          git worktree add --detach "$BASELINE_SRC" origin/main
+          echo "BASELINE_SHA=$(git rev-parse --short origin/main)" >> "$GITHUB_ENV"
+          (cd "$BASELINE_SRC/eval" && uv sync && uv run python -m temporal_model.eval.evaluate \
+            --model-zip "$EVAL_DIR/data/06_models/baseline/model.zip" \
+            --sequences-dir "$EVAL_DIR/data/01_raw/sequential_test" \
+            --output-dir "$EVAL_DIR/data/08_reporting/test-baseline/vit_dinov2_finetune" \
             --model-name vit_dinov2_finetune-test-baseline \
-            --source test-baseline
+            --source test-baseline)
 
       - name: Push eval artifacts to DVC remote
         working-directory: eval
@@ -209,6 +217,7 @@ jobs:
             --current-dir eval/data/08_reporting/test/vit_dinov2_finetune \
             --baseline-dir eval/data/08_reporting/test-baseline/vit_dinov2_finetune \
             --dataset-rev "${DATASET_REV:-unchanged}" \
+            --baseline-ref "$BASELINE_SHA" \
             --result-branch "$RESULT_BRANCH")
 
           PR_NUMBER=$(gh pr list --head "$RESULT_BRANCH" --base main \

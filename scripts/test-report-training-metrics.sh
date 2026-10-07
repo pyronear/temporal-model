@@ -42,7 +42,7 @@ JSON
 run() { python3 "$SCRIPT" "$@"; }
 
 BODY=$(run --current-dir "$WORK/cur" --baseline-dir "$WORK/base" \
-           --dataset-rev v4.5.0 --result-branch result_v4.5.0)
+           --dataset-rev v4.5.0 --result-branch result_v4.5.0 --baseline-ref abc1234)
 expect() {
   echo "$BODY" | grep -qF "$1" || { echo "FAIL: $2"; echo "$BODY"; exit 1; }
 }
@@ -51,7 +51,7 @@ expect "| False alerts (FP) | 1 | 0 | -1 |" "FP count row"
 expect "| Detected within 3 frames | 0.5000 | 1.0000 | +0.5000 |" "detection-within row"
 expect "| smoke (caught / missed) | 1 | 0 | 1.000 |" "paired smoke row"
 expect "| fp (silenced / alerted) | 1 | 0 | 1.000 |" "paired fp row"
-expect "**Dataset rev:** \`v4.5.0\`" "dataset rev footer"
+expect "**Dataset rev:** \`v4.5.0\` | **Baseline:** main @ \`abc1234\`" "footer"
 if echo "$BODY" | grep -q "Precision"; then
   echo "FAIL: precision is prevalence-dependent and must not be reported"; exit 1
 fi

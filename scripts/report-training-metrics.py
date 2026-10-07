@@ -4,8 +4,9 @@
 The train workflow scores the new model and main's model on pyro-dataset's
 sequential_test (the one set models are compared on) and passes both eval
 reporting directories here: each holds metrics.json and predictions.json.
-Re-scoring main's model in the same run is what keeps the comparison valid
-when the test set grows with a dataset release. Prints a Markdown PR body.
+Re-scoring main's model in the same run, with main's code, is what keeps the
+comparison valid when the test set grows or the inference code changes.
+Prints a Markdown PR body.
 
 Metrics are the prevalence-free ones (recall, FPR, detection delay over all
 smoke): the test set's smoke/FP ratio is arbitrary, so precision is not shown.
@@ -142,6 +143,9 @@ def main() -> int:
     parser.add_argument("--baseline-dir", type=Path, required=True)
     parser.add_argument("--dataset-rev", default="unchanged")
     parser.add_argument("--result-branch", default="")
+    parser.add_argument(
+        "--baseline-ref", default="", help="Commit of main the baseline ran on."
+    )
     args = parser.parse_args()
 
     for d in (args.current_dir, args.baseline_dir):
@@ -151,10 +155,15 @@ def main() -> int:
     cur_metrics, cur_preds = load_eval(args.current_dir)
     base_metrics, base_preds = load_eval(args.baseline_dir)
 
+    footer = (
+        f"**Branch:** `{args.result_branch}` | **Dataset rev:** `{args.dataset_rev}`"
+    )
+    if args.baseline_ref:
+        footer += f" | **Baseline:** main @ `{args.baseline_ref}`"
     sections = [
         test_section(cur_metrics, base_metrics),
         paired_section(paired(cur_preds, base_preds)),
-        f"**Branch:** `{args.result_branch}` | **Dataset rev:** `{args.dataset_rev}`",
+        footer,
     ]
     print("\n\n".join(sections))
     return 0
