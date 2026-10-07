@@ -127,11 +127,13 @@ def fpr_at_recall(records: list[SequenceRecord], target: float = 0.95) -> float 
 
 
 def detected_within_frames(
-    records: list[SequenceRecord], ks: tuple[int, ...] = (1, 3, 5)
+    records: list[SequenceRecord], ks: tuple[int, ...] = (2, 3, 5)
 ) -> dict[str, float | None]:
     """Share of all smoke sequences alerted within their first k frames.
 
-    ``ttd_frames`` is zero-based, so "within k" is ``ttd_frames < k``. Missed
+    ``ttd_frames`` is zero-based, so "within k" is ``ttd_frames < k``; the
+    earliest possible alert is the 2nd frame (``infer_min_tube_length: 2``),
+    hence k starts at 2. Missed
     smoke counts as not detected, unlike the TTD mean/median, which only see
     detected smoke and so reward a model for missing the hard ones.
     """

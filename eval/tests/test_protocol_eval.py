@@ -304,7 +304,7 @@ def test_detected_within_frames_counts_misses_as_not_detected():
         "6": 0.75,
     }
     assert detected_within_frames([_rec("fp", False)]) == {
-        "1": None,
+        "2": None,
         "3": None,
         "5": None,
     }
@@ -317,4 +317,4 @@ def test_compute_metrics_reports_the_new_fields():
     assert m["recall_ci95"] == wilson_ci95(1, 1)
     assert m["fpr_ci95"] == wilson_ci95(0, 1)
     assert m["fpr_at_recall_95"] == 0.0
-    assert m["detected_within_frames"]["1"] == 1.0
+    assert m["detected_within_frames"]["2"] == 1.0
