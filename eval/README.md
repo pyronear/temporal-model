@@ -104,8 +104,11 @@ explorer's annotations change, re-copy those sequence directories into
 
 ## Pipeline
 
-`dvc.yaml` defines an `evaluate` stage run `foreach` train/val, plus an
-`evaluate_pyro_annotator` stage for the meta-store source. They consume a
+`dvc.yaml` defines an `evaluate` stage run `foreach` train/val/test, plus an
+`evaluate_pyro_annotator` stage for the meta-store source. `test` is
+pyro-dataset's `sequential_test`, DVC-imported at the same release as train/val
+(`data/01_raw/sequential_test.dvc`, private remote) — the held-out set models
+are compared on; the train workflow bumps it alongside the train imports. They consume a
 packaged model at `data/06_models/vit_dinov2_finetune/model.zip` — wired in from
 the train `package` stage via a local `dvc import-url` (`model.zip.dvc`); refresh
 it with `make update-model` after re-packaging in train, or `dvc pull` it from
