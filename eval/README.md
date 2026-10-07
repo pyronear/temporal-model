@@ -36,7 +36,7 @@ keep/discard decision. Sequences are listed in an error-coloured, filterable tab
 (missed smoke / false alarm / smoke kept / fp filtered). The viewer never runs the
 model — it only reads generated artifacts.
 
-The left pane selects the **source** (train / val / pyro-annotator); org/camera
+The left pane selects the **source** (`test` by default); org/camera
 filters appear only for sources that carry that metadata.
 
 ### React / Next.js viewer
@@ -80,43 +80,30 @@ under `data/08_reporting/<source>/vit_dinov2_finetune/`:
 
 This is the stable interface; a future React/Next.js viewer consumes the same files.
 
-## Pyro-annotator source
-
-Pyro-annotator sequences (human-labeled smoke/fp/unknown, enriched with
-org/camera/timestamps) are a first-class eval source — re-scored by eval's own
-`model.zip`, so the displayed predictions come from the exact model eval evaluates.
-The sequences are DVC-tracked (`data/01_raw/pyro-annotator.dvc`); pull them, then
-run the dedicated stage:
-
-```bash
-uv run dvc pull data/01_raw/pyro-annotator.dvc   # frames + meta.json from eval's remote
-uv run dvc repro evaluate_pyro_annotator         # score + emit viewer artifacts
-```
-
-`unknown`-labeled sequences are excluded from metrics but remain viewable
-(ground-truth-unknown colouring), and pyro-annotator is the viewer's default source.
-
-**Provenance.** The store was copied once from the temporal-model-explorer's
-processed pyro-annotator sequences (`data/03_primary/sequences/pyro-annotator/` —
-each a `meta.json` + `images/`) and `dvc add`ed here. To refresh after the
-explorer's annotations change, re-copy those sequence directories into
-`data/01_raw/pyro-annotator/` and `dvc add` again.
-
 ## Pipeline
 
-`dvc.yaml` defines an `evaluate` stage run `foreach` train/val/test, plus an
-`evaluate_pyro_annotator` stage for the meta-store source. `test` is
-pyro-dataset's `sequential_test`, DVC-imported at the same release as train/val
-(`data/01_raw/sequential_test.dvc`, private remote) — the held-out set models
-are compared on; the train workflow bumps it alongside the train imports. They consume a
-packaged model at `data/06_models/vit_dinov2_finetune/model.zip` — wired in from
-the train `package` stage via a local `dvc import-url` (`model.zip.dvc`); refresh
-it with `make update-model` after re-packaging in train, or `dvc pull` it from
-eval's remote — and raw sequences under
-`data/01_raw/datasets/{train,val}/{fp,wildfire}/<seq>/images/`,
-writing `metrics.json`, `predictions.json`, `dropped.json`, PR/ROC/confusion PNGs,
-and the viewer artifacts (`results.{json,parquet}`, `details/`, `sequences/`)
-under `data/08_reporting/{source}/vit_dinov2_finetune/`.
+`dvc.yaml` defines one `evaluate` stage on pyro-dataset's `sequential_test`, the
+one set models are compared on. It is DVC-imported at the same release as the train
+imports (`data/01_raw/sequential_test.dvc`, private remote), and the train workflow
+bumps it with them. It includes the former pyro-annotator testbed, now registered
+in pyro-dataset, so there is no separate pyro-annotator source any more.
+
+The stage consumes a packaged model at `data/06_models/vit_dinov2_finetune/model.zip`.
+It is wired in from the train `package` stage by a local `dvc import-url`
+(`model.zip.dvc`): refresh it with `make update-model` after re-packaging in train,
+or `dvc pull` it from eval's remote. The stage writes `metrics.json`,
+`predictions.json`, `dropped.json`, PR/ROC/confusion PNGs and the viewer artifacts
+(`results.{json,parquet}`, `details/`, `sequences/`) under
+`data/08_reporting/test/vit_dinov2_finetune/`.
+
+`metrics.json` holds the confusion counts plus prevalence-free metrics:
+- recall and FPR with Wilson 95% intervals (`recall_ci95`, `fpr_ci95`);
+- `fpr_at_recall_95`, a threshold sweep on the sequence score, for ranking models;
+- `detected_within_frames`, the share of all smoke alerted within 2, 3 and 5
+  frames (2 is the earliest possible), with missed smoke counted as not detected.
+
+Precision, F1 and PR AUC are still computed, but depend on the test set's
+smoke/FP ratio, which is arbitrary.
 
 Ground truth comes from the directory convention (`wildfire/` → smoke, else fp).
 Error policy is strict: any per-sequence inference exception aborts the run;
