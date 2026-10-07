@@ -118,6 +118,14 @@ jobs:
         working-directory: eval
         run: |
           rsync -a --delete ../train/data/01_raw/datasets/ data/01_raw/datasets/
+          # Set main's model aside before replacing it: it is re-scored on
+          # this run's test set, since stored metrics from an older test
+          # version are not comparable once the dataset changes.
+          git fetch origin main --depth=1
+          git checkout origin/main -- data/06_models/vit_dinov2_finetune/model.zip.dvc
+          uv run dvc pull data/06_models/vit_dinov2_finetune/model.zip.dvc
+          mkdir -p data/06_models/baseline
+          cp data/06_models/vit_dinov2_finetune/model.zip data/06_models/baseline/model.zip
           make update-model
           # Forgetting the model refresh is silent (frozen import); prove the
           # eval copy is the model this run just built.
@@ -144,6 +152,14 @@ jobs:
           # still means missing metrics files (dvc skips the stage anyway).
           # Force: scoring must actually run on every training run.
           uv run dvc repro --force
+          # Baseline: main's model on the same test set. CI-only comparison,
+          # so outside dvc.yaml.
+          uv run python -m temporal_model.eval.evaluate \
+            --model-zip data/06_models/baseline/model.zip \
+            --sequences-dir data/01_raw/sequential_test \
+            --output-dir data/08_reporting/test-baseline/vit_dinov2_finetune \
+            --model-name vit_dinov2_finetune-test-baseline \
+            --source test-baseline
 
       - name: Push eval artifacts to DVC remote
         working-directory: eval
@@ -197,11 +213,14 @@ jobs:
           # the first run; the report degrades to a no-baseline table).
           git fetch origin main --depth=1 2>/dev/null || true
           BASELINE_DIR=$(mktemp -d)
-          for src in test train val pyro-annotator; do
+          for src in train val pyro-annotator; do
             git show "origin/main:results/$src.json" \
               > "$BASELINE_DIR/$src.json" 2>/dev/null \
               || rm -f "$BASELINE_DIR/$src.json"
           done
+          # Test baseline = main's model re-scored in this run (see eval step).
+          cp eval/data/08_reporting/test-baseline/vit_dinov2_finetune/metrics.json \
+             "$BASELINE_DIR/test.json"
 
           BODY=$(uv run --project eval python scripts/report-training-metrics.py \
             --results-dir results \

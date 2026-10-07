@@ -5,11 +5,13 @@ Reads the metrics.json snapshots the train workflow copies into results/
 (one per eval source) and, when available, the baseline snapshots committed
 on main. Prints a Markdown PR body on stdout.
 
-test (pyro-dataset's sequential_test) is the headline: it grows append-only
-across dataset releases, so every release's test set is a superset of the
-previous one. It and the pyro-annotator testbed get the full old-vs-new
-comparison; train/val change with every dataset release, so they are reported
-as-is (calibration check only, see the retrain runbook).
+test (pyro-dataset's sequential_test) is the headline. It grows append-only
+across dataset releases, so its baseline is main's model re-scored on the
+current test set by the workflow, not a stored snapshot from an older test.
+pyro-annotator is a fixed testbed, so its stored snapshot on main is the
+baseline. Both get the full old-vs-new comparison; train/val change with every
+dataset release, so they are reported as-is (calibration check only, see the
+retrain runbook).
 """
 
 import argparse
@@ -71,7 +73,7 @@ def testbed_section(title: str, curr: dict, base: dict | None) -> str:
         + (
             ""
             if base is None
-            else " — baseline = results/ on main "
+            else " — baseline = model on main "
             f"({base.get('num_sequences', 'n/a')} sequences)"
         ),
         "",
