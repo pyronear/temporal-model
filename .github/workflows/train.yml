@@ -117,7 +117,6 @@ jobs:
       - name: Refresh eval inputs
         working-directory: eval
         run: |
-          rsync -a --delete ../train/data/01_raw/datasets/ data/01_raw/datasets/
           # Set main's model aside before replacing it: it is re-scored on
           # this run's test set, since stored metrics from an older test
           # version are not comparable once the dataset changes.
@@ -136,17 +135,15 @@ jobs:
         if: env.DATASET_REV != ''
         working-directory: eval
         run: |
-          # Same release as train/val: pyro-dataset guarantees no leakage
-          # only between splits of one revision.
+          # Same release as the train imports: pyro-dataset guarantees no
+          # leakage only between splits of one revision.
           uv run dvc update data/01_raw/sequential_test.dvc --rev "$DATASET_REV"
           grep -q "rev: $DATASET_REV" data/01_raw/sequential_test.dvc
 
       - name: Run eval pipeline
         working-directory: eval
         run: |
-          uv run dvc pull \
-            data/01_raw/pyro-annotator.dvc \
-            data/01_raw/sequential_test.dvc
+          uv run dvc pull data/01_raw/sequential_test.dvc
           # Eval reporting outputs are cache: false — they never round-trip
           # through the DVC remote, so on a fresh runner an unchanged lock
           # still means missing metrics files (dvc skips the stage anyway).
@@ -173,10 +170,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           mkdir -p results
-          for src in test train val pyro-annotator; do
-            cp "eval/data/08_reporting/$src/vit_dinov2_finetune/metrics.json" \
-               "results/$src.json"
-          done
+          cp eval/data/08_reporting/test/vit_dinov2_finetune/metrics.json \
+             results/test.json
 
           git checkout -b "$RESULT_BRANCH"
           git add \
@@ -209,22 +204,10 @@ jobs:
         run: |
           RESULT_BRANCH="result_${GITHUB_REF_NAME#train_}"
 
-          # Baseline = the results/ snapshots committed on main (absent on
-          # the first run; the report degrades to a no-baseline table).
-          git fetch origin main --depth=1 2>/dev/null || true
-          BASELINE_DIR=$(mktemp -d)
-          for src in train val pyro-annotator; do
-            git show "origin/main:results/$src.json" \
-              > "$BASELINE_DIR/$src.json" 2>/dev/null \
-              || rm -f "$BASELINE_DIR/$src.json"
-          done
-          # Test baseline = main's model re-scored in this run (see eval step).
-          cp eval/data/08_reporting/test-baseline/vit_dinov2_finetune/metrics.json \
-             "$BASELINE_DIR/test.json"
-
+          # Baseline = main's model re-scored on the same test in this run.
           BODY=$(uv run --project eval python scripts/report-training-metrics.py \
-            --results-dir results \
-            --baseline-dir "$BASELINE_DIR" \
+            --current-dir eval/data/08_reporting/test/vit_dinov2_finetune \
+            --baseline-dir eval/data/08_reporting/test-baseline/vit_dinov2_finetune \
             --dataset-rev "${DATASET_REV:-unchanged}" \
             --result-branch "$RESULT_BRANCH")
 

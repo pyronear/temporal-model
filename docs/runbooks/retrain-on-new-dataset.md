@@ -9,8 +9,9 @@ the examples are that run's real output.
 > [`.github/workflows/train.yml`](../../.github/workflows/train.yml). Push a
 > branch named `train_vX.Y.Z` (the new pyro-dataset release tag) and CI spins
 > up a GPU runner, bumps the dataset pointers to that tag, retrains, refreshes
-> eval, pushes the DVC data, and opens a `result_*` PR with the old-vs-new
-> pyro-annotator table (baseline = `results/` on main). A `train_*` branch
+> eval, pushes the DVC data, and opens a `result_*` PR with the new-vs-main
+> table on `sequential_test`. Main's model is re-scored on the same test in that
+> run, with a paired McNemar comparison. A `train_*` branch
 > whose suffix is not a version tag trains on the pointers as committed
 > (code-change retrain). The manual loop below remains the reference for
 > running locally and for understanding what CI does.
@@ -29,8 +30,8 @@ the examples are that run's real output.
 
 ```
 train/  dvc update  → dvc repro (truncate → tubes → patches → train → package)
-eval/   refresh datasets + model.zip → dvc repro (train / val / pyro-annotator)
-        old-vs-new metrics comparison
+eval/   bump sequential_test + refresh model.zip → dvc repro (test)
+        new-vs-old metrics on the same test set
 push    dvc push (train + eval) → commit pointers + dvc.lock → PR
 release bump api/MODEL_VERSION → publish model.zip to HF → git tag
 ```
@@ -54,11 +55,10 @@ outputs never round-trip through the remote), regenerate it with the **old**
 model before updating anything:
 
 ```bash
-uv run dvc repro evaluate@train evaluate@val evaluate_pyro_annotator
+uv run dvc repro evaluate
 ```
 
-(note the `@` names — `evaluate` is a foreach stage; pull
-`data/01_raw/pyro-annotator.dvc` first if needed). Verify what you snapshotted
+(pull `data/01_raw/sequential_test.dvc` first if needed). Verify what you snapshotted
 is canonical: the `metrics.json` md5s must match the ones recorded in
 `eval/dvc.lock`.
 
@@ -177,27 +177,24 @@ sequence-level protocol eval (next step) is.
          ../train/data/06_models/vit_dinov2_finetune/model.zip
   ```
 
-Then re-score everything (train/val splits + the fixed pyro-annotator store):
+Bump the test import to the same release, then re-score:
 
 ```bash
+uv run dvc update data/01_raw/sequential_test.dvc --rev vX.Y.Z
 uv run dvc repro
 ```
 
-The pyro-annotator store is the one testbed that does *not* change with the
-dataset release, so its old-vs-new delta is the cleanest read on whether the
-new model actually improved.
+`sequential_test` grows append-only, so the step 0 snapshot was scored on an
+older, smaller test set and is **not** comparable. Score the old model on the new
+test too (`python -m temporal_model.eval.evaluate --model-zip <old model.zip>
+...`, as the CI does), then compare the two `metrics.json` files, or run
+`scripts/report-training-metrics.py` on the two reporting dirs.
 
-Compare each source's fresh `metrics.json` against the snapshots from step 0.
-Judge the two families of numbers differently:
-
-- **train / val**: the *dataset itself changed*, so old-vs-new is not
-  apples-to-apples — read these only as "did calibration hold?" (recall should
-  sit at `package.target_recall`).
-- **pyro-annotator**: fixed testbed, the honest comparison. For the v4.1.0
-  retrain: false alerts 114 → 86 (−25%), precision 0.274 → 0.328, at the cost
-  of one extra missed smoke (recall 0.977 → 0.955) and a slower median
-  time-to-detect (1 → 3 frames). Watch precision/FPR *and* TTD — a threshold
-  that suppresses FPs by waiting longer trades detection latency for it.
+Read recall and FPR at the shipped threshold first, with their intervals, and the
+paired McNemar counts: they say whether a difference is more than noise. Then
+check `detected_within_frames`: a model that suppresses false alerts by waiting
+longer trades detection latency for it. Precision is not comparable, because the
+test set's smoke/FP ratio is arbitrary.
 
 ## 4. Push data, commit pointers
 
