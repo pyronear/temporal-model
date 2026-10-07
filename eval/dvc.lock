@@ -1,9 +1,11 @@
 schema: '2.0'
 stages:
   evaluate:
-    cmd: uv run python -m temporal_model.eval.evaluate --model-zip data/06_models/vit_dinov2_finetune/model.zip
-      --sequences-dir data/01_raw/sequential_test --output-dir data/08_reporting/test/vit_dinov2_finetune
-      --model-name vit_dinov2_finetune-test --source test
+    cmd: uv run python -m temporal_model.eval.evaluate --model-zip 
+      data/06_models/vit_dinov2_finetune/model.zip --sequences-dir 
+      data/01_raw/sequential_test --output-dir 
+      data/08_reporting/test/vit_dinov2_finetune --model-name 
+      vit_dinov2_finetune-test --source test
     deps:
     - path: ../core/src/temporal_model/core/crop.py
       hash: md5
@@ -55,13 +57,13 @@ stages:
       size: 1422
     - path: data/01_raw/sequential_test
       hash: md5
-      md5: edb1584cc8f2a0660436bdde0a2d9a6b.dir
-      size: 1007033777
-      nfiles: 18028
+      md5: 3be8ca2d4b976098bce4bbafbd48dc52.dir
+      size: 2176180758
+      nfiles: 39324
     - path: data/06_models/vit_dinov2_finetune/model.zip
       hash: md5
-      md5: 39d7d39141dddf1356dbd860304dda8d
-      size: 162765158
+      md5: 8191bb2129c5fecb6c0c97cf3b8523e2
+      size: 162765154
     - path: src/temporal_model/eval/eval_plots.py
       hash: md5
       md5: f76a38b124a936129d9e0cc6910b9e33
@@ -89,51 +91,52 @@ stages:
     outs:
     - path: data/08_reporting/test/vit_dinov2_finetune/confusion_matrix.png
       hash: md5
-      md5: 0789f1956de856c5a4f4dafd483fa79f
-      size: 21611
-    - path: data/08_reporting/test/vit_dinov2_finetune/confusion_matrix_normalized.png
+      md5: 07672ebbc12c27a9acc78241c619c712
+      size: 25722
+    - path: 
+        data/08_reporting/test/vit_dinov2_finetune/confusion_matrix_normalized.png
       hash: md5
-      md5: 16de08130e913c38690e66424c485295
-      size: 21854
+      md5: 66a670e21c836176bb224c5cf7c1af6f
+      size: 24660
     - path: data/08_reporting/test/vit_dinov2_finetune/details
       hash: md5
-      md5: 09ad6d175e0746c1541ddd91c94a692e.dir
-      size: 1388631
-      nfiles: 380
+      md5: 715883b2f8a23b762e3584bf2e9a6879.dir
+      size: 2522275
+      nfiles: 1100
     - path: data/08_reporting/test/vit_dinov2_finetune/dropped.json
       hash: md5
       md5: d751713988987e9331980363e24189ce
       size: 2
     - path: data/08_reporting/test/vit_dinov2_finetune/metrics.json
       hash: md5
-      md5: b3abb0d2d7251f6059337bf3988119d8
-      size: 493
+      md5: 4acfda65b5e8b4601af60709fc9d239a
+      size: 495
     - path: data/08_reporting/test/vit_dinov2_finetune/model_config.json
       hash: md5
-      md5: dc291c35bd8609ac4c96381cc436a5b1
-      size: 2446
+      md5: 3c375a5b9f67edb02433892c081279e2
+      size: 2447
     - path: data/08_reporting/test/vit_dinov2_finetune/pr_curve.png
       hash: md5
-      md5: ae696e7fa7701e8eb8e04e0177efb13d
-      size: 18482
+      md5: d2ad8443baede7f39e3c54c73c4642ee
+      size: 22557
     - path: data/08_reporting/test/vit_dinov2_finetune/predictions.json
       hash: md5
-      md5: b4eb96600ba416e0330be8e0caeed17f
-      size: 1419960
+      md5: 0460919ba85a57e6c2b15b1b9339a69b
+      size: 2602769
     - path: data/08_reporting/test/vit_dinov2_finetune/results.json
       hash: md5
-      md5: d11ec4194df4829cc0bf1c5071751107
-      size: 140238
+      md5: 05f110fc30b614e868f5256a3459f2c9
+      size: 401057
     - path: data/08_reporting/test/vit_dinov2_finetune/results.parquet
       hash: md5
-      md5: b77cddaba74cdd5393f7c36c6ffcf672
-      size: 19185
+      md5: aa2711376c04ad948107f576924c3602
+      size: 34327
     - path: data/08_reporting/test/vit_dinov2_finetune/roc_curve.png
       hash: md5
-      md5: b47789d73d8e9899749535db5ee6e1d3
-      size: 26442
+      md5: 731d2cc0d8e738e645a9b398ddc48223
+      size: 31548
     - path: data/08_reporting/test/vit_dinov2_finetune/sequences
       hash: md5
-      md5: f4a8ff908bc76d21c98ad550a2ce02f1.dir
-      size: 1453389
-      nfiles: 380
+      md5: 3b4f36b969c7b9c52dec3121e662a500.dir
+      size: 3175953
+      nfiles: 1100
