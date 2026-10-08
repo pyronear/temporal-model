@@ -8,11 +8,14 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 
+import numpy as np
 import torch
 from PIL import Image
 from torch import Tensor
 from torch.utils.data import Dataset
 from torchvision.transforms.functional import to_tensor
+
+from temporal_model.core.yolo_features import model_inputs
 
 IMAGENET_MEAN = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
 IMAGENET_STD = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
@@ -42,6 +45,10 @@ class TubePatchDataset(Dataset):
             sub-directory per tube.
         max_frames: Pad/truncate length.
         transform: Optional callable ``item -> item`` applied after loading.
+        yolo_features_dir: Optional ``build_yolo_features`` output; when set,
+            items also carry ``yolo_roi [max_frames, D]`` (``yolo_levels``
+            concatenated) and ``yolo_ctx [max_frames, C5]``.
+        yolo_levels: Neck levels to concatenate into ``yolo_roi``.
     """
 
     def __init__(
@@ -49,8 +56,12 @@ class TubePatchDataset(Dataset):
         split_dir: Path,
         max_frames: int,
         transform: Callable[[dict], dict] | None = None,
+        yolo_features_dir: Path | None = None,
+        yolo_levels: list[str] | None = None,
     ) -> None:
         self.split_dir = Path(split_dir)
+        self.yolo_features_dir = yolo_features_dir
+        self.yolo_levels = list(yolo_levels or [])
         self.max_frames = max_frames
         self.transform = transform
         index = json.loads((self.split_dir / "_index.json").read_text())
@@ -83,6 +94,14 @@ class TubePatchDataset(Dataset):
             "label": torch.tensor(float(label_int), dtype=torch.float32),
             "sequence_id": seq_id,
         }
+        if self.yolo_features_dir is not None:
+            with np.load(self.yolo_features_dir / f"{seq_id}.npz") as z:
+                feats = {k: z[k].astype(np.float32) for k in z.files}
+            roi, ctx = model_inputs(
+                feats, levels=self.yolo_levels, max_frames=self.max_frames
+            )
+            item["yolo_roi"] = torch.from_numpy(roi)
+            item["yolo_ctx"] = torch.from_numpy(ctx)
 
         if self.transform is None:
             # Legacy path: inline ImageNet normalization (valid frames only).

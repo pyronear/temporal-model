@@ -367,3 +367,29 @@ def test_train_transform_reproducible_with_fixed_seed():
 
     assert torch.equal(out1["patches"], out2["patches"])
     assert torch.equal(out1["mask"], out2["mask"])
+
+
+def test_temporal_keeps_yolo_features_aligned_with_patches() -> None:
+    torch.manual_seed(3)
+    t = 12
+    frame_ids = torch.arange(t, dtype=torch.float32)
+    item = {
+        "patches": frame_ids.view(t, 1, 1, 1).expand(t, 3, 4, 4).clone(),
+        "mask": torch.ones(t, dtype=torch.bool),
+        "yolo_roi": frame_ids.view(t, 1).expand(t, 5).clone(),
+        "yolo_ctx": frame_ids.view(t, 1).expand(t, 2).clone(),
+    }
+    tr = TemporalTubeTransform(
+        subseq_prob=1.0,
+        subseq_min_len=4,
+        stride_prob=1.0,
+        frame_drop_prob=0.3,
+        min_valid_after_drop=2,
+    )
+    out = tr(item)
+    k = int(out["mask"].sum())
+    kept = out["patches"][:k, 0, 0, 0]
+    assert k < t
+    assert torch.equal(out["yolo_roi"][:k, 0], kept)
+    assert torch.equal(out["yolo_ctx"][:k, 0], kept)
+    assert (out["yolo_roi"][k:] == 0).all()

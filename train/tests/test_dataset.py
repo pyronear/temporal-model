@@ -151,3 +151,24 @@ def test_patch_size_follows_meta(tmp_path: Path) -> None:
         )
     item = TubePatchDataset(split, max_frames=5)[0]
     assert item["patches"].shape == (5, 3, 112, 112)
+
+
+def test_yolo_features_loaded_and_padded(tmp_path: Path) -> None:
+    split = _make_split(tmp_path, [("seq_a", 1, 3)])
+    feats_dir = tmp_path / "yolo"
+    feats_dir.mkdir()
+    np.savez(
+        feats_dir / "seq_a.npz",
+        p3=np.ones((3, 2), np.float16),
+        p4=np.full((3, 4), 2, np.float16),
+        p5=np.full((3, 8), 3, np.float16),
+        ctx=np.full((3, 8), 4, np.float16),
+    )
+    ds = TubePatchDataset(
+        split, max_frames=5, yolo_features_dir=feats_dir, yolo_levels=["p3", "p5"]
+    )
+    item = ds[0]
+    assert item["yolo_roi"].shape == (5, 10)
+    assert item["yolo_ctx"].shape == (5, 8)
+    assert (item["yolo_roi"][:3, :2] == 1).all() and (item["yolo_roi"][3:] == 0).all()
+    assert "yolo_roi" not in TubePatchDataset(split, max_frames=5)[0]
