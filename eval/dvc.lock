@@ -1,9 +1,11 @@
 schema: '2.0'
 stages:
   evaluate:
-    cmd: uv run python -m temporal_model.eval.evaluate --model-zip data/06_models/vit_dinov2_finetune/model.zip
-      --sequences-dir data/01_raw/sequential_test --output-dir data/08_reporting/test/vit_dinov2_finetune
-      --model-name vit_dinov2_finetune-test --source test
+    cmd: uv run python -m temporal_model.eval.evaluate --model-zip 
+      data/06_models/vit_dinov2_finetune/model.zip --sequences-dir 
+      data/01_raw/sequential_test --output-dir 
+      data/08_reporting/test/vit_dinov2_finetune --model-name 
+      vit_dinov2_finetune-test --source test
     deps:
     - path: ../core/src/temporal_model/core/crop.py
       hash: md5
@@ -55,13 +57,13 @@ stages:
       size: 1422
     - path: data/01_raw/sequential_test
       hash: md5
-      md5: edb1584cc8f2a0660436bdde0a2d9a6b.dir
-      size: 1007033777
-      nfiles: 18028
+      md5: 9129b4fb4b8d319c18d2d4693e4bda03.dir
+      size: 2149177393
+      nfiles: 38926
     - path: data/06_models/vit_dinov2_finetune/model.zip
       hash: md5
-      md5: 39d7d39141dddf1356dbd860304dda8d
-      size: 162765158
+      md5: dcb2145742530c750fc4bb82b74a6638
+      size: 162765150
     - path: src/temporal_model/eval/eval_plots.py
       hash: md5
       md5: f76a38b124a936129d9e0cc6910b9e33
@@ -89,51 +91,52 @@ stages:
     outs:
     - path: data/08_reporting/test/vit_dinov2_finetune/confusion_matrix.png
       hash: md5
-      md5: 0789f1956de856c5a4f4dafd483fa79f
-      size: 21611
-    - path: data/08_reporting/test/vit_dinov2_finetune/confusion_matrix_normalized.png
+      md5: e678a3187acf50fbf35d5a0cf6f5e31d
+      size: 25792
+    - path: 
+        data/08_reporting/test/vit_dinov2_finetune/confusion_matrix_normalized.png
       hash: md5
-      md5: 16de08130e913c38690e66424c485295
-      size: 21854
+      md5: 1db59858ea181338ad61ef733115d859
+      size: 24534
     - path: data/08_reporting/test/vit_dinov2_finetune/details
       hash: md5
-      md5: 09ad6d175e0746c1541ddd91c94a692e.dir
-      size: 1388631
-      nfiles: 380
+      md5: 8fb076110972e83497c1b752f99fbe97.dir
+      size: 2435659
+      nfiles: 1077
     - path: data/08_reporting/test/vit_dinov2_finetune/dropped.json
       hash: md5
       md5: d751713988987e9331980363e24189ce
       size: 2
     - path: data/08_reporting/test/vit_dinov2_finetune/metrics.json
       hash: md5
-      md5: b3abb0d2d7251f6059337bf3988119d8
-      size: 493
+      md5: 613d1cb21410fc73e8e9dc1a0f42101e
+      size: 498
     - path: data/08_reporting/test/vit_dinov2_finetune/model_config.json
       hash: md5
-      md5: dc291c35bd8609ac4c96381cc436a5b1
-      size: 2446
+      md5: 4ede0f2e2af2f23cc8ea5b6c950b6d4d
+      size: 2443
     - path: data/08_reporting/test/vit_dinov2_finetune/pr_curve.png
       hash: md5
-      md5: ae696e7fa7701e8eb8e04e0177efb13d
-      size: 18482
+      md5: f53bb88f1bfae9e83f2b53f23b1d8ab7
+      size: 23164
     - path: data/08_reporting/test/vit_dinov2_finetune/predictions.json
       hash: md5
-      md5: b4eb96600ba416e0330be8e0caeed17f
-      size: 1419960
+      md5: 8b9737491f82d5e3ae458dadb1710252
+      size: 2514423
     - path: data/08_reporting/test/vit_dinov2_finetune/results.json
       hash: md5
-      md5: d11ec4194df4829cc0bf1c5071751107
-      size: 140238
+      md5: 55f078e2785d8112f4eaea8ff84f2c5d
+      size: 392990
     - path: data/08_reporting/test/vit_dinov2_finetune/results.parquet
       hash: md5
-      md5: b77cddaba74cdd5393f7c36c6ffcf672
-      size: 19185
+      md5: 18c6288b44aad673b6e1fb6b257b1eb1
+      size: 33527
     - path: data/08_reporting/test/vit_dinov2_finetune/roc_curve.png
       hash: md5
-      md5: b47789d73d8e9899749535db5ee6e1d3
-      size: 26442
+      md5: 8059a772fbee89f4d80f74d3b8ea4f9f
+      size: 31640
     - path: data/08_reporting/test/vit_dinov2_finetune/sequences
       hash: md5
-      md5: f4a8ff908bc76d21c98ad550a2ce02f1.dir
-      size: 1453389
-      nfiles: 380
+      md5: b35e4d41360eade17f779deb49d3492a.dir
+      size: 3142601
+      nfiles: 1077
