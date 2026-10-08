@@ -70,6 +70,8 @@ train_vit_dinov2_finetune:
   finetune: true
   finetune_last_n_blocks: 1
   backbone_lr: 0.00001
+  # YOLO P5 whole-frame mean as scene context (512 channels)
+  yolo_ctx_dim: 512
 
 augment:
   enabled: true
