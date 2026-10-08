@@ -137,3 +137,17 @@ def test_dataset_transform_applied_when_provided(tmp_path):
     assert captured["mask_sum"] == 3
     # And its mutation flowed through to the caller
     assert float(sample["patches"].max()) > 1.0
+
+
+def test_patch_size_follows_meta(tmp_path: Path) -> None:
+    split = _make_split(tmp_path, [("seq_a", 1, 3)])
+    seq_dir = split / "seq_a"
+    meta = json.loads((seq_dir / "meta.json").read_text())
+    meta["patch_size"] = 112
+    (seq_dir / "meta.json").write_text(json.dumps(meta))
+    for f in meta["frames"]:
+        Image.fromarray(np.zeros((112, 112, 3), dtype=np.uint8)).save(
+            seq_dir / f["filename"]
+        )
+    item = TubePatchDataset(split, max_frames=5)[0]
+    assert item["patches"].shape == (5, 3, 112, 112)

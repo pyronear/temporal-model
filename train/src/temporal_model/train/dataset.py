@@ -26,7 +26,7 @@ class TubePatchDataset(Dataset):
     .. code-block:: python
 
         {
-            "patches": Tensor[max_frames, 3, 224, 224],  # float32
+            "patches": Tensor[max_frames, 3, P, P],  # P = meta patch_size
             "mask":    Tensor[max_frames] bool,           # True = real frame
             "label":   Tensor[] float32,                  # 0.0 fp, 1.0 smoke
             "sequence_id": str,
@@ -69,7 +69,8 @@ class TubePatchDataset(Dataset):
         frame_files = [seq_dir / f["filename"] for f in meta["frames"]]
         n = min(len(frame_files), self.max_frames)
 
-        patches = torch.zeros(self.max_frames, 3, 224, 224, dtype=torch.float32)
+        size = meta.get("patch_size", 224)
+        patches = torch.zeros(self.max_frames, 3, size, size, dtype=torch.float32)
         mask = torch.zeros(self.max_frames, dtype=torch.bool)
         for i in range(n):
             img = Image.open(frame_files[i]).convert("RGB")
