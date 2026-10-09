@@ -66,10 +66,14 @@ _vit_defaults: &vit_defaults
 
 train_vit_dinov2_finetune:
   <<: *vit_defaults
-  backbone: vit_small_patch14_dinov2.lvd142m
-  finetune: true
+  backbone: null
+  finetune: false
   finetune_last_n_blocks: 1
   backbone_lr: 0.00001
+  # No ViT: YOLO ROI P3+P4+P5 + P5 frame context feed the temporal head
+  yolo_levels: [p3, p4, p5]
+  yolo_roi_dim: 896
+  yolo_ctx_dim: 512
 
 augment:
   enabled: true
