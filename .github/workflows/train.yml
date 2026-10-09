@@ -89,7 +89,7 @@ jobs:
           uv run dvc update \
             data/01_raw/datasets_full/train.dvc \
             data/01_raw/datasets_full/val.dvc \
-            --rev "$DATASET_REV"
+            --rev "$DATASET_REV" -j 64
           # dvc update against an already-recorded tag is a silent no-op;
           # make sure both pointers really record the requested revision.
           grep -q "rev: $DATASET_REV" data/01_raw/datasets_full/train.dvc
@@ -97,12 +97,23 @@ jobs:
 
       - name: Run train pipeline
         working-directory: train
+        # The raw imports (145k files, ~45 min) only feed `truncate`, whose
+        # outputs are in our remote. Pulling them, even when already on disk
+        # after `dvc update`, re-collects every file (~26 min).
         run: |
-          uv run dvc pull \
-            data/01_raw/datasets_full/train.dvc \
-            data/01_raw/datasets_full/val.dvc \
-            data/06_models/detectors/yolo11s_swift-swallow_v8.2.0/yolo_weights.pt.dvc
-          uv run dvc repro --pull
+          YOLO=data/06_models/detectors/yolo11s_swift-swallow_v8.2.0/yolo_weights.pt.dvc
+          if [ -n "$DATASET_REV" ]; then
+            # dvc update already downloaded the new imports; truncate reruns.
+            uv run dvc pull -j 64 "$YOLO"
+            uv run dvc repro --pull
+          else
+            # Restore every pipeline output from the remote, then let
+            # --allow-missing treat the absent imports as unchanged (their
+            # hash in the .dvc matches dvc.lock). A branch that changes
+            # truncate itself fails here: its input is not on disk.
+            uv run dvc pull -j 64 "$YOLO" dvc.yaml
+            uv run dvc repro --allow-missing
+          fi
 
       - name: Push train artifacts to DVC remote
         working-directory: train
@@ -137,13 +148,13 @@ jobs:
         run: |
           # Same release as the train imports: pyro-dataset guarantees no
           # leakage only between splits of one revision.
-          uv run dvc update data/01_raw/sequential_test.dvc --rev "$DATASET_REV"
+          uv run dvc update data/01_raw/sequential_test.dvc --rev "$DATASET_REV" -j 64
           grep -q "rev: $DATASET_REV" data/01_raw/sequential_test.dvc
 
       - name: Run eval pipeline
         working-directory: eval
         run: |
-          uv run dvc pull data/01_raw/sequential_test.dvc
+          uv run dvc pull -j 64 data/01_raw/sequential_test.dvc
           # Eval reporting outputs are cache: false — they never round-trip
           # through the DVC remote, so on a fresh runner an unchanged lock
           # still means missing metrics files (dvc skips the stage anyway).
