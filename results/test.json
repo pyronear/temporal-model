@@ -1,30 +1,30 @@
 {
   "model_name": "vit_dinov2_finetune-test",
-  "num_sequences": 380,
-  "tp": 181,
-  "fp": 5,
-  "fn": 9,
-  "tn": 185,
-  "precision": 0.9731,
-  "recall": 0.9526,
-  "f1": 0.9628,
-  "fpr": 0.0263,
-  "mean_ttd_frames": 1.6,
-  "median_ttd_frames": 1,
-  "pr_auc": 0.9887,
-  "roc_auc": 0.9873,
+  "num_sequences": 1077,
+  "tp": 210,
+  "fp": 73,
+  "fn": 5,
+  "tn": 789,
+  "precision": 0.742,
+  "recall": 0.9767,
+  "f1": 0.8434,
+  "fpr": 0.0847,
+  "mean_ttd_frames": 1.8,
+  "median_ttd_frames": 1.0,
+  "pr_auc": 0.963,
+  "roc_auc": 0.986,
   "recall_ci95": [
-    0.9124,
-    0.9749
+    0.9467,
+    0.99
   ],
   "fpr_ci95": [
-    0.0113,
-    0.0601
+    0.0679,
+    0.1052
   ],
-  "fpr_at_recall_95": 0.0263,
+  "fpr_at_recall_95": 0.0673,
   "detected_within_frames": {
-    "2": 0.7263,
-    "3": 0.8579,
-    "5": 0.9158
+    "2": 0.6558,
+    "3": 0.814,
+    "5": 0.8977
   }
 }
