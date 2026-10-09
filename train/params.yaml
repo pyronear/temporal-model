@@ -70,6 +70,9 @@ train_vit_dinov2_finetune:
   finetune: true
   finetune_last_n_blocks: 1
   backbone_lr: 0.00001
+  # YOLO neck embeddings (yolo11s channels: p3 128, p4 256, p5 512)
+  yolo_levels: [p3, p4, p5]
+  yolo_roi_dim: 896
 
 augment:
   enabled: true
