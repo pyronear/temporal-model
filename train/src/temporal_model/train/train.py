@@ -33,6 +33,13 @@ def main() -> None:
     parser.add_argument("--params-path", type=Path, required=True)
     parser.add_argument("--params-key", required=True, help="Key in params.yaml")
     parser.add_argument(
+        "--train-yolo-dir",
+        type=Path,
+        default=None,
+        help="build_yolo_features output (train); needed by YOLO-feature variants",
+    )
+    parser.add_argument("--val-yolo-dir", type=Path, default=None)
+    parser.add_argument(
         "--sample-batches",
         type=int,
         default=3,
@@ -59,15 +66,22 @@ def main() -> None:
     train_transform = build_tube_augment(augment_cfg, train=True)
     val_transform = build_tube_augment(augment_cfg, train=False)
 
+    uses_yolo = bool(cfg.get("yolo_roi_dim") or cfg.get("yolo_ctx_dim"))
+    if uses_yolo and (args.train_yolo_dir is None or args.val_yolo_dir is None):
+        parser.error("YOLO-feature variant needs --train-yolo-dir and --val-yolo-dir")
     train_ds = TubePatchDataset(
         args.train_dir,
         max_frames=cfg["max_frames"],
         transform=train_transform,
+        yolo_features_dir=args.train_yolo_dir if uses_yolo else None,
+        yolo_levels=cfg.get("yolo_levels"),
     )
     val_ds = TubePatchDataset(
         args.val_dir,
         max_frames=cfg["max_frames"],
         transform=val_transform,
+        yolo_features_dir=args.val_yolo_dir if uses_yolo else None,
+        yolo_levels=cfg.get("yolo_levels"),
     )
 
     train_loader = DataLoader(
@@ -100,6 +114,9 @@ def main() -> None:
         max_frames=cfg.get("max_frames", 20),
         global_pool=cfg.get("global_pool", "avg"),
         img_size=cfg.get("img_size"),
+        yolo_levels=cfg.get("yolo_levels"),
+        yolo_roi_dim=cfg.get("yolo_roi_dim", 0),
+        yolo_ctx_dim=cfg.get("yolo_ctx_dim", 0),
         use_cosine_warmup=cfg.get("use_cosine_warmup", False),
         warmup_frac=cfg.get("warmup_frac", 0.05),
     )
