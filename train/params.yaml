@@ -48,7 +48,7 @@ _train_defaults: &train_defaults
   weight_decay: 0.01
   max_epochs: 30
   early_stop_patience: 5
-  seed: 42
+  seed: 43
 
 _vit_defaults: &vit_defaults
   <<: *train_defaults
