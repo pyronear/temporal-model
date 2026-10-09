@@ -54,6 +54,10 @@ def classifier_kwargs(variant_cfg: dict) -> dict:
         "transformer_ffn_dim",
         "transformer_dropout",
         "img_size",
+        "yolo_levels",
+        "yolo_roi_dim",
+        "yolo_ctx_dim",
+        "head_dim",
     ):
         if k in variant_cfg:
             kwargs[k] = variant_cfg[k]
@@ -230,6 +234,12 @@ def parse_args() -> argparse.Namespace:
         "--val-patches-dir", type=Path, default=Path("data/05_model_input/val")
     )
     parser.add_argument(
+        "--val-yolo-features-dir",
+        type=Path,
+        default=None,
+        help="build_yolo_features output (val); needed by YOLO-feature variants",
+    )
+    parser.add_argument(
         "--raw-train-dir", type=Path, default=Path("data/01_raw/datasets/train")
     )
     parser.add_argument(
@@ -265,6 +275,8 @@ def main() -> None:
         max_frames=variant_cfg["max_frames"],
         batch_size=variant_cfg.get("batch_size", 32),
         num_workers=variant_cfg.get("num_workers", 4),
+        yolo_features_dir=args.val_yolo_features_dir,
+        yolo_levels=variant_cfg.get("yolo_levels"),
     )
     threshold = calibrate_threshold(
         probs, labels, target_recall=package_params["target_recall"]

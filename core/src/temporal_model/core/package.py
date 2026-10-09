@@ -201,6 +201,10 @@ def _build_classifier(classifier_cfg: dict[str, Any]) -> TemporalSmokeClassifier
         "transformer_ffn_dim",
         "transformer_dropout",
         "img_size",
+        "yolo_levels",
+        "yolo_roi_dim",
+        "yolo_ctx_dim",
+        "head_dim",
     ):
         if k in classifier_cfg:
             kwargs[k] = classifier_cfg[k]
