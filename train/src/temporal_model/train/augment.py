@@ -9,6 +9,9 @@ import torch
 from torch import Tensor
 from torchvision.transforms.v2 import functional as TVF
 
+# Per-frame tensors that must follow the patches through temporal resampling.
+PER_FRAME_FEATURE_KEYS = ("yolo_roi", "yolo_ctx")
+
 
 class SpatialTubeTransform:
     """Per-tube-consistent spatial aug (flip + rotation + scale + translate).
@@ -160,16 +163,20 @@ class TemporalTubeTransform:
                 if keep
             ]
 
-        # Re-compact to a fresh padded tensor via one vectorized gather.
-        out_patches = torch.zeros_like(patches)
+        # Re-compact every per-frame tensor (patches, optional YOLO features)
+        # to a fresh padded tensor via one vectorized gather each.
         out_mask = torch.zeros(mask.shape, dtype=torch.bool, device=mask.device)
         k = len(valid_idx)
+        idx = torch.as_tensor(valid_idx, dtype=torch.long, device=patches.device)
+        for key in ("patches", *PER_FRAME_FEATURE_KEYS):
+            if key not in item:
+                continue
+            out = torch.zeros_like(item[key])
+            if k > 0:
+                out[:k] = item[key].index_select(0, idx)
+            item[key] = out
         if k > 0:
-            idx = torch.as_tensor(valid_idx, dtype=torch.long, device=patches.device)
-            out_patches[:k] = patches.index_select(0, idx)
             out_mask[:k] = True
-
-        item["patches"] = out_patches
         item["mask"] = out_mask
         return item
 

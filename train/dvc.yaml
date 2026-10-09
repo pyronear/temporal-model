@@ -73,6 +73,29 @@ stages:
       outs:
         - data/05_model_input/${item}
 
+  build_yolo_features:
+    foreach:
+      - train
+      - val
+    do:
+      cmd: >-
+        uv run python -m temporal_model.train.build_yolo_features
+        --tubes-dir data/03_primary/tubes/${item}
+        --raw-dir data/01_raw/datasets/${item}
+        --yolo-weights data/06_models/detectors/yolo11s_swift-swallow_v8.2.0/yolo_weights.pt
+        --image-size ${package.infer.image_size}
+        --output-dir data/04_feature/yolo/${item}
+      deps:
+        - src/temporal_model/train/build_yolo_features.py
+        - ../core/src/temporal_model/core/yolo_features.py
+        - data/06_models/detectors/yolo11s_swift-swallow_v8.2.0/yolo_weights.pt
+        - data/03_primary/tubes/${item}
+        - data/01_raw/datasets/${item}
+      params:
+        - package.infer.image_size
+      outs:
+        - data/04_feature/yolo/${item}
+
   train:
     cmd: >-
       uv run python -m temporal_model.train.train
@@ -81,6 +104,8 @@ stages:
       --output-dir data/06_models/vit_dinov2_finetune
       --params-path params.yaml
       --params-key train_vit_dinov2_finetune
+      --train-yolo-dir data/04_feature/yolo/train
+      --val-yolo-dir data/04_feature/yolo/val
     deps:
       - src/temporal_model/train/train.py
       - src/temporal_model/train/augment.py
@@ -91,6 +116,8 @@ stages:
       - ../core/src/temporal_model/core/temporal_classifier.py
       - data/05_model_input/train
       - data/05_model_input/val
+      - data/04_feature/yolo/train
+      - data/04_feature/yolo/val
     params:
       - train_vit_dinov2_finetune
       - augment
@@ -105,6 +132,7 @@ stages:
       uv run python -m temporal_model.train.package
       --variant vit_dinov2_finetune
       --output data/06_models/vit_dinov2_finetune/model.zip
+      --val-yolo-features-dir data/04_feature/yolo/val
     deps:
       - src/temporal_model/train/package.py
       - src/temporal_model/train/calibration.py
@@ -117,12 +145,14 @@ stages:
       - ../core/src/temporal_model/core/inference.py
       - ../core/src/temporal_model/core/stabilize.py
       - ../core/src/temporal_model/core/logistic_calibrator.py
+      - ../core/src/temporal_model/core/yolo_features.py
       - ../core/src/temporal_model/core/tubes.py
       - ../core/src/temporal_model/core/sequences.py
       - ../core/src/temporal_model/core/detector.yaml
       - data/06_models/vit_dinov2_finetune/best_checkpoint.pt
       - data/06_models/detectors/yolo11s_swift-swallow_v8.2.0/yolo_weights.pt
       - data/05_model_input/val
+      - data/04_feature/yolo/val
       - data/01_raw/datasets/train
       - data/01_raw/datasets/val
     params:

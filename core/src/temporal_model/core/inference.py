@@ -308,6 +308,7 @@ def find_first_crossing_trigger(
     patches_per_tube: list[np.ndarray],
     masks_per_tube: list[np.ndarray],
     full_logits: np.ndarray,
+    extras_per_tube: list[dict[str, np.ndarray]] | None = None,
     aggregation: str = "max_logit",
     threshold: float,
     calibrator: LogisticCalibrator | None = None,
@@ -339,6 +340,8 @@ def find_first_crossing_trigger(
         patches_per_tube: One ``[max_frames, 3, H, W]`` float32 array per tube.
         masks_per_tube: One ``[max_frames]`` bool array per tube.
         full_logits: Full-tube logits, ``[N]``.
+        extras_per_tube: Optional extra classifier inputs per tube
+            (``{name: [T, ...]}``), passed batched as keyword arguments.
         aggregation: ``"max_logit"`` or ``"logistic"``.
         threshold: Raw logit threshold (``max_logit`` only).
         calibrator: Required when ``aggregation == "logistic"``.
@@ -387,6 +390,10 @@ def find_first_crossing_trigger(
 
         patches_i = patches_per_tube[i]
         mask_i = masks_per_tube[i]
+        extras_i = {
+            k: v[None]
+            for k, v in (extras_per_tube[i] if extras_per_tube else {}).items()
+        }
 
         crossed = False
         for L in range(min_prefix_length, full_len + 1):
@@ -395,7 +402,7 @@ def find_first_crossing_trigger(
             else:
                 prefix_mask = mask_i.copy()
                 prefix_mask[L:] = False
-                out = classifier(patches_i[None], prefix_mask[None])
+                out = classifier(patches_i[None], prefix_mask[None], **extras_i)
                 prefix_logit = float(out[0])
 
             prefix_entries = tube.entries[:L]
