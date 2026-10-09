@@ -7,9 +7,9 @@ stages:
     deps:
     - path: data/01_raw/datasets_full/train
       hash: md5
-      md5: 33ebd4c3de577909200043902d662a5c.dir
-      size: 8776015233
-      nfiles: 145482
+      md5: 608bba86bfe21ba47481a4c86d7875a9.dir
+      size: 9277713117
+      nfiles: 152022
     - path: src/temporal_model/train/truncate.py
       hash: md5
       md5: 50ac7865933889df116cf61d7f35bc63
@@ -20,9 +20,9 @@ stages:
     outs:
     - path: data/01_raw/datasets/train
       hash: md5
-      md5: 9d439215c7e0749d043b0986b80b8c36.dir
-      size: 5829774690
-      nfiles: 94640
+      md5: 320c10e715d78c571dfd6befdc5e6cec.dir
+      size: 6208382693
+      nfiles: 99460
   truncate@val:
     cmd: uv run python -m temporal_model.train.truncate --input-dir 
       data/01_raw/datasets_full/val --output-dir data/01_raw/datasets/val 
@@ -30,9 +30,9 @@ stages:
     deps:
     - path: data/01_raw/datasets_full/val
       hash: md5
-      md5: df9cc34a9f322e39f85bda0d8e183463.dir
-      size: 855129379
-      nfiles: 14054
+      md5: 9dc7924756822f70eff2ead33cfa6a0d.dir
+      size: 894269686
+      nfiles: 14772
     - path: src/temporal_model/train/truncate.py
       hash: md5
       md5: 50ac7865933889df116cf61d7f35bc63
@@ -43,9 +43,9 @@ stages:
     outs:
     - path: data/01_raw/datasets/val
       hash: md5
-      md5: 72d0b36cb36b55e9c038674eb5fb19a5.dir
-      size: 595988785
-      nfiles: 9706
+      md5: 721658db67d3c4092d535f54c015ae4a.dir
+      size: 629091966
+      nfiles: 10252
   build_tubes@train:
     cmd: uv run python -m temporal_model.train.build_tubes --input-dir 
       data/01_raw/datasets/train --output-dir data/03_primary/tubes/train 
@@ -75,9 +75,9 @@ stages:
       size: 1422
     - path: data/01_raw/datasets/train
       hash: md5
-      md5: 9d439215c7e0749d043b0986b80b8c36.dir
-      size: 5829774690
-      nfiles: 94640
+      md5: 320c10e715d78c571dfd6befdc5e6cec.dir
+      size: 6208382693
+      nfiles: 99460
     - path: src/temporal_model/train/build_tubes.py
       hash: md5
       md5: 61fdf917c3fd93320b73139327332f6e
@@ -96,9 +96,9 @@ stages:
     outs:
     - path: data/03_primary/tubes/train
       hash: md5
-      md5: 9d488ef5f97c255426c444b9996d5b0b.dir
-      size: 12537315
-      nfiles: 3148
+      md5: 417bd3b2c3c2ebc572d6dca4496804da.dir
+      size: 13409357
+      nfiles: 3318
   build_tubes@val:
     cmd: uv run python -m temporal_model.train.build_tubes --input-dir 
       data/01_raw/datasets/val --output-dir data/03_primary/tubes/val 
@@ -128,9 +128,9 @@ stages:
       size: 1422
     - path: data/01_raw/datasets/val
       hash: md5
-      md5: 72d0b36cb36b55e9c038674eb5fb19a5.dir
-      size: 595988785
-      nfiles: 9706
+      md5: 721658db67d3c4092d535f54c015ae4a.dir
+      size: 629091966
+      nfiles: 10252
     - path: src/temporal_model/train/build_tubes.py
       hash: md5
       md5: 61fdf917c3fd93320b73139327332f6e
@@ -149,9 +149,9 @@ stages:
     outs:
     - path: data/03_primary/tubes/val
       hash: md5
-      md5: 1f8f9c5db58b47e4f2dcf80583147dde.dir
-      size: 1294581
-      nfiles: 335
+      md5: fd767f46ca29c523febb204294fbca90.dir
+      size: 1387413
+      nfiles: 353
   build_model_input@train:
     cmd: uv run python -m temporal_model.train.build_model_input --tubes-dir 
       data/03_primary/tubes/train --raw-dir data/01_raw/datasets/train 
@@ -172,14 +172,14 @@ stages:
       size: 3052
     - path: data/01_raw/datasets/train
       hash: md5
-      md5: 9d439215c7e0749d043b0986b80b8c36.dir
-      size: 5829774690
-      nfiles: 94640
+      md5: 320c10e715d78c571dfd6befdc5e6cec.dir
+      size: 6208382693
+      nfiles: 99460
     - path: data/03_primary/tubes/train
       hash: md5
-      md5: 9d488ef5f97c255426c444b9996d5b0b.dir
-      size: 12537315
-      nfiles: 3148
+      md5: 417bd3b2c3c2ebc572d6dca4496804da.dir
+      size: 13409357
+      nfiles: 3318
     - path: src/temporal_model/train/build_model_input.py
       hash: md5
       md5: 08014908422b4240dc88f46e9232f180
@@ -197,9 +197,9 @@ stages:
     outs:
     - path: data/05_model_input/train
       hash: md5
-      md5: 22c1db2c26e9c2f0c190a8bbca8be847.dir
-      size: 1295252874
-      nfiles: 44420
+      md5: 110e1ed59cdcfb7afbd3f0b34eb67135.dir
+      size: 1362317705
+      nfiles: 48009
   build_model_input@val:
     cmd: uv run python -m temporal_model.train.build_model_input --tubes-dir 
       data/03_primary/tubes/val --raw-dir data/01_raw/datasets/val --output-dir 
@@ -220,14 +220,14 @@ stages:
       size: 3052
     - path: data/01_raw/datasets/val
       hash: md5
-      md5: 72d0b36cb36b55e9c038674eb5fb19a5.dir
-      size: 595988785
-      nfiles: 9706
+      md5: 721658db67d3c4092d535f54c015ae4a.dir
+      size: 629091966
+      nfiles: 10252
     - path: data/03_primary/tubes/val
       hash: md5
-      md5: 1f8f9c5db58b47e4f2dcf80583147dde.dir
-      size: 1294581
-      nfiles: 335
+      md5: fd767f46ca29c523febb204294fbca90.dir
+      size: 1387413
+      nfiles: 353
     - path: src/temporal_model/train/build_model_input.py
       hash: md5
       md5: 08014908422b4240dc88f46e9232f180
@@ -245,49 +245,60 @@ stages:
     outs:
     - path: data/05_model_input/val
       hash: md5
-      md5: 06711cd8bcbbb35ad359dfd3d7c56038.dir
-      size: 130347814
-      nfiles: 4604
+      md5: 7359afcfa304417e1e79a8c94299e72e.dir
+      size: 141293200
+      nfiles: 5003
   train:
     cmd: uv run python -m temporal_model.train.train --train-dir 
       data/05_model_input/train --val-dir data/05_model_input/val --output-dir 
       data/06_models/vit_dinov2_finetune --params-path params.yaml --params-key 
-      train_vit_dinov2_finetune
+      train_vit_dinov2_finetune --train-yolo-dir data/04_feature/yolo/train 
+      --val-yolo-dir data/04_feature/yolo/val
     deps:
     - path: ../core/src/temporal_model/core/temporal_classifier.py
       hash: md5
-      md5: e50940dafd63ad3e5065d3deee3a7c2f
-      size: 7136
+      md5: 4c5b51c8e6ca9f65db6a98f69471e43c
+      size: 8778
+    - path: data/04_feature/yolo/train
+      hash: md5
+      md5: d0f62c1548e724ad87c427f48d2b3012.dir
+      size: 129060712
+      nfiles: 3317
+    - path: data/04_feature/yolo/val
+      hash: md5
+      md5: 427960fdf0213f89b25c4d1aa614ada6.dir
+      size: 13435136
+      nfiles: 352
     - path: data/05_model_input/train
       hash: md5
-      md5: 22c1db2c26e9c2f0c190a8bbca8be847.dir
-      size: 1295252874
-      nfiles: 44420
+      md5: 110e1ed59cdcfb7afbd3f0b34eb67135.dir
+      size: 1362317705
+      nfiles: 48009
     - path: data/05_model_input/val
       hash: md5
-      md5: 06711cd8bcbbb35ad359dfd3d7c56038.dir
-      size: 130347814
-      nfiles: 4604
+      md5: 7359afcfa304417e1e79a8c94299e72e.dir
+      size: 141293200
+      nfiles: 5003
     - path: src/temporal_model/train/augment.py
       hash: md5
-      md5: 7bad0b20ddd88905a3141b1e05d7f685
-      size: 9395
+      md5: 6806d16c2c8c6d7570f9cd35e6c7288b
+      size: 9713
     - path: src/temporal_model/train/batch_samples.py
       hash: md5
       md5: 5bbc7e7eafd7c9c4f8d2a63ba4a9b0c4
       size: 4961
     - path: src/temporal_model/train/dataset.py
       hash: md5
-      md5: 0963a1ba3fd9e193ab8d4d24bd97aca2
-      size: 3141
+      md5: a65bc4d17dee17a63e6bc4ce2c12e57d
+      size: 4171
     - path: src/temporal_model/train/lit_temporal.py
       hash: md5
-      md5: 023e48e99565f468cf7d5fd7c210b341
-      size: 5951
+      md5: a26fe535405241fdab295b5b01d8913b
+      size: 6700
     - path: src/temporal_model/train/train.py
       hash: md5
-      md5: 96e5b3486858147ddecdddadfc4cf047
-      size: 5534
+      md5: 0b4c2e563a5328ffc7d4e59c8f4a69f9
+      size: 6394
     - path: src/temporal_model/train/training_plots.py
       hash: md5
       md5: 48015bd154587ba3ba493ed5c337e27a
@@ -340,44 +351,48 @@ stages:
           finetune: true
           finetune_last_n_blocks: 1
           backbone_lr: 1e-05
+          yolo_levels:
+          - p5
+          yolo_roi_dim: 512
     outs:
     - path: data/06_models/vit_dinov2_finetune/best_checkpoint.pt
       hash: md5
-      md5: 5bb1fcca14ec48fdce8a4311f70999bb
-      size: 143536747
+      md5: 4f4415dbf7d617cee2ab7b8201f27c1d
+      size: 145917835
     - path: data/06_models/vit_dinov2_finetune/csv_logs/
       hash: md5
-      md5: 939fa225bb178bdf3585e4bf4aef6577.dir
-      size: 14781
+      md5: f73c1520849ff0c975445a90f8c7a253.dir
+      size: 17310
       nfiles: 2
     - path: data/06_models/vit_dinov2_finetune/plots/training_curves.png
       hash: md5
-      md5: 917ae655f989764cc48d67ee946604a2
-      size: 189892
+      md5: b2ac62baf27bb126d3912a01b3d6f4e8
+      size: 221602
   package:
     cmd: uv run python -m temporal_model.train.package --variant 
-      vit_dinov2_finetune --output data/06_models/vit_dinov2_finetune/model.zip
+      vit_dinov2_finetune --output data/06_models/vit_dinov2_finetune/model.zip 
+      --val-yolo-features-dir data/04_feature/yolo/val
     deps:
     - path: ../core/src/temporal_model/core/detector.yaml
       hash: md5
-      md5: ba07c2480d91b7ffdbf8f1967df095f4
-      size: 481
+      md5: 8d7dbbf0e67938a9a9c217d86976eb8c
+      size: 531
     - path: ../core/src/temporal_model/core/inference.py
       hash: md5
-      md5: e8d6bb9ed9ab6dccd625d12721ed382e
-      size: 17580
+      md5: fd9e2811fcb894191365f68efbd824ea
+      size: 17294
     - path: ../core/src/temporal_model/core/logistic_calibrator.py
       hash: md5
-      md5: fc8f3b5f18e59e0c72edc1cf973d1cb2
-      size: 5062
+      md5: 420afc7d79f5172dc7065eb6a42097c5
+      size: 5139
     - path: ../core/src/temporal_model/core/model.py
       hash: md5
-      md5: 04c810d9ea830dbee576ec14db0fecd0
-      size: 16193
+      md5: 8f0820e8c4919eafa8e783df03456703
+      size: 5642
     - path: ../core/src/temporal_model/core/package.py
       hash: md5
-      md5: cd0bfa9f82113a5dba28667ff4b46f63
-      size: 12270
+      md5: 4ae1f21f814817f4853d48fa4e547677
+      size: 11393
     - path: ../core/src/temporal_model/core/sequences.py
       hash: md5
       md5: 52023f25efee8db079a744636b832969
@@ -390,54 +405,63 @@ stages:
       hash: md5
       md5: 3f72927fd827933e9a049979bbc6dec5
       size: 20053
+    - path: ../core/src/temporal_model/core/yolo_features.py
+      hash: md5
+      md5: 32c5d55224f89109a65e632a95c3094c
+      size: 5687
     - path: data/01_raw/datasets/train
       hash: md5
-      md5: 9d439215c7e0749d043b0986b80b8c36.dir
-      size: 5829774690
-      nfiles: 94640
+      md5: 320c10e715d78c571dfd6befdc5e6cec.dir
+      size: 6208382693
+      nfiles: 99460
     - path: data/01_raw/datasets/val
       hash: md5
-      md5: 72d0b36cb36b55e9c038674eb5fb19a5.dir
-      size: 595988785
-      nfiles: 9706
+      md5: 721658db67d3c4092d535f54c015ae4a.dir
+      size: 629091966
+      nfiles: 10252
+    - path: data/04_feature/yolo/val
+      hash: md5
+      md5: 427960fdf0213f89b25c4d1aa614ada6.dir
+      size: 13435136
+      nfiles: 352
     - path: data/05_model_input/val
       hash: md5
-      md5: 06711cd8bcbbb35ad359dfd3d7c56038.dir
-      size: 130347814
-      nfiles: 4604
+      md5: 7359afcfa304417e1e79a8c94299e72e.dir
+      size: 141293200
+      nfiles: 5003
     - path: 
-        data/06_models/detectors/yolo11s_nimble-narwhal_v6.0.0/yolo_weights.pt
+        data/06_models/detectors/yolo11s_swift-swallow_v8.2.0/yolo_weights.pt
       hash: md5
-      md5: fea4ddc8d904fcc5ff11ad900e040837
+      md5: abae965ab4a3a761433ef043a1c2c8ee
       size: 19225626
     - path: data/06_models/vit_dinov2_finetune/best_checkpoint.pt
       hash: md5
-      md5: 5bb1fcca14ec48fdce8a4311f70999bb
-      size: 143536747
+      md5: 4f4415dbf7d617cee2ab7b8201f27c1d
+      size: 145917835
     - path: src/temporal_model/train/calibration.py
       hash: md5
       md5: 9fcc002b92d7c66b446ef1f20a3d88df
       size: 1180
     - path: src/temporal_model/train/dataset.py
       hash: md5
-      md5: 0963a1ba3fd9e193ab8d4d24bd97aca2
-      size: 3141
+      md5: a65bc4d17dee17a63e6bc4ce2c12e57d
+      size: 4171
     - path: src/temporal_model/train/logistic_calibrator_fit.py
       hash: md5
       md5: d610b7e469d94948111902b9ca0ef923
       size: 2511
     - path: src/temporal_model/train/package.py
       hash: md5
-      md5: 355f8769d140a73966d04ff355cd7ecb
-      size: 11636
+      md5: 00f2e994473386de15cca9e7a26992b6
+      size: 12022
     - path: src/temporal_model/train/package_predict.py
       hash: md5
       md5: 72341b820819bc1a3509ab2832e82596
       size: 2130
     - path: src/temporal_model/train/val_predict.py
       hash: md5
-      md5: cd28d9e2879024c2e58da0cc17c86512
-      size: 1514
+      md5: e121afc783d87cc411c4101c8cf7d254
+      size: 1831
     params:
       params.yaml:
         build_tubes:
@@ -479,6 +503,9 @@ stages:
           finetune: true
           finetune_last_n_blocks: 1
           backbone_lr: 1e-05
+          yolo_levels:
+          - p5
+          yolo_roi_dim: 512
         tubes:
           iou_threshold: 0.2
           max_misses: 2
@@ -488,5 +515,83 @@ stages:
     outs:
     - path: data/06_models/vit_dinov2_finetune/model.zip
       hash: md5
-      md5: 39d7d39141dddf1356dbd860304dda8d
-      size: 162765158
+      md5: a88a5ce636f225858af1c91300310028
+      size: 165146284
+  build_yolo_features@train:
+    cmd: uv run python -m temporal_model.train.build_yolo_features --tubes-dir 
+      data/03_primary/tubes/train --raw-dir data/01_raw/datasets/train 
+      --yolo-weights 
+      data/06_models/detectors/yolo11s_swift-swallow_v8.2.0/yolo_weights.pt 
+      --image-size 1024 --output-dir data/04_feature/yolo/train
+    deps:
+    - path: ../core/src/temporal_model/core/yolo_features.py
+      hash: md5
+      md5: 32c5d55224f89109a65e632a95c3094c
+      size: 5687
+    - path: data/01_raw/datasets/train
+      hash: md5
+      md5: 320c10e715d78c571dfd6befdc5e6cec.dir
+      size: 6208382693
+      nfiles: 99460
+    - path: data/03_primary/tubes/train
+      hash: md5
+      md5: 417bd3b2c3c2ebc572d6dca4496804da.dir
+      size: 13409357
+      nfiles: 3318
+    - path: 
+        data/06_models/detectors/yolo11s_swift-swallow_v8.2.0/yolo_weights.pt
+      hash: md5
+      md5: abae965ab4a3a761433ef043a1c2c8ee
+      size: 19225626
+    - path: src/temporal_model/train/build_yolo_features.py
+      hash: md5
+      md5: 5f6ddc1b8fb0d28d41601935328edd3e
+      size: 2549
+    params:
+      params.yaml:
+        package.infer.image_size: 1024
+    outs:
+    - path: data/04_feature/yolo/train
+      hash: md5
+      md5: d0f62c1548e724ad87c427f48d2b3012.dir
+      size: 129060712
+      nfiles: 3317
+  build_yolo_features@val:
+    cmd: uv run python -m temporal_model.train.build_yolo_features --tubes-dir 
+      data/03_primary/tubes/val --raw-dir data/01_raw/datasets/val 
+      --yolo-weights 
+      data/06_models/detectors/yolo11s_swift-swallow_v8.2.0/yolo_weights.pt 
+      --image-size 1024 --output-dir data/04_feature/yolo/val
+    deps:
+    - path: ../core/src/temporal_model/core/yolo_features.py
+      hash: md5
+      md5: 32c5d55224f89109a65e632a95c3094c
+      size: 5687
+    - path: data/01_raw/datasets/val
+      hash: md5
+      md5: 721658db67d3c4092d535f54c015ae4a.dir
+      size: 629091966
+      nfiles: 10252
+    - path: data/03_primary/tubes/val
+      hash: md5
+      md5: fd767f46ca29c523febb204294fbca90.dir
+      size: 1387413
+      nfiles: 353
+    - path: 
+        data/06_models/detectors/yolo11s_swift-swallow_v8.2.0/yolo_weights.pt
+      hash: md5
+      md5: abae965ab4a3a761433ef043a1c2c8ee
+      size: 19225626
+    - path: src/temporal_model/train/build_yolo_features.py
+      hash: md5
+      md5: 5f6ddc1b8fb0d28d41601935328edd3e
+      size: 2549
+    params:
+      params.yaml:
+        package.infer.image_size: 1024
+    outs:
+    - path: data/04_feature/yolo/val
+      hash: md5
+      md5: 427960fdf0213f89b25c4d1aa614ada6.dir
+      size: 13435136
+      nfiles: 352

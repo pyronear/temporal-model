@@ -38,6 +38,9 @@ class LitTemporalClassifier(L.LightningModule):
         max_frames: int = 20,
         global_pool: str = "avg",
         img_size: int | None = None,
+        yolo_levels: list[str] | None = None,
+        yolo_roi_dim: int = 0,
+        yolo_ctx_dim: int = 0,
         use_cosine_warmup: bool = False,
         warmup_frac: float = 0.05,
     ) -> None:
@@ -55,6 +58,9 @@ class LitTemporalClassifier(L.LightningModule):
             max_frames=max_frames,
             global_pool=global_pool,
             img_size=img_size,
+            yolo_levels=yolo_levels,
+            yolo_roi_dim=yolo_roi_dim,
+            yolo_ctx_dim=yolo_ctx_dim,
         )
         self.loss_fn = torch.nn.BCEWithLogitsLoss()
         self.learning_rate = learning_rate
@@ -66,17 +72,31 @@ class LitTemporalClassifier(L.LightningModule):
         self._val_preds: list[float] = []
         self._val_labels: list[float] = []
 
-    def forward(self, patches: Tensor, mask: Tensor) -> Tensor:
-        return self.model(patches, mask)
+    def forward(
+        self,
+        patches: Tensor,
+        mask: Tensor,
+        yolo_roi: Tensor | None = None,
+        yolo_ctx: Tensor | None = None,
+    ) -> Tensor:
+        return self.model(patches, mask, yolo_roi, yolo_ctx)
+
+    def _logits(self, batch: dict) -> Tensor:
+        return self(
+            batch["patches"],
+            batch["mask"],
+            batch.get("yolo_roi"),
+            batch.get("yolo_ctx"),
+        )
 
     def training_step(self, batch: dict, batch_idx: int) -> Tensor:
-        logits = self(batch["patches"], batch["mask"])
+        logits = self._logits(batch)
         loss = self.loss_fn(logits, batch["label"])
         self.log("train/loss", loss, prog_bar=True, batch_size=logits.shape[0])
         return loss
 
     def validation_step(self, batch: dict, batch_idx: int) -> None:
-        logits = self(batch["patches"], batch["mask"])
+        logits = self._logits(batch)
         loss = self.loss_fn(logits, batch["label"])
         probs = torch.sigmoid(logits).detach().cpu()
         labels = batch["label"].detach().cpu()
@@ -106,8 +126,18 @@ class LitTemporalClassifier(L.LightningModule):
         self._val_labels.clear()
 
     def configure_optimizers(self):
+        # "Head" = every trainable non-backbone param: the temporal head plus
+        # the optional YOLO-feature projections.
+        backbone = self.model.backbone
+        backbone_ids = (
+            {id(p) for p in backbone.parameters()} if backbone is not None else set()
+        )
+        head_params = [
+            p
+            for p in self.model.parameters()
+            if p.requires_grad and id(p) not in backbone_ids
+        ]
         if not self.finetune:
-            head_params = [p for p in self.model.head.parameters() if p.requires_grad]
             optimizer = torch.optim.AdamW(
                 head_params,
                 lr=self.learning_rate,
@@ -116,10 +146,7 @@ class LitTemporalClassifier(L.LightningModule):
         else:
             if self.backbone_lr is None:
                 raise ValueError("backbone_lr must be set when finetune=True")
-            backbone_params = [
-                p for p in self.model.backbone.parameters() if p.requires_grad
-            ]
-            head_params = [p for p in self.model.head.parameters() if p.requires_grad]
+            backbone_params = [p for p in backbone.parameters() if p.requires_grad]
             optimizer = torch.optim.AdamW(
                 [
                     {
