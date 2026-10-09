@@ -22,6 +22,8 @@ def collect_val_probabilities(
     batch_size: int = 32,
     num_workers: int = 4,
     device: str | None = None,
+    yolo_features_dir: Path | None = None,
+    yolo_levels: list[str] | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Run the classifier over ``val_patches_dir`` and collect ``(probs, labels)``."""
     if device is not None:
@@ -30,7 +32,12 @@ def collect_val_probabilities(
         dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     classifier.to(dev).eval()
 
-    ds = TubePatchDataset(val_patches_dir, max_frames=max_frames)
+    ds = TubePatchDataset(
+        val_patches_dir,
+        max_frames=max_frames,
+        yolo_features_dir=yolo_features_dir if classifier.uses_yolo else None,
+        yolo_levels=yolo_levels,
+    )
     loader = DataLoader(
         ds, batch_size=batch_size, shuffle=False, num_workers=num_workers
     )
@@ -41,7 +48,8 @@ def collect_val_probabilities(
         for batch in loader:
             patches = batch["patches"].to(dev)
             mask = batch["mask"].to(dev)
-            logits = classifier(patches, mask)
+            extras = [batch[k].to(dev) for k in ("yolo_roi", "yolo_ctx") if k in batch]
+            logits = classifier(patches, mask, *extras)
             probs.extend(torch.sigmoid(logits).cpu().tolist())
             labels.extend(batch["label"].tolist())
 

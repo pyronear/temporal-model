@@ -25,7 +25,7 @@ build_tubes:
 
 model_input:
   context_factor: 1.5
-  patch_size: 224
+  patch_size: 112
   stabilize: true
 
 package:
@@ -66,7 +66,8 @@ _vit_defaults: &vit_defaults
 
 train_vit_dinov2_finetune:
   <<: *vit_defaults
-  backbone: vit_small_patch14_dinov2.lvd142m
+  backbone: vit_small_patch16_dinov3.lvd1689m
+  img_size: 112
   finetune: true
   finetune_last_n_blocks: 1
   backbone_lr: 0.00001
