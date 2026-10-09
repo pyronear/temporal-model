@@ -24,8 +24,8 @@ build_tubes:
   min_detected_entries: 2
 
 model_input:
-  context_factor: 1.5
-  patch_size: 224
+  context_factor: 2.0
+  patch_size: 112
   stabilize: true
 
 package:
@@ -70,6 +70,10 @@ train_vit_dinov2_finetune:
   finetune: true
   finetune_last_n_blocks: 1
   backbone_lr: 0.00001
+  img_size: 112
+  # YOLO neck embeddings (yolo11s channels: p5 512)
+  yolo_levels: [p5]
+  yolo_roi_dim: 512
 
 augment:
   enabled: true
