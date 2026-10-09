@@ -54,17 +54,24 @@ def _cmd_pull(args: argparse.Namespace) -> None:
 
 
 def _cmd_score(args: argparse.Namespace) -> None:
-    model = _load_model(args.model_zip, args.device)
-    scored, dropped = score_sequences(model, args.store, threshold=args.threshold)
+    zips = args.model_zip or [DEFAULT_MODEL_ZIP]
+    models = [_load_model(z, args.device) for z in zips]
+    scored, dropped = score_sequences(models, args.store, threshold=args.threshold)
     write_triage_report(
         args.output_dir,
         scored,
         dropped=dropped,
         threshold=args.threshold,
-        model_config=read_model_config(args.model_zip),
+        model_config={
+            **read_model_config(zips[0]),
+            "ensemble_models": [str(z) for z in zips],
+        },
     )
     n_low = sum(1 for s in scored if s.bucket == "unlabeled")
     n_high = sum(1 for s in scored if s.bucket == "review")
+    n_disagree = sum(
+        1 for s in scored if 0 < s.n_models_review(args.threshold) < len(zips)
+    )
     print(
         json.dumps(
             {
@@ -72,6 +79,8 @@ def _cmd_score(args: argparse.Namespace) -> None:
                 "dropped": len(dropped),
                 "unlabeled": n_low,
                 "review": n_high,
+                "review_disagreements": n_disagree,
+                "models": len(zips),
                 "threshold": args.threshold,
             },
             indent=2,
@@ -127,7 +136,12 @@ def main(argv: list[str] | None = None) -> None:
     p_score = sub.add_parser("score", help="score the store + write report")
     p_score.add_argument("--store", type=Path, default=DEFAULT_STORE)
     p_score.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
-    p_score.add_argument("--model-zip", type=Path, default=DEFAULT_MODEL_ZIP)
+    p_score.add_argument(
+        "--model-zip",
+        type=Path,
+        action="append",
+        help="model.zip to score with; repeat for an ensemble (default: the API's)",
+    )
     p_score.add_argument("--threshold", type=float, default=DEFAULT_THRESHOLD)
     p_score.add_argument("--device", default=None, help="cuda/mps/cpu (default auto)")
     p_score.set_defaults(func=_cmd_score)

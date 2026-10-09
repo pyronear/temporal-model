@@ -72,3 +72,32 @@ def test_score_sequences_classifies_and_carries_through(tmp_path):
     assert s.key == "pyro-annotator_1"
     assert s.score == 0.8
     assert s.bucket == "review"
+
+
+def test_ensemble_unlabels_only_when_every_model_is_below(tmp_path):
+    meta = SequenceMeta(
+        key="pyro-annotator_2",
+        sequence_id=2,
+        camera_name="cam",
+        organization_name="org",
+        frames=[FrameRef(file="images/detection_2.jpg", detection_id=2)],
+    )
+    seq_dir = sequence_dir(tmp_path, meta)
+    (seq_dir / "images").mkdir(parents=True)
+    (seq_dir / "images/detection_2.jpg").write_bytes(b"x")
+    write_meta(seq_dir, meta)
+
+    # One dissenting model is enough to send the sequence to a human.
+    (s,), _ = score_sequences(
+        [_FakeModel(0.1), _FakeModel(0.6)], tmp_path, threshold=0.35
+    )
+    assert s.bucket == "review"
+    assert s.score == 0.6
+    assert s.model_scores == [0.1, 0.6]
+    assert s.n_models_review(0.35) == 1
+
+    (s,), _ = score_sequences(
+        [_FakeModel(0.1), _FakeModel(0.2)], tmp_path, threshold=0.35
+    )
+    assert s.bucket == "unlabeled"
+    assert s.n_models_review(0.35) == 0
