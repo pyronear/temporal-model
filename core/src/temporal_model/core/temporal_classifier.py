@@ -153,12 +153,16 @@ class TransformerHead(nn.Module):
 class TemporalSmokeClassifier(nn.Module):
     """Timm backbone applied per-frame plus a transformer temporal head.
 
-    Produces a single binary logit per tube.
+    Produces a single binary logit per tube. Optional per-frame YOLO
+    embeddings (``yolo_roi``: neck levels ROI-pooled at the tube box,
+    ``yolo_ctx``: P5 global-pooled over the frame) are layer-normed, projected
+    to the token width and added to each frame token. ``backbone=None`` drops
+    the ViT entirely (YOLO-only tokens of width ``head_dim``).
     """
 
     def __init__(
         self,
-        backbone: str,
+        backbone: str | None,
         pretrained: bool = True,
         finetune: bool = False,
         finetune_last_n_blocks: int = 0,
@@ -169,17 +173,38 @@ class TemporalSmokeClassifier(nn.Module):
         max_frames: int = 20,
         global_pool: str = "avg",
         img_size: int | None = None,
+        yolo_levels: list[str] | None = None,
+        yolo_roi_dim: int = 0,
+        yolo_ctx_dim: int = 0,
+        head_dim: int = 384,
     ) -> None:
         super().__init__()
-        self.backbone = TimmBackbone(
-            name=backbone,
-            pretrained=pretrained,
-            finetune=finetune,
-            finetune_last_n_blocks=finetune_last_n_blocks,
-            global_pool=global_pool,
-            img_size=img_size,
+        self.backbone = (
+            TimmBackbone(
+                name=backbone,
+                pretrained=pretrained,
+                finetune=finetune,
+                finetune_last_n_blocks=finetune_last_n_blocks,
+                global_pool=global_pool,
+                img_size=img_size,
+            )
+            if backbone is not None
+            else None
         )
-        feat_dim = self.backbone.feat_dim
+        if self.backbone is None and not (yolo_roi_dim or yolo_ctx_dim):
+            raise ValueError("backbone=None needs yolo_roi_dim or yolo_ctx_dim")
+        feat_dim = self.backbone.feat_dim if self.backbone is not None else head_dim
+        self.yolo_levels = list(yolo_levels or [])
+
+        def proj(dim: int) -> nn.Module | None:
+            return (
+                nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, feat_dim))
+                if dim
+                else None
+            )
+
+        self.yolo_roi_proj = proj(yolo_roi_dim)
+        self.yolo_ctx_proj = proj(yolo_ctx_dim)
         self.head = TransformerHead(
             feat_dim=feat_dim,
             num_layers=transformer_num_layers,
@@ -189,8 +214,24 @@ class TemporalSmokeClassifier(nn.Module):
             max_frames=max_frames,
         )
 
-    def forward(self, patches: Tensor, mask: Tensor) -> Tensor:
-        b, t, c, h, w = patches.shape
-        flat = patches.reshape(b * t, c, h, w)
-        feats = self.backbone(flat).reshape(b, t, -1)
+    @property
+    def uses_yolo(self) -> bool:
+        return self.yolo_roi_proj is not None or self.yolo_ctx_proj is not None
+
+    def forward(
+        self,
+        patches: Tensor,
+        mask: Tensor,
+        yolo_roi: Tensor | None = None,
+        yolo_ctx: Tensor | None = None,
+    ) -> Tensor:
+        feats: Tensor | int = 0
+        if self.backbone is not None:
+            b, t, c, h, w = patches.shape
+            flat = patches.reshape(b * t, c, h, w)
+            feats = self.backbone(flat).reshape(b, t, -1)
+        if self.yolo_roi_proj is not None:
+            feats = feats + self.yolo_roi_proj(yolo_roi)
+        if self.yolo_ctx_proj is not None:
+            feats = feats + self.yolo_ctx_proj(yolo_ctx)
         return self.head(feats, mask)
