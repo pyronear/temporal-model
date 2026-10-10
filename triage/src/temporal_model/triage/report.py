@@ -38,7 +38,7 @@ def model_version_of(model_config: dict) -> str:
     return f"{variant}@{sha[:8]}" if sha else variant
 
 
-def _result_row(s: ScoredSequence, model_version: str) -> dict:
+def _result_row(s: ScoredSequence, model_version: str, threshold: float) -> dict:
     kept = s.details.get("tubes", {}).get("kept", [])
     decision = "keep" if s.bucket == "review" else "discard"
     return {
@@ -49,6 +49,8 @@ def _result_row(s: ScoredSequence, model_version: str) -> dict:
         "outcome": "n/a",  # no ground truth to score against
         "triage_score": s.score,
         "triage_bucket": s.bucket,
+        "model_scores": s.model_scores,
+        "n_models_review": s.n_models_review(threshold),
         "model_version": model_version,
         "score": max((t["logit"] for t in kept), default=None),
         "probability": s.score,
@@ -85,7 +87,7 @@ def write_triage_report(
     (out / "sequences").mkdir(parents=True, exist_ok=True)
 
     model_version = model_version_of(model_config)
-    rows = [_result_row(s, model_version) for s in scored]
+    rows = [_result_row(s, model_version, threshold) for s in scored]
     (out / "results.json").write_text(json.dumps(rows, indent=2))
     # Columnar twin of results.json for analytical reuse (matches eval's
     # results.parquet). Local import keeps pandas off the lightweight pull path.
@@ -109,10 +111,12 @@ def write_triage_report(
         )
 
     low = sorted((s for s in scored if s.bucket == "unlabeled"), key=lambda s: s.score)
+    # Disagreements first (some models review, some not): the most informative
+    # sequences to annotate. Then unanimous reviews, each by descending score.
+    n_models = max((len(s.model_scores) for s in scored), default=1)
     high = sorted(
         (s for s in scored if s.bucket == "review"),
-        key=lambda s: s.score,
-        reverse=True,
+        key=lambda s: (s.n_models_review(threshold) == n_models, -s.score),
     )
     low_ids = [s.sequence_id for s in low]
     (out / "unlabeled.json").write_text(
@@ -144,7 +148,13 @@ def write_triage_report(
                 "count": len(high),
                 "sequence_ids": [s.sequence_id for s in high],
                 "items": [
-                    {"sequence_id": s.sequence_id, "key": s.key, "score": s.score}
+                    {
+                        "sequence_id": s.sequence_id,
+                        "key": s.key,
+                        "score": s.score,
+                        "model_scores": s.model_scores,
+                        "n_models_review": s.n_models_review(threshold),
+                    }
                     for s in high
                 ],
             },

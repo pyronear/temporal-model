@@ -39,7 +39,7 @@ from .protocol import Frame, TemporalModel, TemporalModelOutput
 from .stabilize import tube_stabilized_window
 from .stage_timer import StageTimer, stage_ctx
 from .tubes import build_tubes, tube_intersects_roi, validate_roi
-from .types import FrameDetections
+from .types import FrameDetections, Tube
 
 __all__ = [
     "TubePipelineModel",
@@ -135,9 +135,20 @@ class TubePipelineModel(TemporalModel):
             "every frame"
         )
 
-    def _score(self, patches: np.ndarray, mask: np.ndarray) -> np.ndarray:
-        """Score tubes: ``patches[N,T,3,H,W] float32, mask[N,T] bool -> logits[N]``."""
+    def _score(
+        self, patches: np.ndarray, mask: np.ndarray, **extras: np.ndarray
+    ) -> np.ndarray:
+        """Score tubes: ``patches[N,T,3,H,W] float32, mask[N,T] bool -> logits[N]``.
+
+        ``extras`` are the per-tube classifier inputs from :meth:`_tube_extras`.
+        """
         raise NotImplementedError
+
+    def _tube_extras(
+        self, tubes: list[Tube], frames: list[Frame]
+    ) -> dict[str, np.ndarray]:
+        """Extra classifier inputs per tube, ``{name: [N, T, ...]}`` (default none)."""
+        return {}
 
     def _resolve_frame_detections(
         self,
@@ -313,8 +324,11 @@ class TubePipelineModel(TemporalModel):
                 masks_per_tube.append(m)
 
         with stage_ctx(timer, "classifier"):
+            extras = self._tube_extras(kept, truncated)
             logits = self._score(
-                np.stack(patches_per_tube, axis=0), np.stack(masks_per_tube, axis=0)
+                np.stack(patches_per_tube, axis=0),
+                np.stack(masks_per_tube, axis=0),
+                **extras,
             )
 
         with stage_ctx(timer, "trigger_search"):
@@ -325,6 +339,10 @@ class TubePipelineModel(TemporalModel):
                         tubes=kept,
                         patches_per_tube=patches_per_tube,
                         masks_per_tube=masks_per_tube,
+                        extras_per_tube=[
+                            {k: v[i] for k, v in extras.items()}
+                            for i in range(len(kept))
+                        ],
                         full_logits=logits,
                         aggregation=aggregation,
                         threshold=float(dec["threshold"]),
