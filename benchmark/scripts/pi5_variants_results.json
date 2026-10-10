@@ -1,0 +1,421 @@
+{
+  "machine": {
+    "host": "pi-test",
+    "machine": "aarch64",
+    "cpus": 4,
+    "onnxruntime": "1.30.0",
+    "threads": 4
+  },
+  "rows": [
+    {
+      "model": "preprocess_20_frames",
+      "median_ms": 359.1
+    },
+    {
+      "model": "yolo11s_1024",
+      "tubes": "-",
+      "median_ms": 1019.2,
+      "min_ms": 1013.5,
+      "peak_rss_mb": 482,
+      "load_s": 0.08,
+      "file_mb": 38.2
+    },
+    {
+      "model": "vit224",
+      "tubes": 1,
+      "median_ms": 3518.5,
+      "min_ms": 3469.1,
+      "peak_rss_mb": 510,
+      "load_s": 0.35,
+      "file_mb": 93.6
+    },
+    {
+      "model": "vit224",
+      "tubes": 3,
+      "median_ms": 10862.8,
+      "min_ms": 10758.3,
+      "peak_rss_mb": 980,
+      "load_s": 0.39,
+      "file_mb": 93.6
+    },
+    {
+      "model": "vit224.int8",
+      "tubes": 1,
+      "median_ms": 2024.9,
+      "min_ms": 2014.1,
+      "peak_rss_mb": 361,
+      "load_s": 0.28,
+      "file_mb": 31.9
+    },
+    {
+      "model": "vit224.int8",
+      "tubes": 3,
+      "median_ms": 6127.6,
+      "min_ms": 6118.0,
+      "peak_rss_mb": 806,
+      "load_s": 0.29,
+      "file_mb": 31.9
+    },
+    {
+      "model": "vit224+yolo_p5",
+      "tubes": 1,
+      "median_ms": 3563.3,
+      "min_ms": 3526.5,
+      "peak_rss_mb": 504,
+      "load_s": 0.36,
+      "file_mb": 94.4
+    },
+    {
+      "model": "vit224+yolo_p5",
+      "tubes": 3,
+      "median_ms": 10758.8,
+      "min_ms": 10673.3,
+      "peak_rss_mb": 954,
+      "load_s": 0.36,
+      "file_mb": 94.4
+    },
+    {
+      "model": "vit224+yolo_p5.int8",
+      "tubes": 1,
+      "median_ms": 2087.7,
+      "min_ms": 2024.9,
+      "peak_rss_mb": 363,
+      "load_s": 0.29,
+      "file_mb": 32.1
+    },
+    {
+      "model": "vit224+yolo_p5.int8",
+      "tubes": 3,
+      "median_ms": 6173.0,
+      "min_ms": 6127.1,
+      "peak_rss_mb": 807,
+      "load_s": 0.29,
+      "file_mb": 32.1
+    },
+    {
+      "model": "vit224+yolo_p345",
+      "tubes": 1,
+      "median_ms": 3615.8,
+      "min_ms": 3571.7,
+      "peak_rss_mb": 504,
+      "load_s": 0.37,
+      "file_mb": 95.0
+    },
+    {
+      "model": "vit224+yolo_p345",
+      "tubes": 3,
+      "median_ms": 10903.8,
+      "min_ms": 10815.6,
+      "peak_rss_mb": 955,
+      "load_s": 0.36,
+      "file_mb": 95.0
+    },
+    {
+      "model": "vit224+yolo_p345.int8",
+      "tubes": 1,
+      "median_ms": 2060.0,
+      "min_ms": 2025.6,
+      "peak_rss_mb": 362,
+      "load_s": 0.29,
+      "file_mb": 32.2
+    },
+    {
+      "model": "vit224+yolo_p345.int8",
+      "tubes": 3,
+      "median_ms": 6188.9,
+      "min_ms": 6096.6,
+      "peak_rss_mb": 807,
+      "load_s": 0.29,
+      "file_mb": 32.2
+    },
+    {
+      "model": "vit224+ctx_vit",
+      "tubes": 1,
+      "median_ms": 7057.9,
+      "min_ms": 7000.2,
+      "peak_rss_mb": 797,
+      "load_s": 0.55,
+      "file_mb": 94.3
+    },
+    {
+      "model": "vit224+ctx_vit",
+      "tubes": 3,
+      "median_ms": 14246.5,
+      "min_ms": 14097.6,
+      "peak_rss_mb": 1141,
+      "load_s": 0.57,
+      "file_mb": 94.3
+    },
+    {
+      "model": "vit224+ctx_vit.int8",
+      "tubes": 1,
+      "median_ms": 5544.4,
+      "min_ms": 5501.5,
+      "peak_rss_mb": 725,
+      "load_s": 0.87,
+      "file_mb": 117.1
+    },
+    {
+      "model": "vit224+ctx_vit.int8",
+      "tubes": 3,
+      "median_ms": 9673.5,
+      "min_ms": 9631.6,
+      "peak_rss_mb": 938,
+      "load_s": 0.57,
+      "file_mb": 117.1
+    },
+    {
+      "model": "vit224+ctx_yolo",
+      "tubes": 1,
+      "median_ms": 3581.3,
+      "min_ms": 3545.3,
+      "peak_rss_mb": 509,
+      "load_s": 0.37,
+      "file_mb": 95.2
+    },
+    {
+      "model": "vit224+ctx_yolo",
+      "tubes": 3,
+      "median_ms": 10800.4,
+      "min_ms": 10706.9,
+      "peak_rss_mb": 960,
+      "load_s": 0.36,
+      "file_mb": 95.2
+    },
+    {
+      "model": "vit224+ctx_yolo.int8",
+      "tubes": 1,
+      "median_ms": 2076.6,
+      "min_ms": 2055.4,
+      "peak_rss_mb": 364,
+      "load_s": 0.3,
+      "file_mb": 32.3
+    },
+    {
+      "model": "vit224+ctx_yolo.int8",
+      "tubes": 3,
+      "median_ms": 6152.1,
+      "min_ms": 6085.8,
+      "peak_rss_mb": 807,
+      "load_s": 0.3,
+      "file_mb": 32.3
+    },
+    {
+      "model": "yolo_p345_only",
+      "tubes": 1,
+      "median_ms": 3.4,
+      "min_ms": 3.3,
+      "peak_rss_mb": 148,
+      "load_s": 0.05,
+      "file_mb": 8.6
+    },
+    {
+      "model": "yolo_p345_only",
+      "tubes": 3,
+      "median_ms": 7.0,
+      "min_ms": 6.9,
+      "peak_rss_mb": 148,
+      "load_s": 0.05,
+      "file_mb": 8.6
+    },
+    {
+      "model": "yolo_p345_only.int8",
+      "tubes": 1,
+      "median_ms": 2.5,
+      "min_ms": 2.5,
+      "peak_rss_mb": 150,
+      "load_s": 0.06,
+      "file_mb": 9.4
+    },
+    {
+      "model": "yolo_p345_only.int8",
+      "tubes": 3,
+      "median_ms": 5.0,
+      "min_ms": 4.9,
+      "peak_rss_mb": 150,
+      "load_s": 0.06,
+      "file_mb": 9.4
+    },
+    {
+      "model": "vit112",
+      "tubes": 1,
+      "median_ms": 754.2,
+      "min_ms": 753.3,
+      "peak_rss_mb": 282,
+      "load_s": 1.11,
+      "file_mb": 93.3
+    },
+    {
+      "model": "vit112",
+      "tubes": 3,
+      "median_ms": 2410.3,
+      "min_ms": 2366.6,
+      "peak_rss_mb": 379,
+      "load_s": 0.36,
+      "file_mb": 93.3
+    },
+    {
+      "model": "vit112.int8",
+      "tubes": 1,
+      "median_ms": 397.3,
+      "min_ms": 396.0,
+      "peak_rss_mb": 191,
+      "load_s": 0.62,
+      "file_mb": 31.6
+    },
+    {
+      "model": "vit112.int8",
+      "tubes": 3,
+      "median_ms": 1302.6,
+      "min_ms": 1292.7,
+      "peak_rss_mb": 296,
+      "load_s": 0.29,
+      "file_mb": 31.6
+    },
+    {
+      "model": "dinov3_s16_224",
+      "tubes": 1,
+      "median_ms": 2963.2,
+      "min_ms": 2940.5,
+      "peak_rss_mb": 445,
+      "load_s": 0.56,
+      "file_mb": 93.7
+    },
+    {
+      "model": "dinov3_s16_224",
+      "tubes": 3,
+      "median_ms": 9149.6,
+      "min_ms": 9116.7,
+      "peak_rss_mb": 735,
+      "load_s": 0.55,
+      "file_mb": 93.7
+    },
+    {
+      "model": "dinov3_s16_224.int8",
+      "tubes": 1,
+      "median_ms": 1932.7,
+      "min_ms": 1924.7,
+      "peak_rss_mb": 355,
+      "load_s": 0.49,
+      "file_mb": 32.0
+    },
+    {
+      "model": "dinov3_s16_224.int8",
+      "tubes": 3,
+      "median_ms": 5971.3,
+      "min_ms": 5909.2,
+      "peak_rss_mb": 793,
+      "load_s": 0.5,
+      "file_mb": 32.0
+    },
+    {
+      "model": "dinov3_s16_112",
+      "tubes": 1,
+      "median_ms": 685.3,
+      "min_ms": 681.8,
+      "peak_rss_mb": 289,
+      "load_s": 0.55,
+      "file_mb": 93.7
+    },
+    {
+      "model": "dinov3_s16_112",
+      "tubes": 3,
+      "median_ms": 2250.2,
+      "min_ms": 2218.8,
+      "peak_rss_mb": 359,
+      "load_s": 0.54,
+      "file_mb": 93.7
+    },
+    {
+      "model": "dinov3_s16_112.int8",
+      "tubes": 1,
+      "median_ms": 414.8,
+      "min_ms": 413.0,
+      "peak_rss_mb": 186,
+      "load_s": 0.49,
+      "file_mb": 32.0
+    },
+    {
+      "model": "dinov3_s16_112.int8",
+      "tubes": 3,
+      "median_ms": 1428.3,
+      "min_ms": 1402.6,
+      "peak_rss_mb": 258,
+      "load_s": 0.51,
+      "file_mb": 32.0
+    },
+    {
+      "model": "dinov3_splus16_224",
+      "tubes": 1,
+      "median_ms": 3723.9,
+      "min_ms": 3680.4,
+      "peak_rss_mb": 523,
+      "load_s": 0.66,
+      "file_mb": 122.0
+    },
+    {
+      "model": "dinov3_splus16_224",
+      "tubes": 3,
+      "median_ms": 11382.7,
+      "min_ms": 11294.4,
+      "peak_rss_mb": 1016,
+      "load_s": 0.63,
+      "file_mb": 122.0
+    },
+    {
+      "model": "dinov3_splus16_224.int8",
+      "tubes": 1,
+      "median_ms": 2211.1,
+      "min_ms": 2198.0,
+      "peak_rss_mb": 403,
+      "load_s": 0.56,
+      "file_mb": 39.0
+    },
+    {
+      "model": "dinov3_splus16_224.int8",
+      "tubes": 3,
+      "median_ms": 6770.0,
+      "min_ms": 6701.2,
+      "peak_rss_mb": 911,
+      "load_s": 0.56,
+      "file_mb": 39.0
+    },
+    {
+      "model": "dinov3_convnext_t_224",
+      "tubes": 1,
+      "median_ms": 2995.1,
+      "min_ms": 2945.2,
+      "peak_rss_mb": 741,
+      "load_s": 0.35,
+      "file_mb": 130.2
+    },
+    {
+      "model": "dinov3_convnext_t_224",
+      "tubes": 3,
+      "median_ms": 9092.7,
+      "min_ms": 8988.0,
+      "peak_rss_mb": 1730,
+      "load_s": 0.34,
+      "file_mb": 130.2
+    },
+    {
+      "model": "dinov3_convnext_t_224.int8",
+      "tubes": 1,
+      "median_ms": 2086.9,
+      "min_ms": 2066.3,
+      "peak_rss_mb": 660,
+      "load_s": 0.8,
+      "file_mb": 57.4
+    },
+    {
+      "model": "dinov3_convnext_t_224.int8",
+      "tubes": 3,
+      "median_ms": 6297.8,
+      "min_ms": 6240.7,
+      "peak_rss_mb": 1640,
+      "load_s": 0.24,
+      "file_mb": 57.4
+    }
+  ],
+  "note": "Pi 5 4GB, pyro-engine + temporal API running concurrently; real frames from adf_avinyonet_999_2023-05-23T17-18-31"
+}

@@ -15,7 +15,8 @@ from .logistic_calibrator import LogisticCalibrator
 from .package import DEFAULT_AGGREGATION, ModelPackage, load_model_package
 from .pipeline import DEFAULT_LOGISTIC_THRESHOLD, TubePipelineModel
 from .protocol import Frame
-from .types import FrameDetections
+from .types import FrameDetections, Tube
+from .yolo_features import YoloFeatureExtractor, model_inputs
 
 __all__ = [
     "BboxTubeTemporalModel",
@@ -59,6 +60,7 @@ class BboxTubeTemporalModel(TubePipelineModel):
         self._yolo = yolo_model
         self._device = select_device(device)
         self._classifier = classifier.to(self._device).eval()
+        self._yolo_features: YoloFeatureExtractor | None = None
 
     @property
     def device(self) -> torch.device:
@@ -117,9 +119,47 @@ class BboxTubeTemporalModel(TubePipelineModel):
             device=self._device,
         )
 
-    def _score(self, patches: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    def _tube_extras(
+        self, tubes: list[Tube], frames: list[Frame]
+    ) -> dict[str, np.ndarray]:
+        """YOLO neck embeddings per tube entry, when the classifier uses them."""
+        if not getattr(self._classifier, "uses_yolo", False):
+            return {}
+        if self._yolo_features is None:
+            self._yolo_features = YoloFeatureExtractor(
+                self._yolo,
+                image_size=self._cfg["infer"]["image_size"],
+                device=self._device,
+            )
+        max_frames = self._cfg["classifier"]["max_frames"]
+        cache: dict = {}
+        rois, ctxs = [], []
+        for tube in tubes:
+            entries = [
+                (
+                    frames[e.frame_idx].image_path,
+                    # Detection-less slots are masked out; any box will do.
+                    (e.detection.cx, e.detection.cy, e.detection.w, e.detection.h)
+                    if e.detection is not None
+                    else (0.5, 0.5, 1.0, 1.0),
+                )
+                for e in tube.entries[:max_frames]
+            ]
+            roi, ctx = model_inputs(
+                self._yolo_features.tube_features(entries, cache),
+                levels=self._classifier.yolo_levels,
+                max_frames=max_frames,
+            )
+            rois.append(roi)
+            ctxs.append(ctx)
+        return {"yolo_roi": np.stack(rois), "yolo_ctx": np.stack(ctxs)}
+
+    def _score(
+        self, patches: np.ndarray, mask: np.ndarray, **extras: np.ndarray
+    ) -> np.ndarray:
         """One batched classifier forward over all tubes."""
         p = torch.from_numpy(patches).to(self._device)
         m = torch.from_numpy(mask).to(self._device)
+        kw = {k: torch.from_numpy(v).to(self._device) for k, v in extras.items()}
         with torch.no_grad():
-            return self._classifier(p, m).cpu().numpy()
+            return self._classifier(p, m, **kw).cpu().numpy()
