@@ -14,28 +14,17 @@ A release can move the code version while leaving the model version untouched.
 
 ## Cutting a release
 
-### 1. (Only if the model changed) publish the new model
+### 1. (Only if the model changed) bump the model version
 
-Bump the pin, export the torch-free runtime artifact from the same `model.zip`
-(the export checks torch/ONNX parity and records the source SHA-256 in its
-manifest), then publish **both in one `publish` call** — the `vX.Y.Z` tag is
-immutable, so a second `publish` for the same version fails and cannot add the
-ONNX archive after the fact (needs a **write** HF token):
+Merge a PR that sets the new version in `api/MODEL_VERSION`:
 
 ```bash
-# from the repo root; MODEL=/abs/path/to/model.zip, ONNX=/abs/path/to/model_onnx.zip
 echo "X.Y.Z" > api/MODEL_VERSION   # the new model version
-uv run --project core temporal-export-onnx --model "$MODEL" --output "$ONNX"
-uv run --project api python -m temporal_model.api.release \
-    publish --version X.Y.Z --file "$MODEL" --onnx-file "$ONNX"
 ```
 
-`publish` stamps the version into both manifests, uploads the zips + model
-card, and tags `vX.Y.Z` on the HF repo (immutable — re-publishing an existing
-version fails). It refuses an `--onnx-file` whose manifest was not exported
-from that exact `model.zip`, then re-stamps its source hash from the uploaded
-(version-stamped) copy. Commit the `api/MODEL_VERSION` change. Consumers fetch
-the ONNX artifact with `release fetch --onnx` (or `make fetch-model-onnx`).
+The model that gets published is the `model.zip` that `train`'s `package`
+stage produced at the tagged commit (its `dvc.lock` entry), so merge the
+`result_*` PR first. Publishing happens in CI at step 2.
 
 ### 2. Push the git tag
 
@@ -46,8 +35,14 @@ git push origin vX.Y.Z
 
 That triggers `.github/workflows/push.yml`, which:
 
-1. fetches the `model.zip` pinned by `api/MODEL_VERSION` from HuggingFace,
-2. builds and pushes `pyronear/temporal-model-api:X.Y.Z` and `:latest`,
+1. publishes the model if `v<MODEL_VERSION>` is not yet on HuggingFace: pulls
+   `train`'s `model.zip` from DVC, exports the torch-free `model_onnx.zip` (the
+   export checks torch/ONNX parity and records the source SHA-256), then runs
+   `release publish`, which stamps the version into both manifests, uploads the
+   zips + model card, and tags `v<MODEL_VERSION>` on the HF repo last. A code-only release
+   skips this step,
+2. fetches the `model.zip` pinned by `api/MODEL_VERSION` from HuggingFace and
+   builds and pushes `pyronear/temporal-model-api:X.Y.Z` and `:latest`,
 3. **auto-creates the GitHub Release** for `vX.Y.Z` — a header naming the image
    and bundled model, followed by GitHub's auto-generated "What's Changed".
 
@@ -56,6 +51,9 @@ if a Release for the tag already exists, so tags are effectively immutable.
 
 ## Notes
 
+- The CI publish needs the `HF_TOKEN` secret to have **write** access to
+  `pyronear/temporal-model`. Consumers fetch the ONNX artifact with
+  `release fetch --onnx` (or `make fetch-model-onnx`).
 - The GitHub Release logic lives in `scripts/create-github-release.sh`; its
   behavior is covered by `scripts/test-create-github-release.sh`.
 - `pyproject.toml` versions are not the source of truth for the released version
