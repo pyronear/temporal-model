@@ -58,6 +58,36 @@ jobs:
       - name: Format check (ruff format --check)
         run: uv run --project core --no-sync ruff format --check docs/assets/scripts
 
+  demo:
+    name: demo
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: demo
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: "3.11"
+          enable-cache: true
+
+      - name: Sync dev dependencies (core)
+        run: uv sync --only-group dev
+        working-directory: core
+
+      - name: Lint (ruff check)
+        run: uv run --project ../core --no-sync ruff check .
+
+      - name: Format check (ruff format --check)
+        run: uv run --project ../core --no-sync ruff format --check .
+
+      # The tests cover the app's pure helpers; the models are imported lazily,
+      # so gradio is enough (no torch).
+      - name: Test
+        run: uv run --no-project --with gradio --with pytest python -m pytest test_app.py -v
+
   viewer:
     name: viewer
     runs-on: ubuntu-latest
