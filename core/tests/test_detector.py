@@ -9,11 +9,11 @@ from temporal_model.core.detector import Detector, load_detector
 def test_load_detector_returns_expected_identity() -> None:
     det = load_detector()
     assert det.type == "yolo"
-    assert det.name == "yolo11s_swift-swallow_v8.2.0"
+    assert det.name == "yolo11s_tenacious-tiger_v8.3.0"
     assert det.source == "hf:pyronear/yolov11s"
-    assert det.revision == "v8.2.0"
+    assert det.revision == "v8.3.0"
     assert det.sha256 == (
-        "20cbcae36898dc5a5f2700ad603bde4d3b3b67ed62e64239b7b0e3fe6869827d"
+        "c4b5b846b957cef2465c4f02f657442ec05151b1c3f95cb2e5702c2aa25bc848"
     )
 
 
