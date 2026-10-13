@@ -19,5 +19,6 @@ format: ## ruff format
 
 push: ## mirror this folder to the Space (needs `hf auth login` or HF_TOKEN)
 	uvx --from huggingface_hub hf upload $(SPACE) . . \
-	    --repo-type space --exclude ".venv/*" --delete "*" \
+	    --repo-type space --exclude ".venv/*" --exclude ".cache/*" --exclude "*__pycache__/*" \
+	    --delete "*" \
 	    --commit-message "Sync from temporal-model/demo"
