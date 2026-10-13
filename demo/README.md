@@ -21,8 +21,8 @@ under `demo/`; the Space is a mirror of that folder.
 
 | Tab | Model | Input | Output |
 |---|---|---|---|
-| Single frame — detection | [`pyronear/yolov11s`](https://huggingface.co/pyronear/yolov11s) `v8.3.0` | one image | boxes + confidences |
-| Sequence — temporal model | [`pyronear/temporal-model`](https://huggingface.co/pyronear/temporal-model) `v0.5.0` | ordered frames, or a video | smoke / no-smoke, per-tube probabilities, trigger frame |
+| Single frame — detection | [`pyronear/yolov11s`](https://huggingface.co/pyronear/yolov11s) latest | one image | boxes + confidences |
+| Sequence — temporal model | [`pyronear/temporal-model`](https://huggingface.co/pyronear/temporal-model) latest | ordered frames, or a video | smoke / no-smoke, per-tube probabilities, trigger frame |
 
 Both tabs run the detector at the pipeline's production settings
 (`conf=0.1`, `iou=0.2`, `imgsz=1024`). The temporal `model.zip` bundles its own
@@ -53,7 +53,8 @@ make run          # http://localhost:7860
 `temporal-model-core[torch]` (torch, timm, ultralytics) — the first run is a
 large download. Model weights are fetched from the Hub on first use and cached.
 
-Override the pinned models with `DETECTOR_REPO` / `DETECTOR_REVISION` /
+Both tabs follow the latest release of each repo (its `main` branch). Pin a
+version or switch repo with `DETECTOR_REPO` / `DETECTOR_REVISION` /
 `TEMPORAL_REPO` / `TEMPORAL_REVISION`.
 
 ## Examples

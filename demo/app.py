@@ -20,9 +20,10 @@ from huggingface_hub import hf_hub_download
 from PIL import Image, ImageDraw, ImageFont
 
 DETECTOR_REPO = os.getenv("DETECTOR_REPO", "pyronear/yolov11s")
-DETECTOR_REVISION = os.getenv("DETECTOR_REVISION", "v8.3.0")
+# Unset = the repo's main branch, which always holds the latest release.
+DETECTOR_REVISION = os.getenv("DETECTOR_REVISION") or None
 TEMPORAL_REPO = os.getenv("TEMPORAL_REPO", "pyronear/temporal-model")
-TEMPORAL_REVISION = os.getenv("TEMPORAL_REVISION", "v0.5.0")
+TEMPORAL_REVISION = os.getenv("TEMPORAL_REVISION") or None
 
 # The detector settings the temporal pipeline runs with (train/params.yaml).
 CONF_THRESHOLD = 0.1
@@ -292,9 +293,10 @@ def build_demo() -> gr.Blocks:
             "# 🔥 Pyronear — smoke detection\n"
             "Two models, two tabs: the **single-frame detector** "
             f"([{DETECTOR_REPO}](https://huggingface.co/{DETECTOR_REPO}) "
-            f"`{DETECTOR_REVISION}`) and the **temporal classifier** "
+            f"`{DETECTOR_REVISION or 'latest'}`) and the **temporal classifier** "
             f"([{TEMPORAL_REPO}](https://huggingface.co/{TEMPORAL_REPO}) "
-            f"`{TEMPORAL_REVISION}`), which decides on a whole sequence.\n\n"
+            f"`{TEMPORAL_REVISION or 'latest'}`), which decides on a whole "
+            "sequence.\n\n"
             "Running on free CPU: a few seconds for a short sequence, up to a "
             "minute for a long one with the trigger search on."
         )
