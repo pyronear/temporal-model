@@ -79,6 +79,8 @@ def test_render_model_card_substitutes_version() -> None:
     assert release.VERSION_PLACEHOLDER not in card
     assert "v1.4.2" in card  # revision pin in the usage snippet
     assert card.startswith("---")  # HF frontmatter preserved
+    # the Docker image is tagged by code version, never by model version
+    assert "temporal-model-api:1.4.2" not in card
 
 
 def test_publish_stamps_uploads_zip_and_card_and_tags(tmp_path: Path) -> None:
