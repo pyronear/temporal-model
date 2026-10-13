@@ -1,0 +1,2 @@
+gradio>=5.0
+temporal-model-core[torch] @ git+https://github.com/pyronear/temporal-model.git@main#subdirectory=core

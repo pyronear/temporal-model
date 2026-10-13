@@ -116,6 +116,45 @@ jobs:
             ${{ env.BACKEND_IMAGE_NAME }}:${{ env.VERSION }}
             ${{ env.BACKEND_IMAGE_NAME }}:latest
 
+  sync-space:
+    # The demo follows each repo's latest release and caches the models it
+    # loaded, so restart it even when demo/ is unchanged (no upload commit).
+    needs: publish-model
+    runs-on: ubuntu-latest
+    env:
+      SPACE: pyronear/Pyronear-Wildfire-Detection
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}  # needs write access to the Space
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+      - name: Sync demo/ to the Space
+        working-directory: demo
+        run: make push SPACE="$SPACE"
+      - name: Restart the Space and wait until it runs
+        run: |
+          uv run --no-project --with huggingface_hub python - <<'EOF'
+          import os
+          import time
+
+          from huggingface_hub import HfApi
+
+          api, space = HfApi(), os.environ["SPACE"]
+          api.restart_space(space)
+          time.sleep(30)  # let the stage leave RUNNING before polling
+          deadline = time.time() + 20 * 60
+          while time.time() < deadline:
+              stage = api.get_space_runtime(space).stage
+              print(stage, flush=True)
+              if stage == "RUNNING":
+                  break
+              if stage.endswith("ERROR") or stage == "NO_APP_FILE":
+                  raise SystemExit(f"{space} failed to start: {stage}")
+              time.sleep(20)
+          else:
+              raise SystemExit(f"{space} not RUNNING after 20 min")
+          EOF
+
   release:
     needs: docker
     runs-on: ubuntu-latest

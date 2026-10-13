@@ -88,6 +88,18 @@ with the model, and splits it into **To Review** (worth a human's eyes) and
 above are the *consumer* flow (no annotator credentials, no model, no Docker);
 producing new data needs credentials — see `triage/README.md`.
 
+### Try the models in a browser
+
+```bash
+cd demo && make install && make run     # http://localhost:7860
+```
+
+`demo/` is a Gradio app mirrored to the HuggingFace Space
+[`pyronear/Pyronear-Wildfire-Detection`](https://huggingface.co/spaces/pyronear/Pyronear-Wildfire-Detection):
+one tab for the single-frame detector (`pyronear/yolov11s`), one for this
+repo's temporal model on a whole sequence. Each release tag syncs the folder to
+the Space (`HF_TOKEN=... make push` does it by hand). See `demo/README.md`.
+
 ## Origin
 
 Ported from the Pyronear [`vision-rd`](https://github.com/pyronear/vision-rd)
