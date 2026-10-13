@@ -43,7 +43,10 @@ That triggers `.github/workflows/push.yml`, which:
    skips this step,
 2. fetches the `model.zip` pinned by `api/MODEL_VERSION` from HuggingFace and
    builds and pushes `pyronear/temporal-model-api:X.Y.Z` and `:latest`,
-3. **auto-creates the GitHub Release** for `vX.Y.Z` — a header naming the image
+3. syncs `demo/` to the HuggingFace Space
+   [`pyronear/Pyronear-Wildfire-Detection`](https://huggingface.co/spaces/pyronear/Pyronear-Wildfire-Detection)
+   and restarts it, so it serves the latest model releases,
+4. **auto-creates the GitHub Release** for `vX.Y.Z` — a header naming the image
    and bundled model, followed by GitHub's auto-generated "What's Changed".
 
 The maintainer no longer writes release notes by hand. `gh release create` fails
@@ -51,8 +54,8 @@ if a Release for the tag already exists, so tags are effectively immutable.
 
 ## Notes
 
-- The CI publish needs the `HF_TOKEN` secret to have **write** access to
-  `pyronear/temporal-model`. Consumers fetch the ONNX artifact with
+- The CI publish and Space sync need the `HF_TOKEN` secret to have **write**
+  access to `pyronear/temporal-model` and the Space. Consumers fetch the ONNX artifact with
   `release fetch --onnx` (or `make fetch-model-onnx`).
 - The GitHub Release logic lives in `scripts/create-github-release.sh`; its
   behavior is covered by `scripts/test-create-github-release.sh`.

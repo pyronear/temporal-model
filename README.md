@@ -97,8 +97,8 @@ cd demo && make install && make run     # http://localhost:7860
 `demo/` is a Gradio app mirrored to the HuggingFace Space
 [`pyronear/Pyronear-Wildfire-Detection`](https://huggingface.co/spaces/pyronear/Pyronear-Wildfire-Detection):
 one tab for the single-frame detector (`pyronear/yolov11s`), one for this
-repo's temporal model on a whole sequence. `HF_TOKEN=... make push` syncs the
-folder to the Space. See `demo/README.md`.
+repo's temporal model on a whole sequence. Each release tag syncs the folder to
+the Space (`HF_TOKEN=... make push` does it by hand). See `demo/README.md`.
 
 ## Origin
 
