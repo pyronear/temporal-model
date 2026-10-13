@@ -127,13 +127,15 @@ threshold whenever `is_smoke` is `True`.
 ## Served API (Docker)
 
 The same model is also served as a FastAPI image with the `model.zip` baked in
-(auto-uses the GPU with `--gpus all`):
+(auto-uses the GPU with `--gpus all`). Image tags follow the code version, not
+this model version: each [GitHub Release](https://github.com/pyronear/temporal-model/releases)
+names the model it bundles.
 
 ```bash
 docker run --gpus all -p 8000:8000 \
   -e TEMPORAL_API_S3_BUCKET=<frames-bucket> \
   -e TEMPORAL_API_S3_ENDPOINT_URL=<s3-endpoint> \
-  pyronear/temporal-model-api:{{VERSION}}
+  pyronear/temporal-model-api:latest
 # POST /predict  {"frames": ["<s3-key>", ...]}      GET /health
 ```
 
@@ -146,7 +148,7 @@ per-tube breakdown and decision config.
 
 Every `model.zip` manifest records how it was built — the training git SHA, the
 classifier backbone (`vit_small_patch14_dinov2.lvd142m`), and the exact companion
-detector (e.g. `pyronear/yolov11s` @ `v8.3.0`, verified by SHA-256). So
+detector (`pyronear/yolov11s` at a pinned tag, verified by SHA-256). So
 a served model always traces back to its detector + training code.
 
 Source & pipeline: <https://github.com/pyronear/temporal-model>
