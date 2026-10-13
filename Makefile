@@ -21,13 +21,13 @@ install: ## uv sync every package
 
 lint: ## ruff check every package + docs scripts
 	@fail=0; for pkg in $(PACKAGES); do echo "==> $$pkg"; $(MAKE) -C $$pkg lint || fail=1; done; exit $$fail
-	@echo "==> docs/assets/scripts"
-	uv run --project core ruff check docs/assets/scripts
+	@echo "==> docs/assets/scripts + demo"
+	uv run --project core ruff check docs/assets/scripts demo
 
 format: ## ruff format every package + docs scripts
 	@fail=0; for pkg in $(PACKAGES); do echo "==> $$pkg"; $(MAKE) -C $$pkg format || fail=1; done; exit $$fail
-	@echo "==> docs/assets/scripts"
-	uv run --project core ruff format docs/assets/scripts
+	@echo "==> docs/assets/scripts + demo"
+	uv run --project core ruff format docs/assets/scripts demo
 
 test: ## pytest every package
 	@fail=0; for pkg in $(PACKAGES); do echo "==> $$pkg"; $(MAKE) -C $$pkg test || fail=1; done; exit $$fail
