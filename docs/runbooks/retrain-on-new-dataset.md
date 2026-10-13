@@ -33,7 +33,7 @@ train/  dvc update  → dvc repro (truncate → tubes → patches → train → 
 eval/   bump sequential_test + refresh model.zip → dvc repro (test)
         new-vs-old metrics on the same test set
 push    dvc push (train + eval) → commit pointers + dvc.lock → PR
-release bump api/MODEL_VERSION → publish model.zip to HF → git tag
+release bump api/MODEL_VERSION → git tag (CI publishes model.zip to HF)
 ```
 
 ## 0. Snapshot the current model's metrics (before touching anything)
@@ -227,10 +227,8 @@ Follow **"Cutting a release" in [`docs/releasing.md`](../releasing.md)** — tha
 is the canonical procedure; don't work from a copy of it here. The
 retrain-specific parts:
 
-- the `model.zip` to publish is
-  `train/data/06_models/vit_dinov2_finetune/model.zip` — the artifact this
-  loop just built, packaged, and evaluated;
-- `publish` needs a **write** HF token (the read token in `api/.envrc` 403s at
-  upload);
-- `publish` is immutable per version — a re-publish of an existing version
-  fails by design, so double-check the new version number before running it.
+- CI publishes `train/data/06_models/vit_dinov2_finetune/model.zip` from the
+  tagged commit, the artifact this loop just built, packaged, and evaluated, so
+  tag a commit that includes the merged `result_*` PR;
+- a version already on HuggingFace is never re-published, so double-check the
+  new version number in `api/MODEL_VERSION` before tagging.
