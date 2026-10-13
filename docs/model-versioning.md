@@ -57,10 +57,10 @@ provenance:
   backbone: vit_small_patch14_dinov2.lvd142m
   detector:                     # copied verbatim from core/detector.yaml (§3)
     type: yolo
-    name: yolo11s_swift-swallow_v8.2.0
+    name: yolo11s_tenacious-tiger_v8.3.0
     source: hf:pyronear/yolov11s
-    revision: v8.2.0
-    sha256: 20cbcae36898dc5a5f2700ad603bde4d3b3b67ed62e64239b7b0e3fe6869827d
+    revision: v8.3.0
+    sha256: c4b5b846b957cef2465c4f02f657442ec05151b1c3f95cb2e5702c2aa25bc848
 ```
 
 All fields are **additive** — packages built before they existed still load, and
@@ -89,10 +89,10 @@ by hash.
 ```yaml
 detector:
   type: yolo
-  name: yolo11s_swift-swallow_v8.2.0
+  name: yolo11s_tenacious-tiger_v8.3.0
   source: hf:pyronear/yolov11s   # downloads best.pt
-  revision: v8.2.0               # HF tag; the repo's main branch moves
-  sha256: 20cbcae36898dc5a5f2700ad603bde4d3b3b67ed62e64239b7b0e3fe6869827d
+  revision: v8.3.0               # HF tag; the repo's main branch moves
+  sha256: c4b5b846b957cef2465c4f02f657442ec05151b1c3f95cb2e5702c2aa25bc848
 ```
 
 This is the **only** place the detector is named. `core.detector.load_detector()`
@@ -113,13 +113,13 @@ you choose. It fails loudly on any mismatch.
 ```bash
 cd core
 uv run python -m temporal_model.core.fetch_detector \
-  --output ../train/data/06_models/detectors/yolo11s_swift-swallow_v8.2.0/yolo_weights.pt
+  --output ../train/data/06_models/detectors/yolo11s_tenacious-tiger_v8.3.0/yolo_weights.pt
 ```
 
 Output:
 
 ```
-Fetched yolo11s_swift-swallow_v8.2.0 -> .../yolo_weights.pt (sha256 20cbcae3… verified)
+Fetched yolo11s_tenacious-tiger_v8.3.0 -> .../yolo_weights.pt (sha256 c4b5b846… verified)
 ```
 
 **To switch to a new detector:**
@@ -201,7 +201,7 @@ sha256sum train/data/06_models/detectors/<name>/yolo_weights.pt
 ```
 
 This is how the configured detector was confirmed to be
-`yolo11s_swift-swallow_v8.2.0` (byte-identical to the HF release).
+`yolo11s_tenacious-tiger_v8.3.0` (byte-identical to the HF release).
 
 ## 7. What's deferred
 
