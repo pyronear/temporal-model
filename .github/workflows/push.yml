@@ -11,7 +11,61 @@ permissions:
   contents: read
 
 jobs:
+  publish-model:
+    # Publishes the model.zip packaged by train's pipeline at this commit as
+    # api/MODEL_VERSION, unless that version is already on HuggingFace.
+    # `release publish` creates the HF tag last, so the tag is the "done"
+    # marker: a code-only release skips, a failed publish retries cleanly.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check whether the model version is already published
+        id: check
+        run: |
+          MODEL_VERSION=$(cat api/MODEL_VERSION)
+          if [ -z "$MODEL_VERSION" ]; then
+            echo "api/MODEL_VERSION is missing or empty" >&2
+            exit 1
+          fi
+          echo "MODEL_VERSION=$MODEL_VERSION" >> "$GITHUB_ENV"
+          status=$(curl -s -o /dev/null -w '%{http_code}' \
+            "https://huggingface.co/api/models/pyronear/temporal-model/revision/v$MODEL_VERSION")
+          case "$status" in
+            200) echo "v$MODEL_VERSION is already on HuggingFace, nothing to publish"
+                 echo "publish=false" >> "$GITHUB_OUTPUT" ;;
+            404) echo "publish=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "Unexpected HTTP $status from HuggingFace" >&2; exit 1 ;;
+          esac
+      - name: Configure AWS credentials
+        if: steps.check.outputs.publish == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-3
+      - name: Install uv
+        if: steps.check.outputs.publish == 'true'
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: "3.11"
+      - name: Pull the packaged model.zip from DVC
+        if: steps.check.outputs.publish == 'true'
+        working-directory: train
+        run: uvx --from 'dvc[s3]' dvc pull data/06_models/vit_dinov2_finetune/model.zip
+      - name: Export ONNX and publish to HuggingFace
+        if: steps.check.outputs.publish == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}  # needs write access to the model repo
+        run: |
+          MODEL=$PWD/train/data/06_models/vit_dinov2_finetune/model.zip
+          ONNX=$RUNNER_TEMP/model_onnx.zip
+          # core's dev env has the torch + onnx extras the export needs; api's does not.
+          uv run --project core temporal-export-onnx --model "$MODEL" --output "$ONNX"
+          uv run --project api --no-dev python -m temporal_model.api.release \
+            publish --version "$MODEL_VERSION" --file "$MODEL" --onnx-file "$ONNX"
+
   docker:
+    needs: publish-model
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
