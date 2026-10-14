@@ -19,7 +19,11 @@ from temporal_model.core.export_onnx import (
 from temporal_model.core.labels import load_frame_detections
 from temporal_model.core.model import BboxTubeTemporalModel
 from temporal_model.core.onnx_model import (
-    CLASSIFIER_ONNX_FILENAME,
+    BACKBONE_ONNX_FILENAME,
+    HEAD_ONNX_FILENAME,
+    INPUT_MASK,
+    INPUT_PATCHES,
+    OUTPUT_LOGIT,
     OnnxTemporalModel,
     UncalibratedModelError,  # via onnx_model: the torch-free import path
     load_onnx_package,
@@ -31,6 +35,7 @@ from temporal_model.core.package import (
 )
 from temporal_model.core.protocol import Frame
 from temporal_model.core.temporal_classifier import TemporalSmokeClassifier
+from temporal_model.core.types import Detection, FrameDetections
 
 FIXTURE = Path(__file__).parent / "fixtures" / "parity" / "wildfire" / "seq_synth01"
 
@@ -120,11 +125,15 @@ def _gt_detections() -> dict:
 
 
 def test_export_matches_torch_on_every_mask_pattern(classifier, tmp_path: Path):
-    out = tmp_path / "clf.onnx"
-    spec = export_classifier(classifier, out, max_frames=5, patch_size=224)
-    assert spec["inputs"]["patches"]["shape"] == ["batch", 5, 3, 224, 224]
-    assert spec["inputs"]["mask"]["shape"] == ["batch", 5]
-    worst = verify_export(classifier, out, max_frames=5, patch_size=224, atol=1e-4)
+    backbone, head = tmp_path / "backbone.onnx", tmp_path / "head.onnx"
+    spec = export_classifier(classifier, backbone, head, max_frames=5, patch_size=224)
+    assert spec["backbone"]["inputs"]["patches"]["shape"] == ["batch", 3, 224, 224]
+    assert spec["backbone"]["outputs"]["features"]["shape"] == ["batch", 192]
+    assert spec["head"]["inputs"]["features"]["shape"] == ["batch", 5, 192]
+    assert spec["head"]["inputs"]["mask"]["shape"] == ["batch", 5]
+    worst = verify_export(
+        classifier, backbone, head, max_frames=5, patch_size=224, atol=1e-4
+    )
     assert worst <= 1e-4
     # Export and verify work on deep copies: the caller's model keeps its
     # as-served configuration (fused attention intact).
@@ -140,13 +149,19 @@ def test_onnx_package_contents_and_manifest(model_zip: Path, onnx_zip: Path):
     with zipfile.ZipFile(onnx_zip) as zf:
         names = set(zf.namelist())
         manifest = yaml.safe_load(zf.read(MANIFEST_FILENAME))
-    assert {MANIFEST_FILENAME, CLASSIFIER_ONNX_FILENAME, CONFIG_FILENAME} <= names
-    assert manifest["format_version"] == 1
+    assert {
+        MANIFEST_FILENAME,
+        BACKBONE_ONNX_FILENAME,
+        HEAD_ONNX_FILENAME,
+        CONFIG_FILENAME,
+    } <= names
+    assert manifest["format_version"] == 2
     assert manifest["model_version"] == "9.9.9"
     assert manifest["variant"] == "test"
     assert manifest["source"]["package"] == model_zip.name
     assert len(manifest["source"]["sha256"]) == 64
-    assert manifest["onnx"]["inputs"]["patches"]["dtype"] == "float32"
+    assert manifest["onnx"]["backbone"]["inputs"]["patches"]["dtype"] == "float32"
+    assert manifest["onnx"]["head"]["inputs"]["mask"]["dtype"] == "bool"
     assert manifest["onnx"]["max_abs_logit_diff"] <= 1e-4
     assert "logistic_calibrator" not in manifest
 
@@ -214,3 +229,154 @@ def test_onnx_score_is_numpy_float32(onnx_zip: Path):
     assert logits.shape == (2,)
     assert logits.dtype == np.float32
     assert logits[0] == logits[1]
+
+
+class _CountingSession:
+    """Wraps an onnxruntime session, counting runs and the batch sizes seen."""
+
+    def __init__(self, session) -> None:
+        self._session = session
+        self.batches: list[int] = []
+
+    def run(self, outputs, feeds):
+        self.batches.append(len(next(iter(feeds.values()))))
+        return self._session.run(outputs, feeds)
+
+    def get_outputs(self):
+        return self._session.get_outputs()
+
+
+def _cached_model(
+    onnx_zip: Path, size: int
+) -> tuple[OnnxTemporalModel, _CountingSession]:
+    model = OnnxTemporalModel.from_package(
+        onnx_zip, allow_uncalibrated=True, embedding_cache_size=size
+    )
+    backbone = _CountingSession(model._backbone)
+    model._backbone = backbone
+    return model, backbone
+
+
+def test_cached_predict_matches_and_skips_the_backbone(onnx_zip: Path):
+    frames, dets = _frames(), _gt_detections()
+    plain = OnnxTemporalModel.from_package(onnx_zip, allow_uncalibrated=True)
+    model, backbone = _cached_model(onnx_zip, size=1000)
+
+    ref = plain.predict(frames, frame_detections=dets)
+    first = model.predict(frames, frame_detections=dets)
+    n_slots = sum(backbone.batches)
+    assert n_slots == sum(
+        sum(1 for e in t["entries"] if e["bbox"] is not None)
+        for t in ref.details["tubes"]["kept"]
+    ), "every real slot embedded exactly once, no padded slot"
+    assert (model.cache_hits, model.cache_misses) == (0, n_slots)
+
+    # Same window again: nothing new to embed, same logits.
+    again = model.predict(frames, frame_detections=dets)
+    assert sum(backbone.batches) == n_slots
+    assert model.cache_hits == n_slots
+    kept = lambda out: [t["logit"] for t in out.details["tubes"]["kept"]]  # noqa: E731
+    assert kept(first) == pytest.approx(kept(ref), abs=1e-5)
+    assert kept(again) == kept(first)
+    assert first.details == ref.details
+
+    # The trigger search needs the patches back: it takes the uncached path.
+    model.predict(frames, frame_detections=dets, compute_trigger=True)
+    assert sum(backbone.batches) > n_slots
+
+
+def test_sliding_window_only_embeds_what_changed(onnx_zip: Path):
+    """An engine re-submits its last N frames every round: only new slots cost."""
+    frames = _frames()
+    model, backbone = _cached_model(onnx_zip, size=1000)
+    box = Detection(class_id=0, cx=0.45, cy=0.45, w=0.2, h=0.25, confidence=0.9)
+    same_box = {
+        f.frame_id: FrameDetections(
+            frame_idx=i, frame_id=f.frame_id, timestamp=None, detections=[box]
+        )
+        for i, f in enumerate(frames)
+    }
+    model.predict(frames[:4], frame_detections=same_box)
+    assert backbone.batches == [4]
+    # Window slides by one: the stabilized crop window is unchanged (same box
+    # everywhere), so the three frames still in it come from the cache.
+    out = model.predict(frames[1:], frame_detections=same_box)
+    assert backbone.batches == [4, 1]
+    assert out.details["tubes"]["kept"][0]["entries"][0]["frame_idx"] == 0
+
+    # The fixture's own boxes drift right: dropping the first frame shrinks the
+    # union window, every crop changes, and nothing can be reused (by design:
+    # a cached embedding is only valid for the exact crop it was cut from).
+    dets = _gt_detections()
+    model.predict(frames, frame_detections=dets)
+    model.predict(frames[1:], frame_detections=dets)
+    assert backbone.batches == [4, 1, 5, 4]
+
+
+def test_embedding_cache_is_bounded(onnx_zip: Path):
+    model, backbone = _cached_model(onnx_zip, size=2)
+    frames, dets = _frames(), _gt_detections()
+    model.predict(frames, frame_detections=dets)
+    assert len(model._cache) == 2
+    n = sum(backbone.batches)
+    model.predict(frames, frame_detections=dets)
+    assert sum(backbone.batches) == n + (n - 2), "only the 2 most recent slots survive"
+
+
+def test_cache_requires_split_package(onnx_zip: Path):
+    pkg = load_onnx_package(onnx_zip, allow_uncalibrated=True)
+    with pytest.raises(ValueError, match="format 2"):
+        OnnxTemporalModel(
+            config=pkg.config, classifier=pkg.head, embedding_cache_size=10
+        )
+    with pytest.raises(ValueError, match="either"):
+        OnnxTemporalModel(config=pkg.config, backbone=pkg.backbone)
+
+
+@pytest.fixture(scope="module")
+def onnx_zip_v1(
+    tmp_path_factory: pytest.TempPathFactory, classifier, onnx_zip: Path
+) -> Path:
+    """A format 1 package (one fused classifier.onnx), as published before format 2."""
+    root = tmp_path_factory.mktemp("onnx_v1")
+    fused = copy.deepcopy(classifier).cpu().eval()
+    for module in fused.modules():
+        if hasattr(module, "fused_attn"):
+            module.fused_attn = False
+    graph = root / "classifier.onnx"
+    torch.onnx.export(
+        fused,
+        (torch.zeros(2, 5, 3, 224, 224), torch.ones(2, 5, dtype=torch.bool)),
+        str(graph),
+        input_names=[INPUT_PATCHES, INPUT_MASK],
+        output_names=[OUTPUT_LOGIT],
+        opset_version=18,
+        dynamo=True,
+        dynamic_shapes={INPUT_PATCHES: {0: "batch"}, INPUT_MASK: {0: "batch"}},
+        external_data=False,
+    )
+    out = root / "model_onnx.zip"
+    with zipfile.ZipFile(onnx_zip) as src, zipfile.ZipFile(out, "w") as dst:
+        manifest = yaml.safe_load(src.read(MANIFEST_FILENAME))
+        manifest = {
+            k: v for k, v in manifest.items() if k not in ("backbone_onnx", "head_onnx")
+        }
+        manifest.update(format_version=1, classifier_onnx="classifier.onnx")
+        dst.writestr(MANIFEST_FILENAME, yaml.dump(manifest))
+        dst.write(graph, "classifier.onnx")
+        dst.writestr(CONFIG_FILENAME, src.read(CONFIG_FILENAME))
+    return out
+
+
+def test_format_1_package_still_loads_and_agrees(onnx_zip: Path, onnx_zip_v1: Path):
+    v1 = OnnxTemporalModel.from_package(onnx_zip_v1, allow_uncalibrated=True)
+    v2 = OnnxTemporalModel.from_package(onnx_zip, allow_uncalibrated=True)
+    assert not v1.has_split_graphs and v2.has_split_graphs
+    frames, dets = _frames(), _gt_detections()
+    a = v1.predict(frames, frame_detections=dets).details["tubes"]["kept"]
+    b = v2.predict(frames, frame_detections=dets).details["tubes"]["kept"]
+    assert [t["logit"] for t in a] == pytest.approx([t["logit"] for t in b], abs=1e-4)
+    with pytest.raises(ValueError, match="format 2"):
+        OnnxTemporalModel.from_package(
+            onnx_zip_v1, allow_uncalibrated=True, embedding_cache_size=10
+        )

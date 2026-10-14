@@ -21,7 +21,7 @@ Core building blocks of the bbox-tube temporal smoke classifier. Import as
 - `model.py` — `BboxTubeTemporalModel`, the torch + YOLO backend.
 - `onnx_model.py` — `OnnxTemporalModel`, the onnxruntime backend for `model_onnx.zip`
   (supplied detections only, no torch on its import path).
-- `export_onnx.py` — `temporal-export-onnx`: derive `model_onnx.zip` from a `model.zip`
+- `export_onnx.py` — `temporal-export-onnx`: derive `model_onnx.zip` (backbone + head graphs) from a `model.zip`
   and verify torch/ONNX parity.
 - `package.py` — `model.zip` build/load (YOLO + classifier + calibrator + config)
   and `load_yolo`.
@@ -71,8 +71,11 @@ from huggingface_hub import hf_hub_download
 from temporal_model.core import Detection, FrameDetections
 from temporal_model.core.onnx_model import OnnxTemporalModel
 
-onnx_zip = hf_hub_download("pyronear/temporal-model", "model_onnx.zip", revision="v0.4.0")
-model = OnnxTemporalModel.from_package(Path(onnx_zip))
+onnx_zip = hf_hub_download("pyronear/temporal-model", "model_onnx.zip", revision="v0.6.0")
+# embedding_cache_size: a service that re-scores a sliding window of the same
+# frames every round only pays the ViT for slots it has not embedded yet
+# (format 2 packages, i.e. exported with temporal-export-onnx >= this commit).
+model = OnnxTemporalModel.from_package(Path(onnx_zip), embedding_cache_size=4096)
 
 # Temporally ordered frames (filename order is time order).
 frames = model.load_sequence(sorted(Path("my_sequence").glob("*.jpg")))

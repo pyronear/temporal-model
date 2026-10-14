@@ -33,6 +33,8 @@ __all__ = [
     "pad_frames_uniform",
     "run_yolo_on_frames",
     "filter_and_interpolate_tubes",
+    "tube_crop_boxes",
+    "normalize_patch",
     "crop_tube_patches",
     "make_decision_fn",
     "find_first_crossing_trigger",
@@ -213,6 +215,49 @@ def filter_and_interpolate_tubes(
     return survivors
 
 
+def tube_crop_boxes(
+    tube: Tube,
+    frames: list[Frame],
+    *,
+    context_factor: float,
+    max_frames: int,
+    stabilize: bool = True,
+) -> list[tuple[Frame, tuple[int, int, int, int]] | None]:
+    """Per tube slot (up to ``max_frames``): the frame and its pixel crop box.
+
+    Pure geometry: only the image *size* is read (PIL header, no decode).
+    ``None`` marks an entry without a detection (a zero-padded, masked slot).
+    The crop policy — ``expand_bbox → norm_bbox_to_pixel_square`` on the
+    stabilized window or the per-frame box — lives here only, so every crop
+    path (and any per-slot cache keyed on ``(frame_id, box)``) agrees with
+    the training crop.
+    """
+    frame_by_idx = {i: f for i, f in enumerate(frames)}
+    window = tube_stabilized_window(tube.entries) if stabilize else None
+    out: list[tuple[Frame, tuple[int, int, int, int]] | None] = []
+    for entry in tube.entries[:max_frames]:
+        det = entry.detection
+        if det is None:
+            # Shouldn't happen post-interpolation; leave zero-padded + mask=False.
+            out.append(None)
+            continue
+        frame = frame_by_idx[entry.frame_idx]
+        with Image.open(frame.image_path) as im:
+            img_w, img_h = im.size
+        box_src = window if stabilize else (det.cx, det.cy, det.w, det.h)
+        cx, cy, w, h = expand_bbox(
+            box_src[0], box_src[1], box_src[2], box_src[3], context_factor
+        )
+        out.append((frame, norm_bbox_to_pixel_square(cx, cy, w, h, img_w, img_h)))
+    return out
+
+
+def normalize_patch(patch: np.ndarray, mean: np.ndarray, std: np.ndarray) -> np.ndarray:
+    """uint8 HWC crop -> float32 CHW, as ``torchvision.to_tensor`` then mean/std."""
+    chw = patch.transpose(2, 0, 1).astype(np.float32) / np.float32(255)
+    return (chw - mean) / std
+
+
 def crop_tube_patches(
     tube: Tube,
     frames: list[Frame],
@@ -234,33 +279,26 @@ def crop_tube_patches(
 
     Returns ``(patches[max_frames, 3, P, P] float32, mask[max_frames] bool)``.
     """
-    frame_by_idx = {i: f for i, f in enumerate(frames)}
-
-    n = min(len(tube.entries), max_frames)
     patches = np.zeros((max_frames, 3, patch_size, patch_size), dtype=np.float32)
     mask = np.zeros(max_frames, dtype=bool)
     mean = np.asarray(normalization_mean, dtype=np.float32).reshape(3, 1, 1)
     std = np.asarray(normalization_std, dtype=np.float32).reshape(3, 1, 1)
 
-    window = tube_stabilized_window(tube.entries) if stabilize else None
-
-    for slot, entry in enumerate(tube.entries[:n]):
-        det = entry.detection
-        if det is None:
-            # Shouldn't happen post-interpolation; leave zero-padded + mask=False.
+    slots = tube_crop_boxes(
+        tube,
+        frames,
+        context_factor=context_factor,
+        max_frames=max_frames,
+        stabilize=stabilize,
+    )
+    for slot, item in enumerate(slots):
+        if item is None:
             continue
-        frame = frame_by_idx[entry.frame_idx]
+        frame, box = item
         image = np.array(Image.open(frame.image_path).convert("RGB"))
-        img_h, img_w, _ = image.shape
-
-        box_src = window if stabilize else (det.cx, det.cy, det.w, det.h)
-        cx, cy, w, h = expand_bbox(
-            box_src[0], box_src[1], box_src[2], box_src[3], context_factor
+        patches[slot] = normalize_patch(
+            crop_and_resize(image, box, patch_size), mean, std
         )
-        box = norm_bbox_to_pixel_square(cx, cy, w, h, img_w, img_h)
-        patch_np = crop_and_resize(image, box, patch_size)
-        patch = patch_np.transpose(2, 0, 1).astype(np.float32) / np.float32(255)
-        patches[slot] = (patch - mean) / std
         mask[slot] = True
 
     return patches, mask
