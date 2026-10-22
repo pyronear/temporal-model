@@ -12,7 +12,7 @@ never runs the model.
 
 ## Prerequisites
 
-- Node.js 24.22.1 (pinned in `.nvmrc`) and npm.
+- Node.js 22.23.4 (pinned in `.nvmrc`) and npm.
 - A populated eval reporting tree (`<DATA_ROOT>/data/08_reporting/...`) and the frame images it
   points at. Generate with `uv run dvc repro` in `eval/`, or `dvc pull`.
 

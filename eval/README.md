@@ -43,7 +43,7 @@ filters appear only for sources that carry that metadata.
 
 A polished React/Next.js + Tailwind port of the same viewer lives in
 [`viewer/`](../viewer) and reads the identical reporting tree (it never runs the
-model). It needs Node.js 24.22.1 (pinned in `viewer/.nvmrc`) and a populated
+model). It needs Node.js 22.23.4 (pinned in `viewer/.nvmrc`) and a populated
 reporting tree — pull the packaged model and artifacts first (same as the
 Streamlit app):
 
