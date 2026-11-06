@@ -318,6 +318,8 @@ def test_embedding_cache_is_bounded(onnx_zip: Path):
     frames, dets = _frames(), _gt_detections()
     model.predict(frames, frame_detections=dets)
     assert len(model._cache) == 2
+    # Each entry owns its memory: a view would pin the whole backbone batch.
+    assert all(feat.base is None for feat in model._cache.values())
     n = sum(backbone.batches)
     model.predict(frames, frame_detections=dets)
     assert sum(backbone.batches) == n + (n - 2), "only the 2 most recent slots survive"
