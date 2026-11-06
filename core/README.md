@@ -71,10 +71,10 @@ from huggingface_hub import hf_hub_download
 from temporal_model.core import Detection, FrameDetections
 from temporal_model.core.onnx_model import OnnxTemporalModel
 
-onnx_zip = hf_hub_download("pyronear/temporal-model", "model_onnx.zip", revision="v0.6.0")
+onnx_zip = hf_hub_download("pyronear/temporal-model", "model_onnx.zip", revision="v0.6.1")
 # embedding_cache_size: a service that re-scores a sliding window of the same
 # frames every round only pays the ViT for slots it has not embedded yet
-# (format 2 packages, i.e. exported with temporal-export-onnx >= this commit).
+# (format 2 packages, published from model v0.6.1 on).
 model = OnnxTemporalModel.from_package(Path(onnx_zip), embedding_cache_size=4096)
 
 # Temporally ordered frames (filename order is time order).
