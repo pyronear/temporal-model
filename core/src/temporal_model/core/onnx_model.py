@@ -262,7 +262,8 @@ class OnnxTemporalModel(TubePipelineModel):
     def _remember(self, key: CacheKey, feat: np.ndarray) -> None:
         if self._cache is None:
             return
-        # Copy: `feat` is a row view of the whole backbone batch, which eviction would never free.
+        # Copy: `feat` is a row view of the whole backbone batch,
+        # which eviction would never free.
         self._cache[key] = feat.copy()
         while len(self._cache) > self._cache_size:
             self._cache.popitem(last=False)
