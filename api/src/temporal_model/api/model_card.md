@@ -68,7 +68,11 @@ out = model.predict(frames, frame_detections=detections)
 ```
 
 The manifest of `model_onnx.zip` records the SHA-256 of the `model.zip` it was
-exported from and the measured torch/ONNX logit difference.
+exported from and the measured torch/ONNX logit difference. Packages exported
+as two graphs (`backbone.onnx` + `head.onnx`, `format_version: 2`) embed only
+real frames and can keep per-frame embeddings across calls
+(`OnnxTemporalModel.from_package(..., embedding_cache_size=N)`), which is
+what a service re-scoring a sliding window of frames wants.
 
 ## Usage
 

@@ -3,14 +3,20 @@
 The ONNX package is the torch-free runtime artifact consumed by
 :class:`~temporal_model.core.onnx_model.OnnxTemporalModel`. It is derived from
 a released ``model.zip`` and published next to it under the same HuggingFace
-tag. Contents:
+tag. Contents (format 2):
 
 - ``manifest.yaml`` — format version, file pointers, source ``model.zip``
   identity (SHA-256) and the ONNX I/O contract (names, shapes, dtypes, opset).
-- ``classifier.onnx`` — the classifier with a dynamic batch axis:
-  ``patches[N, max_frames, 3, P, P]`` + ``mask[N, max_frames]`` → ``logit[N]``.
+- ``backbone.onnx`` — per-frame embedding with a dynamic batch axis:
+  ``patches[M, 3, P, P]`` → ``features[M, D]``.
+- ``head.onnx`` — the temporal head with a dynamic batch axis:
+  ``features[N, max_frames, D]`` + ``mask[N, max_frames]`` → ``logit[N]``.
 - ``config.yaml`` and ``logistic_calibrator.json`` — copied verbatim from the
   source package.
+
+Splitting the classifier lets the runtime embed only real (unmasked) slots and
+cache embeddings per frame across calls; see
+``docs/specs/2026-10-14-onnx-embedding-cache-design.md``.
 
 Requires the ``torch`` extra (``torch``, ``timm``, ``onnx``, ``onnxscript``).
 Design: ``docs/specs/2026-09-09-onnx-export-design.md``.
@@ -29,11 +35,15 @@ import torch
 import yaml
 
 from .onnx_model import (
-    CLASSIFIER_ONNX_FILENAME,
+    BACKBONE_ONNX_FILENAME,
+    HEAD_ONNX_FILENAME,
+    INPUT_FEATURES,
     INPUT_MASK,
     INPUT_PATCHES,
     ONNX_FORMAT_VERSION,
+    OUTPUT_FEATURES,
     OUTPUT_LOGIT,
+    score_split,
 )
 from .onnx_model import (
     MANIFEST_FILENAME as ONNX_MANIFEST_FILENAME,
@@ -71,63 +81,107 @@ def _mask_pattern(name: str, max_frames: int) -> np.ndarray:
     return mask
 
 
-def _io_spec(max_frames: int, patch_size: int) -> dict[str, Any]:
+def _io_spec(max_frames: int, patch_size: int, feat_dim: int) -> dict[str, Any]:
     return {
         "opset": OPSET_VERSION,
-        "inputs": {
-            INPUT_PATCHES: {
-                "shape": ["batch", max_frames, 3, patch_size, patch_size],
-                "dtype": "float32",
+        "backbone": {
+            "inputs": {
+                INPUT_PATCHES: {
+                    "shape": ["batch", 3, patch_size, patch_size],
+                    "dtype": "float32",
+                }
             },
-            INPUT_MASK: {"shape": ["batch", max_frames], "dtype": "bool"},
+            "outputs": {
+                OUTPUT_FEATURES: {"shape": ["batch", feat_dim], "dtype": "float32"}
+            },
         },
-        "outputs": {OUTPUT_LOGIT: {"shape": ["batch"], "dtype": "float32"}},
+        "head": {
+            "inputs": {
+                INPUT_FEATURES: {
+                    "shape": ["batch", max_frames, feat_dim],
+                    "dtype": "float32",
+                },
+                INPUT_MASK: {"shape": ["batch", max_frames], "dtype": "bool"},
+            },
+            "outputs": {OUTPUT_LOGIT: {"shape": ["batch"], "dtype": "float32"}},
+        },
     }
+
+
+def _export(
+    module: torch.nn.Module,
+    args: tuple[torch.Tensor, ...],
+    output_path: Path,
+    *,
+    input_names: list[str],
+    output_names: list[str],
+) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    torch.onnx.export(
+        module,
+        args,
+        str(output_path),
+        input_names=input_names,
+        output_names=output_names,
+        opset_version=OPSET_VERSION,
+        dynamo=True,
+        # Positional (one spec per arg): keyed specs must match the forward's own
+        # parameter names, which differ between the backbone (x) and head (feats).
+        dynamic_shapes=tuple({0: "batch"} for _ in args),
+        external_data=False,  # single self-contained file, loadable from bytes
+    )
+    onnx.checker.check_model(str(output_path))
 
 
 def export_classifier(
     classifier: torch.nn.Module,
-    output_path: Path,
+    backbone_path: Path,
+    head_path: Path,
     *,
     max_frames: int,
     patch_size: int,
 ) -> dict[str, Any]:
-    """Export ``classifier`` to ``output_path``; return the I/O spec.
+    """Export ``classifier.backbone`` and ``classifier.head``; return the I/O spec.
 
-    The batch axis is dynamic (one ``session.run`` scores all tubes); the
-    frame/patch axes are fixed. Exports a deep copy on CPU in eval mode with
-    fused attention disabled (timm's fused kernels and the
-    ``nn.TransformerEncoder`` fast path do not trace portably) — the caller's
-    module is never touched. Runs the ONNX checker on the result.
+    Both graphs get a dynamic batch axis (the backbone batch is "slots to
+    embed", the head batch is "tubes"); the frame/patch/feature axes are
+    fixed. Exports a deep copy on CPU in eval mode with fused attention
+    disabled (timm's fused kernels and the ``nn.TransformerEncoder`` fast
+    path do not trace portably) — the caller's module is never touched. Runs
+    the ONNX checker on both results.
     """
     classifier = copy.deepcopy(classifier).cpu().eval()
     for module in classifier.modules():
         if hasattr(module, "fused_attn"):
             module.fused_attn = False
+    feat_dim = int(classifier.backbone.feat_dim)
 
-    # Batch-2 example input: a batch-1 example lets the tracer fold the size-1
+    # Batch-2 example inputs: a batch-1 example lets the tracer fold the size-1
     # batch dim into reshapes, specializing the graph so batch > 1 fails at run.
-    patches = torch.zeros(2, max_frames, 3, patch_size, patch_size)
-    mask = torch.ones(2, max_frames, dtype=torch.bool)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    torch.onnx.export(
-        classifier,
-        (patches, mask),
-        str(output_path),
-        input_names=[INPUT_PATCHES, INPUT_MASK],
-        output_names=[OUTPUT_LOGIT],
-        opset_version=OPSET_VERSION,
-        dynamo=True,
-        dynamic_shapes={INPUT_PATCHES: {0: "batch"}, INPUT_MASK: {0: "batch"}},
-        external_data=False,  # single self-contained file, loadable from bytes
+    _export(
+        classifier.backbone,
+        (torch.zeros(2, 3, patch_size, patch_size),),
+        backbone_path,
+        input_names=[INPUT_PATCHES],
+        output_names=[OUTPUT_FEATURES],
     )
-    onnx.checker.check_model(str(output_path))
-    return _io_spec(max_frames, patch_size)
+    _export(
+        classifier.head,
+        (
+            torch.zeros(2, max_frames, feat_dim),
+            torch.ones(2, max_frames, dtype=torch.bool),
+        ),
+        head_path,
+        input_names=[INPUT_FEATURES, INPUT_MASK],
+        output_names=[OUTPUT_LOGIT],
+    )
+    return _io_spec(max_frames, patch_size, feat_dim)
 
 
 def verify_export(
     classifier: torch.nn.Module,
-    onnx_path: Path,
+    backbone_path: Path,
+    head_path: Path,
     *,
     max_frames: int,
     patch_size: int,
@@ -137,10 +191,11 @@ def verify_export(
     """Compare torch vs onnxruntime logits on random patches; return the max abs diff.
 
     The torch reference is a deep copy in its as-served configuration (fused
-    attention untouched), so parity is measured against the production torch
-    path, not the export-friendly variant. Each mask pattern is checked at
-    batch 1, then all patterns together as one batch to exercise the dynamic
-    batch axis.
+    attention untouched, every slot through the backbone), so parity is
+    measured against the production torch path — and the runtime's shortcut
+    of embedding only unmasked slots is checked along the way. Each mask
+    pattern is checked at batch 1, then all patterns together as one batch
+    to exercise the dynamic batch axis.
 
     Raises:
         ValueError: if any mask pattern (or the batched pass) disagrees by
@@ -148,7 +203,9 @@ def verify_export(
     """
     import onnxruntime as ort  # noqa: PLC0415  # runtime-only dependency
 
-    session = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
+    providers = ["CPUExecutionProvider"]
+    backbone = ort.InferenceSession(str(backbone_path), providers=providers)
+    head = ort.InferenceSession(str(head_path), providers=providers)
     classifier = copy.deepcopy(classifier).cpu().eval()
     rng = np.random.default_rng(seed)
     xs, ms = [], []
@@ -162,7 +219,7 @@ def verify_export(
         ms.append(m)
         with torch.no_grad():
             ref = classifier(torch.from_numpy(x), torch.from_numpy(m)).numpy()
-        got = session.run([OUTPUT_LOGIT], {INPUT_PATCHES: x, INPUT_MASK: m})[0]
+        got = score_split(backbone, head, x, m)
         diff = float(np.abs(ref - got).max())
         worst = max(worst, diff)
         if diff > atol:
@@ -174,7 +231,7 @@ def verify_export(
     x_batch, m_batch = np.concatenate(xs), np.concatenate(ms)
     with torch.no_grad():
         ref = classifier(torch.from_numpy(x_batch), torch.from_numpy(m_batch)).numpy()
-    got = session.run([OUTPUT_LOGIT], {INPUT_PATCHES: x_batch, INPUT_MASK: m_batch})[0]
+    got = score_split(backbone, head, x_batch, m_batch)
     diff = float(np.abs(ref - got).max())
     worst = max(worst, diff)
     if diff > atol:
@@ -213,14 +270,20 @@ def build_onnx_package(
         calibrator_bytes = zf.read(calibrator_name) if calibrator_name else None
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    onnx_path = output_path.with_suffix(".onnx.tmp")
+    backbone_path = output_path.with_suffix(".backbone.onnx.tmp")
+    head_path = output_path.with_suffix(".head.onnx.tmp")
     try:
         io_spec = export_classifier(
-            pkg.classifier, onnx_path, max_frames=max_frames, patch_size=patch_size
+            pkg.classifier,
+            backbone_path,
+            head_path,
+            max_frames=max_frames,
+            patch_size=patch_size,
         )
         io_spec["max_abs_logit_diff"] = verify_export(
             pkg.classifier,
-            onnx_path,
+            backbone_path,
+            head_path,
             max_frames=max_frames,
             patch_size=patch_size,
             atol=atol,
@@ -228,7 +291,8 @@ def build_onnx_package(
 
         manifest: dict[str, Any] = {
             "format_version": ONNX_FORMAT_VERSION,
-            "classifier_onnx": CLASSIFIER_ONNX_FILENAME,
+            "backbone_onnx": BACKBONE_ONNX_FILENAME,
+            "head_onnx": HEAD_ONNX_FILENAME,
             "config": CONFIG_FILENAME,
             "source": {
                 "package": model_zip.name,
@@ -246,12 +310,14 @@ def build_onnx_package(
             zf.writestr(
                 ONNX_MANIFEST_FILENAME, yaml.dump(manifest, default_flow_style=False)
             )
-            zf.write(onnx_path, CLASSIFIER_ONNX_FILENAME)
+            zf.write(backbone_path, BACKBONE_ONNX_FILENAME)
+            zf.write(head_path, HEAD_ONNX_FILENAME)
             zf.writestr(CONFIG_FILENAME, config_bytes)
             if calibrator_bytes is not None:
                 zf.writestr(LOGISTIC_CALIBRATOR_FILENAME, calibrator_bytes)
     finally:
-        onnx_path.unlink(missing_ok=True)
+        backbone_path.unlink(missing_ok=True)
+        head_path.unlink(missing_ok=True)
     return output_path.resolve()
 
 

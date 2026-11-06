@@ -39,7 +39,7 @@ from .protocol import Frame, TemporalModel, TemporalModelOutput
 from .stabilize import tube_stabilized_window
 from .stage_timer import StageTimer, stage_ctx
 from .tubes import build_tubes, tube_intersects_roi, validate_roi
-from .types import FrameDetections
+from .types import FrameDetections, Tube
 
 __all__ = [
     "TubePipelineModel",
@@ -138,6 +138,46 @@ class TubePipelineModel(TemporalModel):
     def _score(self, patches: np.ndarray, mask: np.ndarray) -> np.ndarray:
         """Score tubes: ``patches[N,T,3,H,W] float32, mask[N,T] bool -> logits[N]``."""
         raise NotImplementedError
+
+    def _crop_and_score(
+        self,
+        kept: list[Tube],
+        frames: list[Frame],
+        *,
+        timer: StageTimer | None,
+        keep_patches: bool,
+    ) -> tuple[np.ndarray, list[np.ndarray], list[np.ndarray]]:
+        """The ``crop`` + ``classifier`` stages over every kept tube.
+
+        Returns ``(logits[N], patches_per_tube, masks_per_tube)``. The patch
+        lists are only consumed by the trigger search; a backend may return
+        them empty when ``keep_patches`` is False (e.g. to score from cached
+        per-frame embeddings without materialising every crop).
+        """
+        mi = self._cfg["model_input"]
+        clf_cfg = self._cfg["classifier"]
+        patches_per_tube: list[np.ndarray] = []
+        masks_per_tube: list[np.ndarray] = []
+        with stage_ctx(timer, "crop"):
+            for t in kept:
+                p, m = crop_tube_patches(
+                    t,
+                    frames,
+                    context_factor=mi["context_factor"],
+                    patch_size=mi["patch_size"],
+                    max_frames=clf_cfg["max_frames"],
+                    normalization_mean=mi["normalization"]["mean"],
+                    normalization_std=mi["normalization"]["std"],
+                    stabilize=mi.get("stabilize", True),
+                )
+                patches_per_tube.append(p)
+                masks_per_tube.append(m)
+
+        with stage_ctx(timer, "classifier"):
+            logits = self._score(
+                np.stack(patches_per_tube, axis=0), np.stack(masks_per_tube, axis=0)
+            )
+        return logits, patches_per_tube, masks_per_tube
 
     def _resolve_frame_detections(
         self,
@@ -295,27 +335,9 @@ class TubePipelineModel(TemporalModel):
                 ),
             )
 
-        patches_per_tube: list[np.ndarray] = []
-        masks_per_tube: list[np.ndarray] = []
-        with stage_ctx(timer, "crop"):
-            for t in kept:
-                p, m = crop_tube_patches(
-                    t,
-                    truncated,
-                    context_factor=mi["context_factor"],
-                    patch_size=mi["patch_size"],
-                    max_frames=clf_cfg["max_frames"],
-                    normalization_mean=mi["normalization"]["mean"],
-                    normalization_std=mi["normalization"]["std"],
-                    stabilize=mi.get("stabilize", True),
-                )
-                patches_per_tube.append(p)
-                masks_per_tube.append(m)
-
-        with stage_ctx(timer, "classifier"):
-            logits = self._score(
-                np.stack(patches_per_tube, axis=0), np.stack(masks_per_tube, axis=0)
-            )
+        logits, patches_per_tube, masks_per_tube = self._crop_and_score(
+            kept, truncated, timer=timer, keep_patches=compute_trigger
+        )
 
         with stage_ctx(timer, "trigger_search"):
             if compute_trigger:
