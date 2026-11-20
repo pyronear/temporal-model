@@ -43,8 +43,9 @@ filters appear only for sources that carry that metadata.
 
 A polished React/Next.js + Tailwind port of the same viewer lives in
 [`viewer/`](../viewer) and reads the identical reporting tree (it never runs the
-model). It needs Node 22+ and a populated reporting tree — pull the packaged
-model and artifacts first (same as the Streamlit app):
+model). It needs Node.js 22.23.4 (pinned in `viewer/.nvmrc`) and a populated
+reporting tree — pull the packaged model and artifacts first (same as the
+Streamlit app):
 
 ```bash
 # from eval/: fetch model.zip + raw sequences + reporting tree from the DVC remote

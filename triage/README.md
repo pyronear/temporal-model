@@ -34,8 +34,9 @@ not ~290k loose files). Browsing needs only S3 read access (`AWS_PROFILE=pyronea
 — no annotator credentials, no `model.zip`, no GPU, no Docker.
 
 **Prerequisites:** this repo checked out on the branch holding `data/02_shards.dvc`
-(until merged), `uv` + Node 22 + `npm`, the `pyronear` AWS profile configured, and
-**~55 GB free disk** (26 GB DVC cache + 26 GB unpacked working tree). Then:
+(until merged), `uv` + Node.js 22.23.4 (pinned in `viewer/.nvmrc`) + `npm`, the
+`pyronear` AWS profile configured, and **~55 GB free disk** (26 GB DVC cache +
+26 GB unpacked working tree). Then:
 
 ```bash
 cd triage
