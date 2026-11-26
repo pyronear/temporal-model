@@ -96,6 +96,20 @@ probs = [t["probability"] for t in kept if t["probability"] is not None]
 print("smoke probability:", max(probs) if probs else 0.0)
 ```
 
+Frames already held in memory need no file: build them from the encoded
+bytes instead of calling `load_sequence`.
+
+```python
+from temporal_model.core import Frame
+from temporal_model.core.protocol import parse_timestamp
+
+# jpegs: temporally ordered (frame_id, JPEG bytes) pairs
+frames = [
+    Frame(frame_id=frame_id, image_bytes=data, timestamp=parse_timestamp(frame_id))
+    for frame_id, data in jpegs
+]
+```
+
 To run the ONNX session on a GPU, install `onnxruntime-gpu` and pass
 `providers=["CUDAExecutionProvider", "CPUExecutionProvider"]` to
 `from_package`.

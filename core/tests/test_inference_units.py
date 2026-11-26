@@ -98,6 +98,16 @@ class TestRunYoloOnFrames:
             frame_idx=1, frame_id="f1", timestamp=None, detections=[]
         )
 
+    def test_in_memory_frame_is_refused(self) -> None:
+        yolo = MagicMock()
+        frames = [Frame(frame_id="f0", image_bytes=b"jpeg")]
+
+        with pytest.raises(ValueError, match="no image_path"):
+            run_yolo_on_frames(
+                yolo, frames, confidence_threshold=0.01, iou_nms=0.2, image_size=1024
+            )
+        yolo.predict.assert_not_called()
+
     def test_empty_frames_returns_empty(self) -> None:
         yolo = MagicMock()
         yolo.predict.return_value = []
@@ -234,6 +244,38 @@ class TestCropTubePatches:
         assert patches.dtype == np.float32
         assert mask.shape == (5,)
         assert mask.tolist() == [True, True, True, False, False]
+
+    def test_in_memory_frames_match_files(
+        self, gradient_image_sequence: list[Path]
+    ) -> None:
+        tube = _tube(0, [(i, _det(cx=0.3 + 0.1 * i, w=0.2, h=0.2)) for i in range(3)])
+        kwargs = dict(
+            context_factor=1.5,
+            patch_size=64,
+            max_frames=5,
+            normalization_mean=[0.485, 0.456, 0.406],
+            normalization_std=[0.229, 0.224, 0.225],
+        )
+        from_files = crop_tube_patches(
+            tube,
+            [Frame(frame_id=p.stem, image_path=p) for p in gradient_image_sequence],
+            **kwargs,
+        )
+        from_memory = crop_tube_patches(
+            tube,
+            [
+                Frame(frame_id=p.stem, image_bytes=p.read_bytes())
+                for p in gradient_image_sequence
+            ],
+            **kwargs,
+        )
+        assert from_memory[1].tolist() == [True, True, True, False, False]
+        np.testing.assert_array_equal(from_memory[0], from_files[0])
+        np.testing.assert_array_equal(from_memory[1], from_files[1])
+
+    def test_frame_without_image_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="neither image_bytes nor image_path"):
+            Frame(frame_id="f0").image_source()
 
     def test_padding_slots_are_zero(self, red_image_sequence: list[Path]) -> None:
         frames = [

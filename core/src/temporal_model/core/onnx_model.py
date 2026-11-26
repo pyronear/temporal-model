@@ -323,7 +323,9 @@ class OnnxTemporalModel(TubePipelineModel):
                     self.cache_misses += 1
                     image = decoded.get(frame.frame_id)
                     if image is None:
-                        image = np.array(Image.open(frame.image_path).convert("RGB"))
+                        image = np.array(
+                            Image.open(frame.image_source()).convert("RGB")
+                        )
                         decoded[frame.frame_id] = image
                     patches.append(
                         normalize_patch(
