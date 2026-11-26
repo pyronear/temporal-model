@@ -195,6 +195,22 @@ def test_predict_parity_with_torch_backend(classifier, onnx_zip: Path):
     assert got.details["decision"] == ref.details["decision"]
 
 
+def test_predict_from_image_bytes_matches_files(onnx_zip: Path):
+    frames = _frames()
+    in_memory = [
+        Frame(frame_id=f.frame_id, image_bytes=f.image_path.read_bytes())
+        for f in frames
+    ]
+    dets = _gt_detections()
+    model = OnnxTemporalModel.from_package(onnx_zip, allow_uncalibrated=True)
+
+    ref = model.predict(frames, frame_detections=dets)
+    got = model.predict(in_memory, frame_detections=dets)
+
+    assert len(ref.details["tubes"]["kept"]) >= 1
+    assert got.details == ref.details
+
+
 def test_trigger_search_runs_on_onnx_backend(onnx_zip: Path):
     onnx_model = OnnxTemporalModel.from_package(onnx_zip, allow_uncalibrated=True)
     out = onnx_model.predict(

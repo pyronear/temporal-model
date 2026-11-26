@@ -138,6 +138,13 @@ def run_yolo_on_frames(
     if not frames:
         return []
 
+    for f in frames:
+        if f.image_path is None:
+            raise ValueError(
+                f"the bundled detector reads image files: frame {f.frame_id!r} "
+                "has no image_path. Give the frames an image_path or pass "
+                "frame_detections to predict()."
+            )
     paths = [str(f.image_path) for f in frames]
     predict_kwargs: dict[str, Any] = dict(
         conf=confidence_threshold,
@@ -242,7 +249,7 @@ def tube_crop_boxes(
             out.append(None)
             continue
         frame = frame_by_idx[entry.frame_idx]
-        with Image.open(frame.image_path) as im:
+        with Image.open(frame.image_source()) as im:
             img_w, img_h = im.size
         box_src = window if stabilize else (det.cx, det.cy, det.w, det.h)
         cx, cy, w, h = expand_bbox(
@@ -295,7 +302,7 @@ def crop_tube_patches(
         if item is None:
             continue
         frame, box = item
-        image = np.array(Image.open(frame.image_path).convert("RGB"))
+        image = np.array(Image.open(frame.image_source()).convert("RGB"))
         patches[slot] = normalize_patch(
             crop_and_resize(image, box, patch_size), mean, std
         )

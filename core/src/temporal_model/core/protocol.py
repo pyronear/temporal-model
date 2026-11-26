@@ -8,6 +8,7 @@ detection models implement. Uses a template-method pattern:
 (overridable) and :meth:`TemporalModel.predict` (abstract).
 """
 
+import io
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -23,13 +24,28 @@ class Frame:
 
     Attributes:
         frame_id: Unique identifier, typically the image filename stem.
-        image_path: Path to the frame image file.
+        image_path: Path to the frame image file, or ``None`` for a frame
+            held in memory.
         timestamp: Capture time, or ``None`` if it cannot be parsed.
+        image_bytes: Encoded image (e.g. JPEG) held in memory. Takes
+            precedence over ``image_path`` when both are set.
     """
 
     frame_id: str
-    image_path: Path
+    image_path: Path | None = None
     timestamp: datetime | None = None
+    image_bytes: bytes | None = None
+
+    def image_source(self) -> Path | io.BytesIO:
+        """What ``PIL.Image.open`` should read: a fresh buffer over
+        ``image_bytes`` when set, else ``image_path``."""
+        if self.image_bytes is not None:
+            return io.BytesIO(self.image_bytes)
+        if self.image_path is None:
+            raise ValueError(
+                f"frame {self.frame_id!r} has neither image_bytes nor image_path"
+            )
+        return self.image_path
 
 
 @dataclass
